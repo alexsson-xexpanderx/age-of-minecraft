@@ -169,6 +169,11 @@ def test_find_game(tmp: Path):
     unpacked.parent.mkdir(parents=True)
     assert build_mod.find_game(unpacked) == game
     assert build_mod.is_game(game) and not build_mod.is_game(tmp)
+    build_mod.SEARCH_FOLDERS.append(str(tmp))  # e.g. C:\\Games\\Age Of Empires II Gold Edition
+    try:
+        assert build_mod.find_game(tmp / "elsewhere" / "build_mod.py") == game
+    finally:
+        build_mod.SEARCH_FOLDERS.pop()
 
 
 def test_direct_mode_and_restore(tmp: Path):

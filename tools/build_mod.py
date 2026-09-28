@@ -172,14 +172,28 @@ def is_game(folder: Path) -> bool:
     return data is not None and pick(data, "graphics.drs") is not None
 
 
+SEARCH_FOLDERS = [r"C:\Games", r"D:\Games", r"E:\Games", r"C:\Program Files (x86)", r"C:\Program Files",
+                  r"C:\Program Files (x86)\Microsoft Games", r"C:\Program Files\Microsoft Games", "C:\\", "D:\\"]
+
+
 def find_game(start: Path = Path(__file__).resolve()) -> Optional[Path]:
-    """The game folder: one this mod was unpacked into, or a usual install location."""
+    """The game folder: one this mod was unpacked into, a usual install location, or any
+    'Age of Empires...' folder in the usual places (e.g. C:\\Games\\Age Of Empires II Gold Edition)."""
     for folder in [start, *start.parents]:
         if is_game(folder):
             return folder
     for c in COMMON_INSTALLS:
         if is_game(Path(c)):
             return Path(c)
+    for base in map(Path, SEARCH_FOLDERS):
+        try:
+            children = sorted(base.iterdir()) if base.is_dir() else []
+        except OSError:
+            continue
+        for child in children:
+            name = child.name.lower()
+            if ("age of empires" in name or "aoe" in name or "age2" in name) and is_game(child):
+                return child
     return None
 
 
