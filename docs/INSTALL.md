@@ -79,13 +79,13 @@ next to `build_mod.bat`. You have two options:
 * All unit sprites are replaced: standing, walking, attacking, dying and
   decaying, plus villager work and carry animations. Male and female
   villagers share the Minecraft villager models.
-* Some original sprites are built from several layers, such as ram heads and
-  wheels, ship sails, and the war wagon. The build hides the extra layers
-  where the `.dat` shows they belong only to the replaced unit. These units
-  are the most likely to look wrong in the first test.
-* The Halberdier, Petard, Javelina, Elite Eagle Warrior and Elite Cannon
-  Galleon aren't mapped yet. Their original sprite ids will be picked out of
-  your `aom_report.txt`.
+* Original sprites are built in layers: a main sprite with a layer drawn
+  before and after it, and for ships a hull, a shadow and up to seven sails.
+  The build reads these layers from your `.dat` and hides the extra ones, so
+  only the Minecraft sprite shows.
+* The Halberdier, Javelina and Elite Eagle Warrior are found by their
+  internal names in your `.dat`. If they still look original, your
+  `aom_report.txt` shows their names so they can be mapped exactly.
 * Unit names in the game are unchanged for now.
 * Buildings are unchanged; they come after the units.
 

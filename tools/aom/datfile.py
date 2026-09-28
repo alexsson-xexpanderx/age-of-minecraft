@@ -111,5 +111,5 @@ def read_graphics(raw_or_path) -> dict[int, Graphic]:
 def _check(g: Graphic) -> None:
     """Sanity checks so a mis-parse fails loudly instead of producing bad sprites."""
     printable = all(32 <= ord(c) < 127 for c in g.name + g.filename)
-    if not printable or not (-1 <= g.slp < 70000) or not (0 <= g.frame_count < 1000) or not (0 <= g.angle_count <= 64):
+    if not printable or not (-1 <= g.slp < 70000) or not (0 <= g.frame_count < 5000) or not (0 <= g.angle_count <= 720):
         raise ValueError(f"graphics table looks wrong at graphic {g.id}: {g}")

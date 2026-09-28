@@ -56,12 +56,16 @@ TARGETS: list[Target] = [
     Target(1431, "villager_hunter", "walk", "female"), Target(1877, "villager_hunter", "carry", "female meat"),
     Target(1878, "villager_hunter", "work", "female butcher"),
     # miners (gold and stone share the pick; only the carried block differs)
-    *_set("villager_gold_miner", 1560, 1555, 1558, 1559, 1563),
+    *_set("villager_stone_miner", 1560, 1555, 1558, 1559, 1563),
     Target(2117, "villager_gold_miner", "carry", "male gold"), Target(1552, "villager_stone_miner", "carry", "male stone"),
-    Target(1880, "villager_gold_miner", "attack", "female"), Target(1450, "villager_gold_miner", "die", "female"),
-    Target(1453, "villager_gold_miner", "idle", "female"), Target(1454, "villager_gold_miner", "decay", "female"),
-    Target(1457, "villager_gold_miner", "walk", "female"), Target(2118, "villager_gold_miner", "carry", "female gold"),
+    Target(1880, "villager_stone_miner", "attack", "female"), Target(1450, "villager_stone_miner", "die", "female"),
+    Target(1453, "villager_stone_miner", "idle", "female"), Target(1454, "villager_stone_miner", "decay", "female"),
+    Target(1457, "villager_stone_miner", "walk", "female"), Target(2218, "villager_gold_miner", "carry", "female gold"),
     Target(1879, "villager_stone_miner", "carry", "female stone"),
+    Target(3425, "villager_gold_miner", "die", "male"), Target(3428, "villager_gold_miner", "idle", "male"),
+    Target(3429, "villager_gold_miner", "decay", "male"), Target(3432, "villager_gold_miner", "walk", "male"),
+    Target(3412, "villager_gold_miner", "die", "female"), Target(3415, "villager_gold_miner", "idle", "female"),
+    Target(3416, "villager_gold_miner", "decay", "female"), Target(3419, "villager_gold_miner", "walk", "female"),
     # lumberjack
     *_set("villager_lumberjack", 1535, 1539, 1542, 1544, 1548),
     Target(1545, "villager_lumberjack", "attack", "male, second copy"),
@@ -91,11 +95,12 @@ TARGETS: list[Target] = [
     Target(3980, "villager_fisherman", "carry", "male fish"),
     # monks and king
     *_set("monk", 768, 771, 774, 775, 779), Target(776, "monk", "attack", "second copy"),
+    Target(3824, "monk", "die", "with relic"), Target(3827, "monk", "idle", "with relic"),
+    Target(3831, "monk", "walk", "with relic"),
     Target(4865, "missionary", "attack"), Target(4869, "missionary", "attack", "heal"),
     Target(4866, "missionary", "die"), Target(4867, "missionary", "idle"), Target(4868, "missionary", "decay"),
     Target(4870, "missionary", "walk"),
-    Target(1764, "king", "die"), Target(1767, "king", "idle"), Target(1768, "king", "decay"),
-    Target(1771, "king", "walk"),
+    *_std("king", 1761),
     # ---------------------------------------------------------------- infantry
     *_std("militia", 987), *_std("man_at_arms", 1038), *_std("long_swordsman", 1175),
     *_std("two_handed", 2800), *_std("champion", 3085),
@@ -111,7 +116,7 @@ TARGETS: list[Target] = [
     *_std("camel", 676), *_std("heavy_camel", 2762),
     *_std("cavalry_archer", 320), *_std("heavy_cavalry_archer", 3757),
     # ---------------------------------------------------------------- unique units
-    *_std("longbowman", 702), *_std("cataphract", 199), *_std("woad_raider", 1592), *_std("chu_ko_nu", 215),
+    *_set("longbowman", 702, 705, 708, 710, 713), *_std("cataphract", 199), *_std("woad_raider", 1592), *_std("chu_ko_nu", 215),
     *_std("throwing_axeman", 1051), *_set("huskarl", 4537, 4538, 4539, 4540, 4541), *_std("samurai", 974),
     *_std("mangudai", 782), *_std("war_elephant", 795), *_std("mameluke", 351), *_std("teutonic_knight", 1188),
     *_std("janissary", 634), *_set("berserk", 4373, 4376, 4379, 4393, 4383),
@@ -119,53 +124,66 @@ TARGETS: list[Target] = [
     Target(4392, "berserk", "idle", "second copy"), Target(4396, "berserk", "walk", "second copy"),
     *_set("jaguar_warrior", 4858, 4859, 4860, 4861, 4862), *_set("tarkan", 4916, 4917, 4918, 4919, 4920),
     *_set("plumed_archer", 4871, 4872, 4873, 4874, 4875), *_std("conquistador", 4716),
-    Target(5204, "war_wagon", "idle"), Target(5210, "war_wagon", "attack"), Target(5207, "war_wagon", "die"),
-    Target(5211, "war_wagon", "decay"), Target(5214, "war_wagon", "walk"),
-    Target(5218, "turtle_ship", "idle"), Target(5219, "turtle_ship", "walk"), Target(5220, "turtle_ship", "attack"),
-    Target(689, "longboat", "idle"), Target(695, "longboat", "walk"), Target(699, "longboat", "attack"),
+    *_std("war_wagon", 5204),
+    Target(5218, "turtle_ship", "attack"), Target(5219, "turtle_ship", "idle"), Target(5220, "turtle_ship", "walk"),
+    Target(689, "longboat", "idle", "used for standing, moving and attacking"),
     # ---------------------------------------------------------------- siege
-    Target(171, "battering_ram", "idle"), Target(179, "battering_ram", "walk"),
-    Target(181, "battering_ram", "attack"), Target(176, "battering_ram", "die"),
-    Target(180, "battering_ram", "decay"),
-    Target(1681, "capped_ram", "idle"), Target(1689, "capped_ram", "walk"), Target(1691, "capped_ram", "attack"),
-    Target(1686, "capped_ram", "die"), Target(1690, "capped_ram", "decay"),
-    Target(3027, "siege_ram", "attack"), Target(3032, "siege_ram", "die"), Target(3035, "siege_ram", "idle"),
-    Target(3036, "siege_ram", "decay"), Target(3037, "siege_ram", "walk"),
-    *_set("mangonel", 716, 719, 722, 723, 724),
-    *_set("onager", 3017, 3020, 3023, 4168, 3024),
-    *_set("siege_onager", 3553, 3556, 3559, 3560, 3561),
-    *_set("scorpion", 936, 939, 942, 943, 944), *_set("heavy_scorpion", 2813, 2816, 2819, 2820, 2821),
+    # the walk sprites here are the turning wheels; the static body is a layer and gets blanked
+    *_std("battering_ram", 173), *_std("capped_ram", 1683), *_std("siege_ram", 3029),
+    *_std("mangonel", 716), *_set("onager", 3017, 3020, 3023, 4168, 3026), *_std("siege_onager", 3553),
+    *_std("scorpion", 936), *_std("heavy_scorpion", 2813),
     *_set("bombard_cannon", 61, 64, 67, 68, 71),
     Target(1237, "trebuchet", "attack"), Target(1241, "trebuchet", "die"), Target(1244, "trebuchet", "idle"),
-    Target(1246, "trebuchet", "decay"), Target(2279, "trebuchet", "walk", "packed"),
+    Target(1246, "trebuchet", "decay"), Target(1249, "trebuchet", "walk", "packing up"),
+    Target(2279, "trebuchet", "walk", "packed"),
     Target(4572, "trebuchet", "die", "packed"), Target(4573, "trebuchet", "decay", "packed"),
     Target(1122, "trade_cart", "idle", "empty"), Target(4486, "trade_cart", "walk", "empty"),
     Target(1119, "trade_cart", "die", "empty"), Target(1124, "trade_cart", "decay", "empty"),
     Target(4608, "trade_cart", "idle", "loaded"), Target(1127, "trade_cart", "walk", "loaded"),
     Target(4607, "trade_cart", "die", "loaded"), Target(4609, "trade_cart", "decay", "loaded"),
-    # ---------------------------------------------------------------- ships (hulls; sails are blanked)
-    Target(444, "fishing_ship", "idle"), Target(449, "fishing_ship", "walk"),
-    Target(4331, "transport_ship", "idle"), Target(4254, "trade_cog", "idle"), Target(4300, "galley", "idle"),
-    Target(4256, "war_galley", "idle", "unidentified hull in the SLP list"), Target(4199, "galleon", "idle"),
+    # ---------------------------------------------------------------- ships (hulls; sails, shadows are blanked)
+    Target(444, "fishing_ship", "idle"), Target(449, "fishing_ship", "walk"), Target(438, "fishing_ship", "attack"),
+    Target(441, "fishing_ship", "die"), Target(445, "fishing_ship", "decay"),
+    Target(4331, "transport_ship", "idle"), Target(4254, "trade_cog", "idle"), Target(4256, "galley", "idle"),
+    Target(4300, "war_galley", "idle"), Target(4199, "galleon", "idle"),
     Target(4255, "fire_ship", "idle"), Target(4268, "fast_fire_ship", "idle"),
     Target(4299, "demolition_ship", "idle"), Target(4253, "heavy_demolition_ship", "idle"),
-    Target(4244, "cannon_galleon", "idle"),
+    Target(4244, "cannon_galleon", "idle", "the elite cannon galleon shares this hull"),
     # ---------------------------------------------------------------- animals
     Target(3626, "sheep", "die"), Target(3629, "sheep", "idle"), Target(3631, "sheep", "decay"),
-    Target(3634, "sheep", "walk"),
-    *_set("wolf", 1629, 1632, 1635, 1637, 1636), Target(1640, "wolf", "run"),
+    Target(3634, "sheep", "walk"), Target(3623, "sheep", "idle", "herded"),
+    *_set("wolf", 1629, 1632, 1635, 1637, 1640), Target(1636, "wolf", "run"),
     Target(5165, "turkey", "idle"), Target(5167, "turkey", "walk"), Target(5164, "turkey", "run"),
     Target(5166, "turkey", "decay"),
-    Target(339, "deer", "die"), Target(344, "deer", "decay"), Target(343, "deer", "walk"), Target(348, "deer", "run"),
+    Target(339, "deer", "die"), Target(344, "deer", "decay"), Target(348, "deer", "walk"), Target(343, "deer", "run"),
+    Target(342, "deer", "idle"), Target(336, "deer", "idle", "attack sprite"),
+    # ---------------------------------------------------------------- petard (its death is the shared explosion)
+    Target(4497, "petard", "idle"), Target(4498, "petard", "walk"),
     *_set("wild_boar", 2555, 2556, 2557, 2558, 2559),
 ]
 
 # Layered parts of the originals that must disappear once the base sprite is ours.
 BLANK: list[tuple[int, str]] = [
-    (173, "battering ram swinging part"), (183, "battering ram wheels"),
-    (1683, "capped/siege ram front animation"), (1693, "capped ram wheels"),
-    (3029, "siege ram ram section"), (3039, "siege ram wheels"),
     (446, "fishing ship nets"),
     (5238, "war wagon body"), (5239, "war wagon body"), (5240, "war wagon body"),
     (5168, "turtle ship shadow"), (5176, "turtle ship shadow"), (5182, "turtle ship shadow"),
+    # ship hull shadows (also used by the sinking animations, which is why the .dat check keeps them)
+    *[(s, "ship shadow") for s in (4336, 4501, 4502, 4503, 4508, 4509, 4510, 4514, 4515, 4516, 4517)],
+    # sails, by civilisation style (East, Asian, Middle Eastern, West, Meso)
+    *[(s, "ship sail") for s in (*range(4224, 4244), *range(4301, 4329), *range(4598, 4602),
+                                 *range(5092, 5100), 4935, 4936)],
 ]
+
+# Units whose sprite ids are not in the community list: matched at build time by the
+# internal graphic name in the player's .dat (prefix + action suffix, e.g. HALBD_AN).
+NAME_PREFIXES: dict[str, list[str]] = {
+    "halberdier": ["HALB", "HLBRD", "HALBD", "HLBDR"],
+    "javelina": ["JAVEL", "JAVLN", "PECCA", "JVLNA"],
+    "elite_eagle_warrior": ["EEAGL", "EAGLE_E", "UEAGL"],
+    "petard": ["PETARD", "PETRD", "SABOT"],
+}
+# Units drawn by another unit's sprites in the original game.
+SHARED = {"elite_cannon_galleon": "cannon_galleon"}
+
+SUFFIX_ACTIONS = {"AN": "attack", "DN": "die", "FN": "idle", "SN": "decay", "WN": "walk", "RN": "run",
+                  "CN": "carry"}

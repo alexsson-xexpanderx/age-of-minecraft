@@ -79,15 +79,21 @@ def fake_game(root: Path) -> Path:
                               (2, 10, 8), (5, 10, 8), (8, 6, 8), (9, 5, 8), (12, 10, 8)]:
         graphics.put(s, build_mod.blank(frames * 5))
         table.append({"name": f"UNIT_{s}", "slp": s, "frames": frames, "angles": angles})
-    for s in (171, 173, 183, 176, 180):
+    # battering ram as in the real .dat: each action is [layer 0, own sprite, layer 1]
+    for s in (171, 172, 173, 176, 180, 181, 182, 183):
         graphics.put(s, build_mod.blank(5 * 5))
-    table += [{"name": "RAM_BODY", "slp": 171, "frames": 5, "angles": 8},
-              {"name": "RAM_HEAD", "slp": 173, "frames": 5, "angles": 8},
-              {"name": "RAM_WHEELS", "slp": 183, "frames": 5, "angles": 8}]
-    ram = len(table) - 3
-    table.append({"name": "RAM_STAND", "slp": -1, "frames": 5, "angles": 8, "deltas": [ram, ram + 1, ram + 2]})
-    table += [{"name": "RAM_DIE", "slp": 176, "frames": 5, "angles": 8},
-              {"name": "RAM_DECAY", "slp": 180, "frames": 5, "angles": 8}]
+    table += [{"name": "BTRAM_A0", "slp": 171, "frames": 5, "angles": 8},
+              {"name": "BTRAM_A1", "slp": 172, "frames": 5, "angles": 8},
+              {"name": "BTRAM_W0", "slp": 181, "frames": 5, "angles": 8},
+              {"name": "BTRAM_W1", "slp": 182, "frames": 5, "angles": 8}]
+    a0 = len(table) - 4
+    table += [{"name": "BTRAM_AN", "slp": 173, "frames": 5, "angles": 8, "deltas": [a0, -1, a0 + 1]},
+              {"name": "BTRAM_WN", "slp": 183, "frames": 5, "angles": 8, "deltas": [a0 + 2, -1, a0 + 3]},
+              {"name": "BTRAM_DN", "slp": 176, "frames": 5, "angles": 8},
+              {"name": "BTRAM_SN", "slp": 180, "frames": 5, "angles": 8}]
+    for s, name in ((9000, "HALBD_AN"), (9003, "HALBD_DN"), (9100, "PETARD_DN"), (9101, "BLAST_NN")):
+        graphics.put(s, build_mod.blank(10 * 5))
+        table.append({"name": name, "slp": s if s != 9101 else 9100, "frames": 10, "angles": 8})
     graphics.put(40000, b"not a sprite we touch")
     graphics.write(data / "graphics.drs")
     (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table))
@@ -152,14 +158,16 @@ def test_full_build(tmp: Path):
     out = Drs(mod / "Data" / "graphics.drs")
     orig = Drs(game / "Data" / "graphics.drs")
     assert out.get(40000) == orig.get(40000)  # untouched files are copied as they were
-    for s in (987, 993, 2, 171, 176):
+    for s in (987, 993, 2, 173, 183, 176):
         assert slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
         assert out.get(s) != orig.get(s)
-    for s in (173, 183):  # ram head and wheels are blanked, same frame count
+    for s in (171, 172, 181, 182):  # the ram's extra layers are blanked, same frame count
         frames = slp.decode(out.get(s))
         assert len(frames) == 25 and all((f.pixels == slp.TRANSPARENT).all() for f in frames)
+    assert out.get(9000) != orig.get(9000) and out.get(9003) != orig.get(9003)  # halberdier found by name
+    assert out.get(9100) == orig.get(9100)  # shared explosion is left alone
     report = (mod / "aom_report.txt").read_text()
-    assert "REPLACED" in report and "RAM_STAND" in report
+    assert "REPLACED" in report and "BTRAM_AN" in report and "found by name HALBD_AN" in report
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
 

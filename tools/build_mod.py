@@ -35,7 +35,7 @@ from aom.drs import Drs  # noqa: E402
 from aom.export import blank, render_frames  # noqa: E402
 from aom.palette import Quantiser, parse_jasc  # noqa: E402
 from aom.roster import ROSTER  # noqa: E402
-from aom.slpmap import BLANK, TARGETS  # noqa: E402
+from aom.slpmap import BLANK, NAME_PREFIXES, SHARED, SUFFIX_ACTIONS, TARGETS, Target  # noqa: E402
 
 MOD = "AgeOfMinecraft"
 BACKUP = ".aom-backup"
@@ -132,6 +132,24 @@ class Game:
         if num_frames % 5 == 0:
             return num_frames // 5, 8, True, "guessed 8 mirrored angles"
         return num_frames, 1, False, "guessed 1 angle"
+
+    def name_targets(self, known: set[int]) -> list[Target]:
+        """Sprites for units missing from the id list, found by their internal graphic names."""
+        found = []
+        for unit, prefixes in NAME_PREFIXES.items():
+            for g in self.graphics_table.values():
+                name = g.name.upper()
+                action = SUFFIX_ACTIONS.get(name[-2:])
+                if not action or g.slp <= 0 or g.slp in known or not name.startswith(tuple(prefixes)):
+                    continue
+                if g.deltas and not any(d.graphic_id == -1 for d in g.deltas):
+                    continue  # its own sprite is never drawn
+                owners = self.by_slp.get(g.slp, [])
+                if not all(o.name.upper().startswith(tuple(prefixes)) for o in owners):
+                    continue  # shared with other things (e.g. the petard's explosion)
+                found.append(Target(g.slp, unit, action, f"found by name {g.name}"))
+                known.add(g.slp)
+        return found
 
     def delta_blanks(self, target_slps: set[int]) -> dict[int, str]:
         """Layered parts of the sprites we replace that no other graphic needs."""
@@ -259,7 +277,8 @@ def main(argv=None) -> int:
     only = set(args.only.split(",")) if args.only else None
     if only and not only <= set(ROSTER):
         raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER)))}")
-    targets = [t for t in TARGETS if only is None or t.unit in only]
+    targets = list(TARGETS) + game.name_targets({t.slp for t in TARGETS})
+    targets = [t for t in targets if only is None or t.unit in only]
 
     jobs, skipped, planned = [], [], []
     for t in targets:
@@ -427,6 +446,7 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
     lines += ["", "BLANKED LAYERS"] + [f"  {s:6d}  {why}" for s, why in sorted(blanks.items())]
     lines += ["", "SKIPPED"] + [f"  {t.slp:6d}  {t.unit:24s} {t.action:7s} {why}" for t, why in skipped]
     covered = {p[0].unit for p in planned}
+    covered |= {unit for unit, host in SHARED.items() if host in covered}
     lines += ["", "UNITS WITHOUT SPRITES YET: " + ", ".join(sorted(set(ROSTER) - covered))]
     if game.graphics_table:
         lines += ["", "GRAPHICS TABLE (id, name, slp, frames, angles, mirror, deltas)"]
