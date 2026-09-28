@@ -63,6 +63,7 @@ class Part:
     rot: Vec3 = (0.0, 0.0, 0.0)  # rest pose, degrees
     boxes: list[Box] = field(default_factory=list)
     children: list["Part"] = field(default_factory=list)
+    offset: Vec3 = (0.0, 0.0, 0.0)  # rest translation, e.g. a rider sitting on a horse
 
     def add(self, *children: "Part") -> "Part":
         self.children.extend(children)
@@ -85,6 +86,7 @@ class Pose:
     rot: dict[str, Vec3] = field(default_factory=dict)
     move: dict[str, Vec3] = field(default_factory=dict)
     tint: Optional[tuple[float, float, float, float]] = None  # r, g, b, strength (hurt/death flash)
+    hidden: set[str] = field(default_factory=set)  # parts (and their children) left out of this frame
 
 
 @dataclass
@@ -94,9 +96,11 @@ class PlacedBox:
 
 
 def place(part: Part, pose: Pose, parent: np.ndarray) -> list[PlacedBox]:
+    if part.name in pose.hidden:
+        return []
     rest = np.asarray(part.rot, float)
     extra = np.asarray(pose.rot.get(part.name, (0, 0, 0)), float)
-    move = np.asarray(pose.move.get(part.name, (0, 0, 0)), float)
+    move = np.asarray(part.offset, float) + np.asarray(pose.move.get(part.name, (0, 0, 0)), float)
     pivot = np.asarray(part.pivot, float)
     M = parent @ affine(t=pivot + move) @ affine(rotation(*(rest + extra))) @ affine(t=-pivot)
     placed = [PlacedBox(b, M) for b in part.boxes]

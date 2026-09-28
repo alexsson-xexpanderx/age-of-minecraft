@@ -113,13 +113,17 @@ class Painter:
         dims = {"front": (w, h), "back": (w, h), "right": (d, h), "left": (d, h),
                 "top": (w, d), "bottom": (w, d)}
         paints = {"front": sides, "back": sides, "right": sides, "left": sides,
-                  "top": sides if top == "same" else top,
-                  "bottom": sides if bottom == "same" else bottom}
+                  "top": sides if _same(top) else top,
+                  "bottom": sides if _same(bottom) else bottom}
         paints.update(faces)
         out = {f: self.resolve(paints[f], *dims[f], noise=noise) for f in FACES}
         if mirror and "right" in faces and "left" not in faces:
             out["left"] = out["right"][:, ::-1].copy()
         return out
+
+
+def _same(paint) -> bool:
+    return isinstance(paint, str) and paint == "same"
 
 
 def layered(base: dict[str, np.ndarray], *layers: dict[str, np.ndarray]) -> dict[str, np.ndarray]:

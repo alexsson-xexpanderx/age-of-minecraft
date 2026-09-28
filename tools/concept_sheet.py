@@ -3,11 +3,14 @@
     python tools/concept_sheet.py [output_dir]
 
 Writes into previews/ by default:
-    roster.png         every unit, all 8 directions, 2x zoom
-    player_colors.png  one unit in all 8 player colours
-    scene.png          in-game mock-up of two armies, 2x zoom
-    village.png        Town Center and houses with villagers, 2x zoom
-    animations.gif     walk / attack / death cycles, 3x zoom
+    roster_<group>.png  every unit of a group in the 5 stored directions, 2x zoom
+    anim_<group>.gif    walk / attack / death cycles for a sample of the group, 2x zoom
+    player_colors.png   one unit in all 8 player colours
+    scene.png           two armies, in-game size, 2x zoom
+    battle.png          siege and cavalry assaulting a town, 2x zoom
+    harbor.png          the fleet on the water, 2x zoom
+    village.png         Town Center and houses with villagers, 2x zoom
+and docs/UNITS.md, the full unit list.
 """
 from __future__ import annotations
 
@@ -20,23 +23,29 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aom.animation import DIRECTIONS, pose  # noqa: E402
-from aom.colors import PLAYER_COLORS  # noqa: E402
 from aom.buildings import BUILDING_HEADING, BUILDINGS, block_types  # noqa: E402
+from aom.colors import PLAYER_COLORS  # noqa: E402
+from aom.geometry import Pose  # noqa: E402
 from aom.render import SHADOW, Camera, Frame, fit_camera, render  # noqa: E402
-from aom.units import ROSTER, Unit  # noqa: E402
+from aom.roster import SHEETS, build_all  # noqa: E402
+from aom.units import Unit  # noqa: E402
 
+ROOT = Path(__file__).resolve().parent.parent
 TILE_W, TILE_H = 96, 48  # AoE2 tile size at 1x
+BASE_SCALE = 1.5  # screen pixels per Minecraft pixel
 GRASS = [(84, 128, 52), (92, 138, 56), (78, 120, 48), (98, 144, 62)]
+WATER = [(38, 86, 150), (44, 96, 162), (34, 78, 140), (52, 106, 170)]
 INK, PAPER, MUTED = (32, 30, 28), (236, 232, 222), (110, 104, 96)
+STORED = DIRECTIONS[:5]  # S, SW, W, NW, N; the game mirrors the rest
 
 
 def font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default(size=size)
 
 
-def grass(w: int, h: int, seed: int = 7) -> np.ndarray:
+def ground(w: int, h: int, seed: int = 7, water: bool = False) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    pal = np.array(GRASS, np.uint8)
+    pal = np.array(WATER if water else GRASS, np.uint8)
     return pal[rng.choice(len(pal), size=(h, w), p=[0.4, 0.25, 0.2, 0.15])]
 
 
@@ -57,52 +66,65 @@ def zoom(img: np.ndarray, k: int) -> np.ndarray:
     return img.repeat(k, 0).repeat(k, 1)
 
 
-def frame_on_grass(frame: Frame, player: int, k: int, seed: int) -> np.ndarray:
+def framed(frame: Frame, player: int, k: int, seed: int, water: bool = False) -> np.ndarray:
     h, w = frame.kind.shape
-    bg = grass(w, h, seed)
+    bg = ground(w, h, seed, water)
     blend(bg, frame.to_rgba(player), 0, 0)
     return zoom(bg, k)
 
 
-# --------------------------------------------------------------------------- roster
+def shared_camera(jobs: list[tuple[Unit, float, Pose]], pad: int = 3) -> tuple[int, int, int, int]:
+    """Canvas extents (left, right, up, down) around the hotspot that fit every (unit, heading, pose)."""
+    left = right = up = down = 0
+    for unit, heading, ps in jobs:
+        cam = fit_camera(unit.root, heading, ps, scale=BASE_SCALE * unit.scale, pad=pad)
+        left, up = max(left, cam.origin[0]), max(up, cam.origin[1])
+        right, down = max(right, cam.width - cam.origin[0]), max(down, cam.height - cam.origin[1])
+    return int(left), int(right), int(up), int(down)
 
-def roster_sheet(units: list[Unit], out: Path, k: int = 2) -> None:
-    cam = Camera(width=80, height=76, origin=(40, 66))
-    cell_w, cell_h = cam.width * k, cam.height * k
-    label_w, head_h, gap = 250, 64, 6
-    W = label_w + len(DIRECTIONS) * (cell_w + gap)
-    H = head_h + len(units) * (cell_h + gap) + 40
+
+def camera_for(unit: Unit, ext: tuple[int, int, int, int]) -> Camera:
+    left, right, up, down = ext
+    return Camera(width=left + right, height=up + down, origin=(left, up), scale=BASE_SCALE * unit.scale)
+
+
+# --------------------------------------------------------------------------- roster sheets
+
+def roster_sheet(title: str, units: list[Unit], out: Path, k: int = 2) -> None:
+    ext = shared_camera([(u, h, pose(u, "idle", 0)) for u in units for _, h in STORED])
+    cw, ch = (ext[0] + ext[1]) * k, (ext[2] + ext[3]) * k
+    label_w, head_h, gap = 290, 70, 6
+    W = label_w + len(STORED) * (cw + gap)
+    H = head_h + len(units) * (ch + gap) + 40
     sheet = np.full((H, W, 3), PAPER, np.uint8)
-
     for r, unit in enumerate(units):
-        player = r % 8 + 1
-        y = head_h + r * (cell_h + gap)
-        for c, (_, heading) in enumerate(DIRECTIONS):
-            f = render(unit.root, heading, pose(unit.rig, "idle", 0), cam)
-            sheet[y:y + cell_h, label_w + c * (cell_w + gap):][:, :cell_w] = frame_on_grass(f, player, k, r * 8 + c)
+        cam = camera_for(unit, ext)
+        y = head_h + r * (ch + gap)
+        for c, (_, heading) in enumerate(STORED):
+            f = render(unit.root, heading, pose(unit, "idle", 0), cam)
+            x = label_w + c * (cw + gap)
+            sheet[y:y + ch, x:x + cw] = framed(f, r % 8 + 1, k, r * 8 + c, water=unit.group == "ship")
 
     img = Image.fromarray(sheet)
     d = ImageDraw.Draw(img)
-    d.text((16, 14), "Age of Minecraft - unit roster (idle, 2x zoom)", font=font(26), fill=INK)
-    for c, (name, _) in enumerate(DIRECTIONS):
-        x = label_w + c * (cell_w + gap) + cell_w // 2
-        d.text((x, head_h - 8), name + ("*" if c >= 5 else ""), font=font(18), fill=INK, anchor="ms")
+    d.text((16, 14), f"Age of Minecraft - {title} ({len(units)} units, idle, 2x zoom)", font=font(26), fill=INK)
+    for c, (name, _) in enumerate(STORED):
+        d.text((label_w + c * (cw + gap) + cw // 2, head_h - 10), name, font=font(18), fill=INK, anchor="ms")
     for r, unit in enumerate(units):
-        y = head_h + r * (cell_h + gap) + cell_h // 2
-        d.text((16, y - 14), unit.name, font=font(20), fill=INK)
-        d.text((16, y + 12), f"replaces {unit.replaces}", font=font(15), fill=MUTED)
-        d.text((16, y + 32), f"player {r % 8 + 1}: {PLAYER_COLORS[r % 8 + 1][0].lower()}", font=font(13), fill=MUTED)
-    d.text((16, H - 30), "* NE, E and SE are mirrored from NW, W and SW by the game, so only 5 directions "
-                         "are stored per animation.", font=font(14), fill=MUTED)
+        y = head_h + r * (ch + gap) + ch // 2
+        d.text((16, y - 22), unit.name, font=font(20), fill=INK)
+        d.text((16, y + 4), f"replaces {unit.replaces}", font=font(15), fill=MUTED)
+        if unit.civ:
+            d.text((16, y + 24), f"unique unit: {unit.civ}", font=font(13), fill=MUTED)
+    d.text((16, H - 30), "NE, E and SE are mirrored from NW, W and SW by the game, so these 5 directions are "
+                         "all that is stored per animation.", font=font(14), fill=MUTED)
     img.save(out)
 
 
-# --------------------------------------------------------------------------- player colours
-
 def player_sheet(unit: Unit, out: Path, k: int = 3) -> None:
     cam = Camera(width=64, height=72, origin=(32, 62))
-    f = render(unit.root, -135, pose(unit.rig, "idle", 0), cam)
-    cells = [frame_on_grass(f, p, k, p) for p in PLAYER_COLORS]
+    f = render(unit.root, -135, pose(unit, "idle", 0), cam)
+    cells = [framed(f, p, k, p) for p in PLAYER_COLORS]
     strip = np.concatenate([np.pad(c, ((0, 0), (0, 4), (0, 0)), constant_values=236) for c in cells], 1)
     pad = np.full((40, strip.shape[1], 3), PAPER, np.uint8)
     img = Image.fromarray(np.concatenate([pad, strip], 0))
@@ -113,21 +135,86 @@ def player_sheet(unit: Unit, out: Path, k: int = 3) -> None:
     img.save(out)
 
 
-# --------------------------------------------------------------------------- in-game scene
+# --------------------------------------------------------------------------- animations
+
+ANIMATIONS = {  # group -> [(unit, action, direction index)]
+    "civilians": [("villager", "walk", 1), ("villager_lumberjack", "attack", 1), ("villager_gold_miner", "attack", 2),
+                  ("villager_farmer", "attack", 1), ("villager_lumberjack", "carry", 1),
+                  ("villager_fisherman", "attack", 2), ("monk", "attack", 1), ("king", "walk", 1)],
+    "infantry": [("militia", "walk", 1), ("champion", "attack", 1), ("pikeman", "attack", 2),
+                 ("archer", "attack", 2), ("crossbowman", "attack", 1), ("skirmisher", "attack", 1),
+                 ("hand_cannoneer", "attack", 2), ("eagle_warrior", "walk", 1)],
+    "cavalry": [("knight", "walk", 1), ("paladin", "attack", 1), ("cavalry_archer", "attack", 2),
+                ("camel", "walk", 1), ("scout_cavalry", "die", 1)],
+    "siege": [("battering_ram", "attack", 1), ("mangonel", "attack", 1), ("scorpion", "walk", 1),
+              ("bombard_cannon", "attack", 2), ("trebuchet", "attack", 1), ("trebuchet", "walk", 1),
+              ("war_wagon", "walk", 1), ("trade_cart", "walk", 2)],
+    "ships": [("galley", "walk", 1), ("galleon", "attack", 2), ("fire_ship", "attack", 1),
+              ("demolition_ship", "walk", 1), ("longboat", "walk", 2), ("turtle_ship", "attack", 1),
+              ("fishing_ship", "idle", 1), ("cannon_galleon", "die", 2)],
+    "uniques": [("longbowman", "attack", 2), ("woad_raider", "walk", 1), ("throwing_axeman", "attack", 1),
+                ("samurai", "attack", 1), ("war_elephant", "attack", 1), ("janissary", "attack", 1),
+                ("mangudai", "walk", 1), ("tarkan", "walk", 2)],
+    "animals": [("sheep", "walk", 1), ("wolf", "attack", 1), ("wild_boar", "attack", 2), ("deer", "walk", 1),
+                ("turkey", "walk", 1), ("petard", "attack", 1)],
+}
+
+
+def _t(action: str, n: int, frames: int) -> float:
+    return min(1.0, n / (frames - 3)) if action == "die" else n / frames
+
+
+def animation_gif(cells, units: dict[str, Unit], out: Path, k: int = 2, frames: int = 12) -> None:
+    exts = [shared_camera([(units[key], DIRECTIONS[d][1], pose(units[key], action, _t(action, n, frames)))
+                           for n in range(0, frames, 2)], pad=5) for key, action, d in cells]
+    height = max(e[2] + e[3] for e in exts) * k
+    label_h = 26
+    images = []
+    for n in range(frames):
+        row = []
+        for idx, ((key, action, d), ext) in enumerate(zip(cells, exts)):
+            u = units[key]
+            f = render(u.root, DIRECTIONS[d][1], pose(u, action, _t(action, n, frames)), camera_for(u, ext))
+            cell = framed(f, idx % 8 + 1, k, idx, water=u.group == "ship")
+            cell = np.pad(cell, ((height - cell.shape[0], 0), (0, 0), (0, 0)), constant_values=236)
+            label = np.full((label_h, max(cell.shape[1], 150), 3), PAPER, np.uint8)
+            cell = np.pad(cell, ((0, 0), (0, label.shape[1] - cell.shape[1]), (0, 0)), constant_values=236)
+            row.append(np.pad(np.concatenate([label, cell], 0), ((0, 0), (0, 4), (0, 0)), constant_values=236))
+        img = Image.fromarray(np.concatenate(row, 1))
+        dr = ImageDraw.Draw(img)
+        x = 0
+        for (key, action, _), cell in zip(cells, row):
+            dr.text((x + cell.shape[1] // 2, 19), f"{units[key].replaces}: {action}", font=font(14), fill=INK,
+                    anchor="ms")
+            x += cell.shape[1]
+        images.append(img.convert("P", palette=Image.Palette.ADAPTIVE, colors=128))
+    images[0].save(out, save_all=True, append_images=images[1:], duration=90, loop=0, disposal=2, optimize=True)
+
+
+# --------------------------------------------------------------------------- scenes
 
 def tile_xy(i: float, j: float) -> tuple[int, int]:
     """Screen position of map tile (i, j); AoE2 tiles are 96x48 diamonds."""
     return int((i - j) * TILE_W / 2), int((i + j) * TILE_H / 2)
 
 
-def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, margin: int = 24) -> None:
-    """Draw (frame, player, x, y) sprites, hotspot at map pixel (x, y), on grass cropped to fit."""
+def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, margin: int = 24,
+            shore: float = None) -> None:
+    """Draw (frame, player, x, y) sprites with hotspots at map pixel (x, y), cropped to fit.
+
+    With `shore`, map tiles whose i coordinate is at least `shore` are water.
+    """
     items = [(f, player, x - f.hotspot[0], y - f.hotspot[1], y) for f, player, x, y in placed]
     x0 = min(x for _, _, x, _, _ in items) - margin
     y0 = min(y for _, _, _, y, _ in items) - margin
     x1 = max(x + f.kind.shape[1] for f, _, x, _, _ in items) + margin
     y1 = max(y + f.kind.shape[0] for f, _, _, y, _ in items) + margin
-    canvas = grass(x1 - x0, y1 - y0, 3)
+    canvas = ground(x1 - x0, y1 - y0, 3)
+    if shore is not None:
+        yy, xx = np.mgrid[y0:y1, x0:x1]
+        i = (xx / (TILE_W / 2) + yy / (TILE_H / 2)) / 2
+        wet = i >= shore
+        canvas[wet] = ground(x1 - x0, y1 - y0, 5, water=True)[wet]
     for f, _, x, y, _ in items:  # shadows go under every sprite
         shadow = np.zeros((*f.kind.shape, 4), np.uint8)
         shadow[f.kind == SHADOW] = (0, 0, 0, 102)
@@ -139,87 +226,118 @@ def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, ma
 
 def place_units(army, units: dict[str, Unit]) -> list[tuple[Frame, int, int, int]]:
     """army: (unit, player, tile i, tile j, direction index, action, t)."""
-    cam = Camera(width=96, height=96, origin=(48, 80))
     placed = []
     for key, player, i, j, dir_idx, action, t in army:
         u = units[key]
-        f = render(u.root, DIRECTIONS[dir_idx][1], pose(u.rig, action, t), cam)
-        placed.append((f, player, *tile_xy(i, j)))
+        ps = pose(u, action, t)
+        cam = fit_camera(u.root, DIRECTIONS[dir_idx][1], ps, scale=BASE_SCALE * u.scale)
+        placed.append((render(u.root, DIRECTIONS[dir_idx][1], ps, cam), player, *tile_xy(i, j)))
+    return placed
+
+
+def place_buildings(spots, player: int = 1) -> list[tuple[Frame, int, int, int]]:
+    types = block_types()
+    placed = []
+    for key, i, j in spots:
+        root = BUILDINGS[key]().part(types)
+        cam = fit_camera(root, BUILDING_HEADING)
+        placed.append((render(root, BUILDING_HEADING, camera=cam), player, *tile_xy(i, j)))
     return placed
 
 
 def army_scene(out: Path, units: dict[str, Unit]) -> None:
-    """Two small armies, drawn at the size they would have in game."""
     army = [
-        ("villager", 1, 1.3, 2.0, 0, "idle", 0), ("villager", 1, 2.2, 1.4, 1, "walk", 0.25),
+        ("villager", 1, 1.3, 2.0, 0, "idle", 0), ("villager_lumberjack", 1, 2.2, 1.4, 1, "carry", 0.25),
         ("sheep", 1, 1.0, 3.2, 1, "idle", 0), ("sheep", 1, 1.6, 3.8, 6, "idle", 0),
         ("militia", 1, 3.2, 3.0, 7, "idle", 0), ("man_at_arms", 1, 3.8, 3.6, 7, "walk", 0.5),
-        ("long_swordsman", 1, 3.0, 4.2, 7, "idle", 0), ("champion", 1, 3.6, 4.8, 7, "attack", 0.5),
-        ("skeleton_archer", 1, 2.2, 4.4, 7, "idle", 0), ("skeleton_archer", 1, 2.6, 5.2, 7, "idle", 0),
-        ("two_handed", 2, 5.0, 4.2, 3, "attack", 0.3), ("champion", 2, 5.6, 5.4, 3, "idle", 0),
-        ("militia", 2, 5.4, 3.3, 3, "walk", 0.0), ("skeleton_archer", 2, 6.6, 4.6, 3, "idle", 0),
-        ("skeleton_archer", 2, 6.4, 3.6, 3, "idle", 0), ("creeper", 2, 4.5, 5.9, 2, "walk", 0.25),
-        ("man_at_arms", 2, 4.6, 2.4, 3, "idle", 0), ("villager", 2, 6.6, 6.6, 4, "walk", 0.1),
-        ("sheep", 2, 7.4, 6.8, 2, "idle", 0),
+        ("pikeman", 1, 3.0, 4.2, 7, "idle", 0), ("champion", 1, 3.6, 4.8, 7, "attack", 0.5),
+        ("archer", 1, 2.2, 4.4, 7, "idle", 0), ("crossbowman", 1, 2.6, 5.2, 7, "idle", 0),
+        ("skirmisher", 1, 1.8, 5.6, 7, "idle", 0),
+        ("two_handed", 2, 5.0, 4.2, 3, "attack", 0.3), ("halberdier", 2, 5.6, 5.4, 3, "idle", 0),
+        ("militia", 2, 5.4, 3.3, 3, "walk", 0.0), ("arbalest", 2, 6.6, 4.6, 3, "idle", 0),
+        ("hand_cannoneer", 2, 6.4, 3.6, 3, "idle", 0), ("petard", 2, 4.5, 5.9, 2, "walk", 0.25),
+        ("eagle_warrior", 2, 4.6, 2.4, 3, "idle", 0), ("monk", 2, 6.9, 6.2, 3, "attack", 0.4),
     ]
     compose(place_units(army, units), out)
 
 
+def battle_scene(out: Path, units: dict[str, Unit]) -> None:
+    """Red siege and cavalry storming a blue town."""
+    placed = place_buildings([("town_center", 2.5, 2.5), ("house", -1.5, 5.5), ("house", 6.0, -1.0)])
+    army = [
+        ("knight", 1, 5.2, 5.0, 7, "attack", 0.5), ("paladin", 1, 4.4, 6.0, 7, "idle", 0),
+        ("crossbowman", 1, 2.4, 5.6, 7, "attack", 0.5), ("hand_cannoneer", 1, 5.8, 3.2, 7, "idle", 0),
+        ("skirmisher", 1, 1.6, 6.2, 7, "attack", 0.5), ("war_elephant", 1, 3.6, 6.8, 7, "idle", 0),
+        ("battering_ram", 2, 6.2, 6.0, 3, "attack", 0.5), ("capped_ram", 2, 7.0, 4.6, 3, "walk", 0.3),
+        ("trebuchet", 2, 10.4, 8.4, 3, "attack", 0.3), ("mangonel", 2, 8.4, 9.0, 3, "attack", 0.45),
+        ("bombard_cannon", 2, 9.8, 6.2, 3, "idle", 0), ("scorpion", 2, 7.6, 7.8, 3, "idle", 0),
+        ("cavalier", 2, 6.4, 7.6, 3, "walk", 0.2), ("cavalry_archer", 2, 7.6, 3.2, 3, "attack", 0.5),
+        ("hussar", 2, 8.6, 5.2, 3, "walk", 0.6), ("camel", 2, 5.4, 8.6, 3, "walk", 0.1),
+        ("war_wagon", 2, 9.2, 3.6, 3, "walk", 0.4), ("siege_onager", 2, 11.0, 6.6, 3, "idle", 0),
+    ]
+    compose(placed + place_units(army, units), out)
+
+
+def harbor_scene(out: Path, units: dict[str, Unit]) -> None:
+    """The fleet off the coast; tiles with i >= 3 are water."""
+    placed = place_buildings([("house", 0.5, 2.0), ("house", 0.5, 6.0)])
+    fleet = [
+        ("villager_fisherman", 1, 2.0, 4.0, 7, "idle", 0), ("trade_cart", 1, 1.6, 8.2, 7, "idle", 0),
+        ("fishing_ship", 1, 4.4, 2.2, 7, "idle", 0), ("fishing_ship", 1, 4.2, 7.6, 1, "idle", 0.5),
+        ("transport_ship", 1, 5.0, 4.8, 3, "idle", 0.2), ("trade_cog", 1, 6.4, 1.2, 1, "walk", 0.3),
+        ("galley", 1, 6.6, 6.4, 7, "walk", 0.1), ("war_galley", 1, 7.4, 3.4, 7, "attack", 0.5),
+        ("galleon", 2, 10.4, 2.2, 3, "attack", 0.4), ("cannon_galleon", 2, 10.2, 6.2, 3, "attack", 0.5),
+        ("fire_ship", 2, 8.8, 8.4, 3, "walk", 0.3), ("demolition_ship", 2, 9.2, 4.6, 2, "walk", 0.6),
+        ("longboat", 2, 12.4, 4.4, 3, "walk", 0.2), ("turtle_ship", 2, 12.4, 8.6, 3, "idle", 0),
+    ]
+    compose(placed + place_units(fleet, units), out, shore=3.0)
+
+
 def village_scene(out: Path, units: dict[str, Unit]) -> None:
-    """A starting town: Town Center, houses, villagers and sheep."""
-    types = block_types()
-    placed = []
-    for key, i, j in (("town_center", 4.0, 4.0), ("house", -0.5, 6.0), ("house", 3.0, -0.5), ("house", 8.5, 1.5)):
-        root = BUILDINGS[key]().part(types)
-        cam = fit_camera(root, BUILDING_HEADING)
-        placed.append((render(root, BUILDING_HEADING, camera=cam), 1, *tile_xy(i, j)))
+    placed = place_buildings([("town_center", 4.0, 4.0), ("house", -0.5, 6.0), ("house", 3.0, -0.5),
+                              ("house", 8.5, 1.5)])
     folk = [
-        ("villager", 1, 6.9, 5.2, 7, "walk", 0.2), ("villager", 1, 7.4, 3.8, 1, "idle", 0),
-        ("villager", 1, 2.6, 7.6, 3, "walk", 0.6), ("villager", 1, 1.6, 1.4, 0, "idle", 0),
-        ("sheep", 1, 7.2, 6.9, 1, "idle", 0), ("sheep", 1, 7.9, 7.3, 6, "walk", 0.4),
-        ("sheep", 1, 6.6, 7.6, 3, "idle", 0), ("militia", 1, 4.6, 7.2, 0, "idle", 0),
-        ("skeleton_archer", 1, 5.4, 7.6, 0, "idle", 0), ("creeper", 2, 10.4, 5.2, 2, "walk", 0.3),
+        ("villager_builder", 1, 6.9, 5.2, 7, "attack", 0.3), ("villager_farmer", 1, 7.4, 3.8, 1, "attack", 0.6),
+        ("villager_lumberjack", 1, 2.6, 7.6, 3, "carry", 0.6), ("villager", 1, 1.6, 1.4, 0, "idle", 0),
+        ("villager_shepherd", 1, 7.0, 6.6, 1, "attack", 0.2),
+        ("sheep", 1, 7.2, 7.3, 1, "idle", 0), ("sheep", 1, 7.9, 7.3, 6, "walk", 0.4),
+        ("sheep", 1, 6.6, 7.9, 3, "idle", 0), ("scout_cavalry", 1, 4.6, 7.4, 0, "idle", 0),
+        ("villager_gold_miner", 1, 5.4, 8.2, 0, "walk", 0.3), ("turkey", 7, 9.2, 5.6, 2, "idle", 0),
+        ("petard", 2, 10.4, 5.2, 2, "walk", 0.3), ("wolf", 7, 10.6, 3.2, 2, "walk", 0.5),
     ]
     compose(placed + place_units(folk, units), out)
 
 
-# --------------------------------------------------------------------------- animations
+# --------------------------------------------------------------------------- unit list
 
-def animations(out: Path, k: int = 3, frames: int = 12) -> None:
-    cam = Camera(width=80, height=84, origin=(40, 72))
-    cells = [("militia", "walk", 1, 1), ("man_at_arms", "attack", 1, 2), ("champion", "walk", 1, 5),
-             ("skeleton_archer", "walk", 1, 3), ("villager", "walk", 1, 4), ("creeper", "walk", 1, 3),
-             ("sheep", "walk", 1, 1), ("long_swordsman", "die", 1, 6)]
-    units = {key: ROSTER[key]() for key, *_ in cells}
-    label_h = 26
-    images = []
-    for n in range(frames):
-        row = []
-        for idx, (key, action, dir_idx, player) in enumerate(cells):
-            u = units[key]
-            t = n / frames if action != "die" else min(1.0, n / (frames - 3))
-            f = render(u.root, DIRECTIONS[dir_idx][1], pose(u.rig, action, t), cam)
-            cell = frame_on_grass(f, player, k, idx)
-            label = np.full((label_h, cell.shape[1], 3), PAPER, np.uint8)
-            row.append(np.pad(np.concatenate([label, cell], 0), ((0, 0), (0, 4), (0, 0)), constant_values=236))
-        img = Image.fromarray(np.concatenate(row, 1))
-        d = ImageDraw.Draw(img)
-        for idx, (key, action, *_) in enumerate(cells):
-            d.text((idx * (cam.width * k + 4) + cam.width * k // 2, 19), f"{units[key].name}: {action}",
-                   font=font(14), fill=INK, anchor="ms")
-        images.append(img.convert("P", palette=Image.Palette.ADAPTIVE, colors=255))
-    images[0].save(out, save_all=True, append_images=images[1:], duration=90, loop=0, disposal=2)
+def unit_table(units: dict[str, Unit], out: Path) -> None:
+    lines = ["# Age of Minecraft: unit list", "",
+             "Generated by `tools/concept_sheet.py`. Every unit in AoE2: Gold Edition (The Age of Kings and",
+             "The Conquerors) and its Minecraft-style replacement. Previews: `previews/roster_<group>.png`.", ""]
+    total = 0
+    for stem, title, keep in SHEETS:
+        group = [u for u in units.values() if keep(u)]
+        total += len(group)
+        lines += [f"## {title} ({len(group)})", "", "| AoE2 unit | Minecraft figure | Civilisation |", "|---|---|---|"]
+        lines += [f"| {u.replaces} | {u.name} | {u.civ or ''} |" for u in group]
+        lines += [""]
+    lines.insert(5, f"**{total} units.** Villager jobs share one model per job for both genders.\n")
+    out.write_text("\n".join(lines))
 
 
 def main() -> None:
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent / "previews"
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "previews"
     out.mkdir(parents=True, exist_ok=True)
-    units = {key: make() for key, make in ROSTER.items()}
-    roster_sheet(list(units.values()), out / "roster.png")
+    units = build_all()
+    for stem, title, keep in SHEETS:
+        roster_sheet(title, [u for u in units.values() if keep(u)], out / f"roster_{stem}.png")
+        animation_gif(ANIMATIONS[stem], units, out / f"anim_{stem}.gif")
     player_sheet(units["champion"], out / "player_colors.png")
     army_scene(out / "scene.png", units)
+    battle_scene(out / "battle.png", units)
+    harbor_scene(out / "harbor.png", units)
     village_scene(out / "village.png", units)
-    animations(out / "animations.gif")
+    unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")
 
 

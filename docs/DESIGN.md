@@ -1,17 +1,18 @@
 # Age of Minecraft — design
 
 A graphics mod for **Age of Empires II: Gold Edition** (The Age of Kings +
-The Conquerors) that redraws the units as blocky, pixel-art Minecraft-style
-figures. Gameplay stays the same; only the sprites and unit names change.
+The Conquerors) that redraws the units and buildings as blocky, pixel-art
+Minecraft-style figures. Gameplay stays the same; only the sprites and unit
+names change.
 
-![roster](../previews/roster.png)
+![battle](../previews/battle.png)
 
 ## Art direction
 
 | Rule | Value | Why |
 |---|---|---|
 | Model units | Minecraft pixels: head 8×8×8, body 8×4×12, limbs 4×4×12 | The classic proportions everyone recognises |
-| Scale | 1.5 screen px per Minecraft pixel → infantry ≈ 45 px tall | Roughly the size of AoE2 units on a 96×48 tile |
+| Scale | 1.5 screen px per Minecraft pixel → infantry ≈ 45 px tall; large siege and ships are drawn 1.1–1.6× bigger | Roughly the size of AoE2 units on a 96×48 tile |
 | Camera | Orthographic, looking down at 30° (AoE2's 2:1 isometric view) | Sprites sit correctly on AoE2 terrain |
 | Sampling | Nearest texel, no anti-aliasing | Keeps the pixel look and suits AoE2's 256-colour palette |
 | Light | From the upper left and front; Minecraft-like flat face shading | Matches the lighting of the original sprites |
@@ -25,45 +26,35 @@ texture files are used or needed.
 ### Where team colour goes
 
 Team colour is Minecraft's own dye system: shirts, dyed leather armour, capes,
-wool, and (later) wolf collars, llama carpets and banners. Units in full
-metal armour get a team-coloured cape, so you can always tell who owns them.
+wool sails, llama carpets, saddle blankets and banners. Units in full metal
+armour get a team-coloured cape, so you can always tell who owns them. Mobs
+wear team colour too: skeletons get a dyed leather cap and tunic, and zombies
+a team shirt. Siege weapons fly a team flag.
 
-## Unit mapping
+## Units
 
-✅ = modelled in the current concept · 🧱 = planned
+All **90 units** of the game are modelled; the complete list is in
+[UNITS.md](UNITS.md). Each group has a preview sheet in `previews/roster_<group>.png`
+and an animation sample in `previews/anim_<group>.gif`.
 
-| AoE2 unit | Minecraft figure | Team colour on | |
-|---|---|---|---|
-| Villager | Villager (robe, crossed arms, big nose) | robe | ✅ |
-| Militia | Crafter with a wooden sword | shirt | ✅ |
-| Man-at-Arms | Crafter in a leather cap and tunic, stone sword | dyed leather | ✅ |
-| Long Swordsman | Chainmail armour, iron sword | shirt showing through the chainmail | ✅ |
-| Two-Handed Swordsman | Full iron armour, iron sword, cape | cape | ✅ |
-| Champion | Full diamond armour, diamond sword, cape | cape | ✅ |
-| Archer | Skeleton with a bow | leather cap and tunic | ✅ |
-| Crossbowman / Arbalest | Pillager with a crossbow / Pillager captain with a banner | banner, sleeves | 🧱 |
-| Skirmisher line | Snow Golem (lobs snowballs) | pumpkin band / scarf | 🧱 |
-| Spearman / Pikeman / Halberdier | Drowned with a trident | torn shirt | 🧱 |
-| Scout / Light Cavalry / Hussar | Crafter on a horse with leather horse armour | horse armour | 🧱 |
-| Knight / Cavalier / Paladin | Crafter on a horse with iron, gold or diamond horse armour | saddle blanket, cape | 🧱 |
-| Cavalry Archer | Skeleton horseman | cap, tunic | 🧱 |
-| Camel | Llama with a carpet | carpet | 🧱 |
-| Monk | Evoker (or Witch) | robe | 🧱 |
-| Battering Ram | Ravager | harness | 🧱 |
-| Mangonel / Onager | Dispenser on a minecart | banner | 🧱 |
-| Scorpion | Arrow dispenser on wheels | banner | 🧱 |
-| Bombard Cannon / Trebuchet | TNT cannon | banner | 🧱 |
-| Petard | Creeper | speckles in the skin | ✅ |
-| King (Regicide) | Crafter in netherite with a gold crown | cape | 🧱 |
-| Trade Cart | Minecart with a chest | banner | 🧱 |
-| Ships | Oak boats with team sails | sails | 🧱 |
-| Sheep | Sheep with dyed wool | wool | ✅ |
-| Wolf | Wolf | collar | 🧱 |
-| Deer / Boar / Turkey | Cow / Hoglin / Chicken | — (Gaia) | 🧱 |
+| Group | Minecraft take |
+|---|---|
+| Villager jobs | Minecraft villagers. They stand with crossed arms, and uncross them to work with the job's tool (axe, pickaxe, hoe, hammer, bow, fishing rod, shears). They carry logs, ore blocks, wheat or meat. The farmer wears a straw hat and the fisherman a bucket hat. |
+| Swordsmen | Crafters whose armour goes up the tiers: none → leather → chainmail → iron → diamond, with wood → stone → iron → diamond swords |
+| Spearmen | Drowned with tridents, gaining chainmail and iron |
+| Archers | Skeleton → Pillager (crossbow) → Pillager Captain with a banner. Skirmishers are Snow Golems. The Hand Cannoneer carries a copper firework gun. |
+| Eagle Warriors | Crafters in parrot-feather headdresses with clubs |
+| Cavalry | Crafters on horses in Minecraft horse armour: leather → iron → gold → diamond |
+| Camels | Llama riders; the llama wears a team carpet |
+| Cavalry Archers | Skeleton horsemen |
+| Monk / Missionary | Cleric villager in a hooded team robe with a book (the Missionary rides a donkey) |
+| Siege | Ravager rams (bare → iron-capped → netherite). Dispenser minecarts as mangonels. Crossbow turrets as scorpions. A TNT cannon with an obsidian barrel. A log-frame trebuchet that packs flat. |
+| Wagons | War Wagon as a covered wagon with a team canopy; Trade Cart as a chest minecart pulled by a donkey |
+| Ships | Minecraft boats scaled up, with team wool sails. The Fire Ship carries a campfire (soul fire when upgraded), the Demolition Ship is loaded with TNT, and the Cannon Galleon mounts a TNT cannon. |
+| Unique units | Longbowman → Stray · Woad Raider → Zombie · Chu Ko Nu → Illusioner · Throwing Axeman → Piglin · Huskarl → Piglin Brute · Samurai → Wither Skeleton · War Elephant → Iron Golem · Teutonic Knight → netherite knight · Janissary → Blaze · Berserk → Vindicator · Jaguar Warrior → ocelot-hooded warrior · Plumed Archer → Bogged · Cataphract → netherite-barded horseman · Mangudai → Pillager on horseback · Mameluke → Husk on a llama · Tarkan → Zombie on a zombie horse · Conquistador → firework rider · War Wagon → armoured wagon · Longboat → spruce longship with shields · Turtle Ship → turtle-shell ship |
+| Animals | Sheep (dyed wool) · Turkey → Chicken · Deer → Goat · Wild Boar → Hoglin · Javelina → Pig · Wolf |
 
-Unique-unit ideas: Teutonic Knight → netherite knight · Berserk / Throwing
-Axeman → Vindicator · Samurai → Piglin Brute · Woad Raider → Zombie ·
-War Elephant → Iron Golem · Mameluke → Blaze.
+![uniques](../previews/anim_uniques.gif)
 
 ## Buildings
 
@@ -131,17 +122,31 @@ Since the buildings are made of blocks, these come almost free:
 ## Animations
 
 AoE2 needs a set of sprites for each unit: **stand, walk, attack, die and
-decay** (the corpse). Each animation is stored for 5 directions (S, SW, W,
-NW, N). The game mirrors those to get NE, E and SE. Because the figures are 3D
-box models, every direction and frame is rendered automatically, with no
-redrawing by hand:
+decay** (the corpse), and villagers also walk while carrying. Each animation
+is stored for 5 directions (S, SW, W, NW, N). The game mirrors those to get
+NE, E and SE. Because the figures are 3D box models, every direction and
+frame is rendered automatically, with no redrawing by hand.
 
-* **walk**: legs and arms swing in opposite directions, the way Minecraft mobs walk
-* **attack**: an overhead chop (swordsmen), drawing the bow (archers)
-* **die**: Minecraft's death: the body tips over sideways and flashes red
-* **decay**: planned as the corpse turning into a puff of smoke, like mob deaths in Minecraft
+Each unit has a **rig** (how its body moves) and an **attack style**:
 
-![animations](../previews/animations.gif)
+| Attack style | Units | Motion |
+|---|---|---|
+| chop | swordsmen, cavalry, villagers at work | overhead swing |
+| thrust | spearmen | pull back, then stab |
+| bow | archers, cavalry archers | raise the bow, draw, release |
+| crossbow / gun | crossbowmen, hand cannoneers | recoil |
+| throw | skirmishers, throwing axemen, mamelukes | wind up and throw |
+| cast | monks | both arms raised, waving |
+| punch / slam | zombies, iron golem | arms swing together |
+| work motions | fisherman, forager, shepherd | cast the rod, bend and pick, snip |
+| ram / fire | ravagers, carts, ships | head-butt, recoil |
+| trebuchet | trebuchet | the counterweight drops and the arm throws over the top; it packs flat to move |
+
+Deaths use Minecraft's look: the body tips over sideways and flashes red.
+Siege burns and tips over, and ships sink. Decay (the corpse) is planned as a
+puff of smoke, like mob deaths in Minecraft.
+
+![animations](../previews/anim_infantry.gif)
 
 ## Pipeline
 
@@ -171,9 +176,9 @@ modding tools are only needed at step 4.
 
 ## Open questions
 
-* Villager: keep the crossed-arm Minecraft villager, even though work
-  animations (chopping, mining) would then need the arms to uncross? Or use a
-  Crafter in overalls for the villager?
+* Villager: idle villagers keep their arms crossed, and working villagers
+  uncross them. Is that the look you want, or should they always have free
+  arms?
 * Creeper: team-colour speckles, or plain green with only its feet in team
   colour?
 * Scale: are infantry at ≈ 45 px the right size next to the original
