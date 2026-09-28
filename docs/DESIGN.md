@@ -143,7 +143,8 @@ rule change: every civilisation can train him at a finished Wonder
 Wonder, 200 food and 100 gold, 30 s, 250 hit points, and infantry instead of
 the Monkey Boy's "predator animal" class, which Transport Ships refuse; he
 also gets the Militia's "board a Transport Ship" task if his task list lacks
-it). He gets his own Pac-Man icon, added at the end of the unit icon sheet
+it, and the Militia's terrain restriction: like the wild animals, the Monkey
+Boy may not stand on beaches, and ships unload onto the beach). He gets his own Pac-Man icon, added at the end of the unit icon sheet
 so no other unit's icon changes, and `langdll.py` renames him "Pac-Man" in
 the game's language files: his name string and the old name inside his
 button and help texts are rewritten in place (shorter text in the same

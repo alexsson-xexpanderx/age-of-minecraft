@@ -48,7 +48,8 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 10 if uid == 860 else 0))
     b += struct.pack("<hhhhbhfb", standing, -1, -1, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
-    b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
+    b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 1 if uid == 860 else 7,  # no beaches
+                     0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
     b += struct.pack("<iiibbbbbbbBbhbBfff", 105000 + uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
     b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
     if utype >= 20:
@@ -298,6 +299,7 @@ def test_full_build(tmp: Path):
         assert pac.values["cost"][:2] == (0, 200) and civ[4].values["enabled"] == 0  # nothing else changes
         assert pac.values["icon"] == 170  # his own icon, added to the sheet
         assert pac.values["class"] == 6  # infantry, not a predator animal: ships take him
+        assert pac.values["terrain_restriction"] == 7  # the Militia's: he may stand on the beach ships unload onto
     heads = datunits.read_unit_headers(datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes()), units)
     assert [(t[1], t[3], t[4]) for t in heads.tasks[860]] == [(0, 7, -1), (1, 3, 20)]  # the Militia's boarding task
     assert len(heads.tasks[74]) == 2 and heads.tasks[861] is None

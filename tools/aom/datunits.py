@@ -60,6 +60,7 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "button": "b", "cost": "hhhhhhhhh", "creatable_type": "b", "hotkey": "i", "name_id": "H",
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
            "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h",
+           "terrain_restriction": "h",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
 
 
@@ -103,7 +104,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.take("hhhh")  # placement side terrain, placement terrain
     r.take("ff")  # clearance size
     r.take("bb")  # hill mode, fog visibility
-    r.one("h")  # terrain restriction
+    f["terrain_restriction"] = r.p
+    v["terrain_restriction"] = r.one("h")  # which terrains the unit may stand on (a row of the restriction table)
     r.one("b")  # fly mode
     r.one("h")  # resource capacity
     r.one("f")  # resource decay

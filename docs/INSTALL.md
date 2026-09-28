@@ -111,7 +111,8 @@ next to `build_mod.bat`. You have two options:
 first button trains **Pac-Man** (200 food, 100 gold, 30 seconds, 250 hit
 points), with his own Pac-Man icon, and the game calls him **Pac-Man**. This
 works for every civilisation. He is infantry, not a wild animal like the cheat
-unit: he boards Transport Ships, garrisons like a foot soldier, and gets the
+unit: he boards Transport Ships (and gets off again on any shore), walks on
+beaches, garrisons like a foot soldier, and gets the
 Blacksmith's infantry upgrades and your civilisation's infantry bonuses.
 
 He has his own arcade sounds: click on him and he goes "waka-waka" (or

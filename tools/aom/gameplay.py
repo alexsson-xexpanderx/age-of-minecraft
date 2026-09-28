@@ -8,7 +8,10 @@ unit's icon changes), and his name in the language files becomes "Pac-Man".
 
 The Monkey Boy is a "predator animal" (unit class 10), and Transport Ships
 do not take animals. Pac-Man becomes infantry (class 6, like the Militia),
-and gets the Militia's "board a Transport Ship" task if he lacks it.
+and gets the Militia's "board a Transport Ship" task if he lacks it. Like
+the wild animals, the Monkey Boy may not stand on beaches (terrain
+restriction 1), and ships unload onto the beach ("Not close enough to land
+to unload"), so Pac-Man also walks where the Militia walks.
 
 He also gets his own sounds (sounds.py): new entries at the end of the
 sound table for clicking on him, ordering him around, training him, his
@@ -36,6 +39,7 @@ PACMAN_BUTTON = 1
 PACMAN_HP = 250  # the Monkey Boy has 50; a unit from a Wonder should last a bit longer
 INFANTRY = 6  # unit class: foot soldiers board ships, garrison, and get the Blacksmith's infantry upgrades
 MILITIA = 74
+LAND = 7  # the Militia's terrain restriction: land, beaches and shallows (the Monkey Boy's 1 has no beaches)
 UNIT_ICONS = 50730  # the unit icon sheet in interfac.drs
 PACMAN_NAME = "Pac-Man"
 HELP_STRINGS = 79000  # the .dat stores help text ids 79000 above the string's id in the language files
@@ -91,8 +95,11 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
     check = DU.read_units(bytes(data))  # read everything back: same layout, new values
     for units in check.units:
         pac = units[PACMAN_UNIT] if len(units) > PACMAN_UNIT else None
+        militia = units[MILITIA] if len(units) > MILITIA else None
+        land = militia.values["terrain_restriction"] if militia is not None else LAND
         if pac_done and pac is not None and pac.type >= 70 and (pac.values["train_location"] != WONDER_UNIT
-                                                                 or pac.values["class"] != INFANTRY):
+                                                                 or pac.values["class"] != INFANTRY
+                                                                 or pac.values["terrain_restriction"] != land):
             return None, notes + ["not changed: the patched file did not read back as expected"]
     if pac_done:
         try:
@@ -122,8 +129,10 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
         gfx = graphics.get(pac.values["standing"][0])
         if gfx is not None and not gfx.name.lower().startswith("mkyby"):
             return f"Pac-Man at the Wonder: not changed, unit {PACMAN_UNIT} is {pac.name!r} ({gfx.name})", None
+        militia = units[MILITIA]
+        land = militia.values["terrain_restriction"] if militia is not None else LAND
         DU.patch(data, pac, enabled=1, train_location=WONDER_UNIT, button=PACMAN_BUTTON, cost=PACMAN_COST,
-                 train_time=PACMAN_TIME, hit_points=PACMAN_HP, **{"class": INFANTRY})
+                 train_time=PACMAN_TIME, hit_points=PACMAN_HP, terrain_restriction=land, **{"class": INFANTRY})
         if icon is not None:
             DU.patch(data, pac, icon=icon)
         if strings is None:
@@ -135,7 +144,8 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
         return "Pac-Man at the Wonder: not changed, no civilisation has both the Monkey Boy and the Wonder", None
     return (f"Pac-Man (unit {PACMAN_UNIT}) trainable at the Wonder (unit {WONDER_UNIT}) for {patched} "
             f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points"
-            + (f", icon {icon}" if icon is not None else "")), strings
+            + (f", icon {icon}" if icon is not None else "")
+            + "; he walks on beaches like the Militia, so ships can unload him"), strings
 
 
 def _boarding(data: bytearray, civs) -> str:
