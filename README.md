@@ -18,6 +18,14 @@ team-colour regions ready for the game palette.
 See [docs/DESIGN.md](docs/DESIGN.md) for the art direction and the path into
 the game, and [docs/UNITS.md](docs/UNITS.md) for the full unit list.
 
+## Try it in your game
+
+You need AoE2: The Conquerors with UserPatch 1.5, and Python 3. Drag your
+*Age of Empires II* folder onto **`build_mod.bat`**, then start
+`age2_x1\AgeOfMinecraft.exe`. The build reads your own game files and
+writes a separate UserPatch mod, so your normal game stays untouched. Full
+steps and options are in [docs/INSTALL.md](docs/INSTALL.md).
+
 ## Previews
 
 ```sh
@@ -50,12 +58,20 @@ tools/aom/ships.py       boats and warships with team sails
 tools/aom/animals.py     sheep, chicken, goat, hoglin, pig, wolf
 tools/aom/roster.py      the full roster and preview groups
 tools/aom/buildings.py   block textures, block shapes (stairs, slabs, panes) and the buildings
+tools/aom/slp.py         SLP 2.0N sprite encoder/decoder
+tools/aom/drs.py         DRS archive reader/writer
+tools/aom/palette.py     game palette and colour matching
+tools/aom/datfile.py     graphics table reader for empires2_x1_p1.dat
+tools/aom/slpmap.py      which original sprite id each render replaces
+tools/aom/export.py      renders an animation in the original sprite's frame layout
+tools/build_mod.py       builds the mod from your game files (build_mod.bat on Windows)
 tools/concept_sheet.py   preview generator
+tools/tests/             format round trips and a full build against a fake game folder
 ```
 
 ## Status
 
-All 90 units are modelled and animated, and 2 buildings (House, Town Center)
-are built. Next come the palette quantisation and the SLP encoder, so the
-units can be tried in the game. After that, the Castle, walls and the other
-buildings.
+All 90 units are modelled and animated, and the exporter to the game is ready
+for a first in-game test. Two buildings (House, Town Center) are designed.
+Next come fixes from the first test, the last 5 units' sprite ids, then the
+Castle, walls and the other buildings.

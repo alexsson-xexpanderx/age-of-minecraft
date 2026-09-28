@@ -1,2 +1,2 @@
-pillow>=10.1
-numpy>=1.24
+numpy>=1.24          # rendering and building the mod
+pillow>=10.1         # previews only (concept_sheet.py)

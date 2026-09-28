@@ -156,23 +156,27 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
         ──import──▶  Data/graphics.drs  (on the player's PC)
 ```
 
-1. **Render** (`tools/aom`) — done. A small ray-caster draws the models from
-   the AoE2 camera angle. It keeps each pixel's kind (solid, team colour,
-   shadow, outline) separate, so the output can be converted exactly to SLP.
-2. **Quantise** — next. Snap solid colours to the AoE2 256-colour palette
-   (`50500` in `interfac.drs`). Team-colour pixels become player-colour
-   indices instead.
-3. **Encode SLP** — next. Write SLP 2.0N frames: outline table, row
-   commands, player-colour and shadow commands, and the hotspot at the unit's
+1. **Render** (`tools/aom`). A small ray-caster draws the models from the
+   AoE2 camera angle. It keeps each pixel's kind (solid, team colour, shadow,
+   outline) separate, so the output converts exactly to SLP.
+2. **Quantise** (`palette.py`). Solid colours snap to the game's own
+   256-colour palette (`50500` in `interfac.drs`), using nearest colour in
+   CIELAB. Team-colour pixels become the 8 player-colour shades.
+3. **Encode SLP** (`slp.py`). SLP 2.0N frames with outline tables, row
+   commands, player-colour, shadow and the team-colour silhouette outline
+   (shown when a unit is behind a building). The hotspot sits at the unit's
    feet.
-4. **Install** — on the player's PC. Replace the unit SLPs in `graphics.drs`
-   with a DRS editor, or ship them as a UserPatch data mod. Rename units in the
-   language DLL. Each replacement SLP must have the same number of frames per
-   direction as the one it replaces, or the frame counts must be changed in the
-   `.dat` with Advanced Genie Editor.
+4. **Match the original** (`build_mod.py`, on the player's PC). For each
+   original sprite (ids in `slpmap.py`), the frame count, angle count and
+   mirroring are read from the player's `graphics.drs` and `.dat`, and the
+   animation is rendered in exactly that layout. Extra layers of composite
+   sprites (ram heads, sails) are blanked.
+5. **Install** as a UserPatch 1.5 data mod: `Games\AgeOfMinecraft.xml`,
+   `Games\AgeOfMinecraft\Data\graphics.drs`, and
+   `age2_x1\AgeOfMinecraft.exe` made by `SetupAoC.exe -g:AgeOfMinecraft`.
+   A `--mode direct` fallback patches `Data\graphics.drs` with a backup.
 
-None of this needs the game on the machine that builds the mod. The game and
-modding tools are only needed at step 4.
+See [INSTALL.md](INSTALL.md) for how to run it.
 
 ## Open questions
 
