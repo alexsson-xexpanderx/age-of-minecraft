@@ -136,6 +136,46 @@ def replace_frame(data: bytes, index: int, frame: SlpFrame) -> bytes:
     return bytes(out + edges + offsets + commands)
 
 
+def append_frames(data: bytes, frames: list[SlpFrame]) -> bytes:
+    """A copy of an SLP with frames added at the end; the existing frames keep their pixels.
+
+    The frame table grows, so every stored offset (frame tables and row offsets) moves by the same amount.
+    """
+    version, n = struct.unpack_from("<4si", data, 0)
+    if version != b"2.0N":
+        raise ValueError(f"unsupported SLP version {version!r}")
+    shift = 32 * len(frames)
+    table_end = 32 + 32 * n
+    out = bytearray(data[:table_end]) + bytearray(shift) + bytearray(data[table_end:])
+    struct.pack_into("<i", out, 4, n + len(frames))
+    moved = set()
+    props = 0
+    for i in range(n):
+        at = 32 + 32 * i
+        cmd, outline, _, props_i, _, h = struct.unpack_from("<IIIIii", out, at)
+        props = props if i else props_i
+        struct.pack_into("<II", out, at, cmd + shift, outline + shift)
+        if cmd not in moved:  # a row table shared by several frames moves once
+            moved.add(cmd)
+            for r in range(max(0, h)):
+                p = cmd + shift + 4 * r
+                struct.pack_into("<I", out, p, struct.unpack_from("<I", out, p)[0] + shift)
+    for k, frame in enumerate(frames):
+        h, w = frame.pixels.shape
+        edges, rows = _encode_frame(frame)
+        outline_off = len(out)
+        cmd_table_off = outline_off + len(edges)
+        data_off = cmd_table_off + 4 * h
+        offsets, commands = bytearray(), bytearray()
+        for r in rows:
+            offsets += struct.pack("<I", data_off + len(commands))
+            commands += r
+        struct.pack_into("<IIIIiiii", out, 32 + 32 * (n + k), cmd_table_off, outline_off, 0, props, w, h,
+                         frame.hotspot[0], frame.hotspot[1])
+        out += edges + offsets + commands
+    return bytes(out)
+
+
 # --------------------------------------------------------------------------- reading
 
 @dataclass

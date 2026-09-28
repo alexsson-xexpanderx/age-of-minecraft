@@ -68,7 +68,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     f["name_id"] = r.p
     v["name_id"] = r.one("H")
     f["creation_id"] = r.p
-    r.one("H")
+    v["creation_id"] = r.one("H")
     v["class"] = r.one("h")
     f["standing"] = r.p
     v["standing"] = r.take("hh")
@@ -103,7 +103,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.one("f")  # multiple attribute mode
     r.one("b")  # minimap colour
     f["help_id"] = r.p
-    r.one("i")
+    v["help_id"] = r.one("i")
     f["hotkey_text_id"] = r.p
     r.one("i")
     f["hotkey"] = r.p

@@ -150,6 +150,17 @@ class Game:
         for g in self.graphics_table.values():
             self.by_slp.setdefault(g.slp, []).append(g)
 
+    def language_files(self) -> dict[str, Path]:
+        """The game's language files (unit names and help texts), read from their originals if backed up."""
+        from aom.langdll import FILES
+        found = {}
+        for name in FILES:
+            p = pick(self.root, name)
+            if p is not None:
+                backup = p.with_name(p.name + BACKUP)
+                found[p.name] = backup if backup.exists() else p
+        return found
+
     def _drs(self, name: str) -> Optional[Drs]:
         p = pick(self.data, name)
         if p is None:
@@ -542,8 +553,9 @@ def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Pat
     return game.data
 
 
-def write_game_file(game: Game, mode: str, name: str, data: bytes, log) -> None:
-    """Write a changed Data file: into the mod's Data folder, or over the game's own file (backed up once)."""
+def write_game_file(game: Game, mode: str, name: str, data: bytes, log, folder: Path = None) -> None:
+    """Write a changed game file: into the mod's Data folder, or over the game's own file in `folder` (the
+    Data folder by default), backed up once."""
     if mode == "upmod":
         games = pick(game.root, "Games") or (game.root / "Games")
         path = games / MOD / "Data" / name
@@ -551,7 +563,8 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log) -> None:
         path.write_bytes(data)
         log(f"wrote {path}")
         return
-    live = pick(game.data, name) or (game.data / name)
+    folder = folder or game.data
+    live = pick(folder, name) or (folder / name)
     backup = live.with_name(live.name + BACKUP)
     if live.exists() and not backup.exists():
         shutil.copy2(live, backup)
@@ -563,29 +576,33 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log) -> None:
 
 
 def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True) -> None:
-    """The .dat changes (Pac-Man at the Wonder, the Javelina's own sprites) and Pac-Man's icon."""
+    """The .dat changes (Pac-Man at the Wonder, the Javelina's own sprites), Pac-Man's icon and his name."""
     from aom import gameplay
     if game.dat_path is None:
         log(".dat changes: no empires2_x1_p1.dat found, skipped")
         return
-    patch, notes = gameplay.patch_dat(game.dat_path.read_bytes(), game.graphics_table, pacman, javelina)
+    archives = list(game.archives) + ([("interfac.drs", game.interfac)] if game.interfac is not None else [])
+    sheets = gameplay.icon_sheets(archives) if pacman else []
+    icon = gameplay.new_icon_index(sheets) if sheets else None
+    quant = Quantiser(game.palette)
+    new_sheets = []
+    for name, drs, sheet in sheets:  # every copy, so the load order cannot matter
+        new_sheet, msg = gameplay.add_icon(sheet, icon, quant)
+        new_sheets.append((name, drs, new_sheet))
+        log(f"Pac-Man icon in {name} (sheet {gameplay.UNIT_ICONS}, {slp.info(sheet).num_frames} icons): {msg}")
+    if pacman and not sheets:
+        log(f"Pac-Man icon: no unit icon sheet ({gameplay.UNIT_ICONS}) in {', '.join(n for n, _ in archives)}")
+    if not any(new for _, _, new in new_sheets):
+        icon = None  # he keeps the Monkey Boy's icon
+    patch, notes = gameplay.patch_dat(game.dat_path.read_bytes(), game.graphics_table, pacman, javelina, icon)
     for note in notes:
         log(note)
     if patch is None:
         return
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
-    if not pacman:
+    if not patch.pacman_strings:
         return
-    archives = list(game.archives) + ([("interfac.drs", game.interfac)] if game.interfac is not None else [])
-    sheets = gameplay.icon_sheets(archives)
-    if not sheets:
-        log(f"Pac-Man icon: no unit icon sheet ({gameplay.UNIT_ICONS}) in {', '.join(n for n, _ in archives)}")
-        return
-    quant = Quantiser(game.palette)
-    for name, drs, sheet in sheets:  # every copy, so the load order cannot matter
-        new_sheet, msg = gameplay.icon_sheet(sheet, quant)
-        info = slp.info(sheet)
-        log(f"Pac-Man icon in {name} (sheet {gameplay.UNIT_ICONS}, {info.num_frames} icons): {msg}")
+    for name, drs, new_sheet in new_sheets if icon is not None else []:
         if new_sheet is None:
             continue
         drs.put(gameplay.UNIT_ICONS, new_sheet)
@@ -593,13 +610,29 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         drs.write(tmp)
         write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
+    rename_pacman(game, mode, patch.pacman_strings, log)
+
+
+def rename_pacman(game: Game, mode: str, strings: dict[str, int], log) -> None:
+    """Pac-Man's name in the language files. The mod exe reads language_x1_p1.dll from the mod's Data folder."""
+    from aom import gameplay
+    paths = game.language_files()
+    changed, notes = gameplay.rename_pacman({name: p.read_bytes() for name, p in paths.items()}, strings)
+    for note in notes:
+        log(note)
+    for name, data in changed.items():
+        if mode == "upmod" and name.lower() != "language_x1_p1.dll":
+            log(f"Pac-Man's name: {name} left alone (a UserPatch mod only has its own language_x1_p1.dll); "
+                "build_mod_direct.bat renames him in the game's files")
+            continue
+        write_game_file(game, mode, name, data, log, folder=game.root)
 
 
 def restore(root: Path) -> int:
     data = pick(root, "Data")
     restored = 0
-    for p in data.iterdir() if data else []:
-        if p.name.endswith(BACKUP):
+    for p in [*(data.iterdir() if data else []), *root.iterdir()]:  # Data files, and the language files
+        if p.is_file() and p.name.endswith(BACKUP):
             live = p.with_name(p.name[:-len(BACKUP)])
             shutil.copy2(p, live)
             p.unlink()

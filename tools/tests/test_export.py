@@ -16,7 +16,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import build_mod  # noqa: E402
-from aom import slp  # noqa: E402
+from aom import langdll, slp  # noqa: E402
 from aom.datfile import read_graphics  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import render_frames  # noqa: E402
@@ -49,7 +49,7 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     b += struct.pack("<hhhhbhfb", standing, -1, -1, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
     b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
-    b += struct.pack("<iiibbbbbbbBbhbBfff", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
+    b += struct.pack("<iiibbbbbbbBbhbBfff", 105000 + uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
     b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
     if utype >= 20:
         b += struct.pack("<f", 1.0)
@@ -127,6 +127,12 @@ def fake_game(root: Path) -> Path:
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.write(data / "interfac.drs")
+    # the language files: Furious the Monkey Boy's name (5860), button (6860) and help (26860) texts
+    monkey = {5860: "Furious the Monkey Boy", 6860: "Create <b>Furious the Monkey Boy<b> (<cost>)",
+              26860: "Create <b>Furious the Monkey Boy<b> (<cost>)\nA very fast cheat unit.", 5861: "Next unit"}
+    (root / "language_x1_p1.dll").write_bytes(langdll.build_dll({5860: monkey[5860], 9999: "UserPatch"}))
+    (root / "language_x1.dll").write_bytes(langdll.build_dll(monkey))
+    (root / "language.dll").write_bytes(langdll.build_dll({5079: "Militia"}))
     graphics = Drs()
     table = []
     # militia (5 sprites), archer (5), a battering ram with a separate swinging head and wheels
@@ -275,12 +281,19 @@ def test_full_build(tmp: Path):
         pac = civ[860]
         assert pac.values["enabled"] == 1 and pac.values["train_location"] == 276 and pac.values["button"] == 1
         assert pac.values["cost"][:2] == (0, 200) and civ[4].values["enabled"] == 0  # nothing else changes
+        assert pac.values["icon"] == 170  # his own icon, added to the sheet
     icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     icons_after = slp.decode(Drs(mod / "Data" / "interfac.drs").get(50730))
-    assert len(icons_after) == len(icons_before)
-    assert np.array_equal(icons_after[0].pixels, icons_before[0].pixels)
-    assert not np.array_equal(icons_after[159].pixels, icons_before[159].pixels)
-    assert "trainable at the Wonder" in report
+    assert len(icons_after) == len(icons_before) + 1
+    assert all(np.array_equal(a.pixels, b.pixels) for a, b in zip(icons_after, icons_before))
+    assert icons_after[170].pixels.shape == (36, 36) and len(np.unique(icons_after[170].pixels)) >= 4
+    assert "trainable at the Wonder" in report and "Pac-Man is icon 170 (36x36)" in report
+    # his name: the mod has its own language_x1_p1.dll; the game's files are untouched
+    p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
+    assert langdll.read_string(p1, 5860) == "Pac-Man" and langdll.read_string(p1, 9999) == "UserPatch"
+    assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
+    assert not (mod / "Data" / "language_x1.dll").exists()
+    assert "'Furious the Monkey Boy' is now 'Pac-Man'" in report
     # the Javelina gets its own sprites: the missing files are created, the unit points at them
     table = read_graphics((game / "Data" / "empires2_x1_p1.dat").read_bytes())
     gid = {g.name: k for k, g in table.items()}
@@ -316,13 +329,42 @@ def test_direct_mode_and_restore(tmp: Path):
     game = fake_game(tmp / "aoe2")
     before = (game / "Data" / "graphics.drs").read_bytes()
     dat_before = (game / "Data" / "empires2_x1_p1.dat").read_bytes()
-    assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia,pacman", "--jobs", "1"]) == 0
+    lang_before = {n: (game / n).read_bytes() for n in langdll.FILES}
+    for _ in range(2):  # building twice starts from the originals again
+        assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia,pacman",
+                               "--jobs", "1"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() != before
     assert (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).read_bytes() == before
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() != dat_before
+    x1 = (game / "language_x1.dll").read_bytes()
+    assert [langdll.read_string(x1, i) for i in (5860, 6860, 26860, 5861)] == [
+        "Pac-Man", "Create <b>Pac-Man<b> (<cost>)", "Create <b>Pac-Man<b> (<cost>)\nA very fast cheat unit.",
+        "Next unit"]
+    assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Pac-Man"
+    assert (game / "language.dll").read_bytes() == lang_before["language.dll"]  # nothing of his in it
+    icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
+    assert len(icons) == 171  # one icon added, not one per build
     assert build_mod.main(["--game", str(game), "--restore"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() == before
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() == dat_before
+    assert {n: (game / n).read_bytes() for n in langdll.FILES} == lang_before
+    assert not list(game.glob("*" + build_mod.BACKUP))
+
+
+def test_language_files():
+    from aom import gameplay
+    x1 = langdll.build_dll({5860: "Furious the Monkey Boy", 6860: "Create Furious the Monkey Boy", 5861: "Next"})
+    p1 = langdll.build_dll({100: "UserPatch"})  # does not have him: the game falls back to language_x1.dll
+    changed, notes = gameplay.rename_pacman({"language_x1_p1.dll": p1, "language_x1.dll": x1},
+                                            {"name": 5860, "creation": 6860, "help": 26860})
+    assert list(changed) == ["language_x1.dll"] and len(changed["language_x1.dll"]) == len(x1)
+    assert langdll.read_string(changed["language_x1.dll"], 6860) == "Create Pac-Man"
+    assert langdll.read_string(changed["language_x1.dll"], 5861) == "Next"
+    short = langdll.build_dll({5860: "Mono"})  # a name shorter than "Pac-Man" cannot grow in place
+    changed, notes = gameplay.rename_pacman({"language_x1.dll": short}, {"name": 5860})
+    assert not changed and "does not fit" in notes[-1]
+    changed, notes = gameplay.rename_pacman({"language_x1.dll": p1}, {"name": 5860})
+    assert not changed and "in none of the language files" in notes[0]
 
 
 def main() -> None:

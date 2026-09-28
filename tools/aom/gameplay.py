@@ -3,8 +3,8 @@
 The easter egg lives in Furious the Monkey Boy's slot (unit 860), so the
 chat cheat still spawns him. Here every civilisation also gets him enabled,
 trained at the Wonder (unit 276), which exists only once a Wonder stands.
-The unit icon (frame 159 of the unit icon sheet in interfac.drs) becomes
-Pac-Man too.
+He gets his own icon, added at the end of the unit icon sheet (so no other
+unit's icon changes), and his name in the language files becomes "Pac-Man".
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from typing import Optional
 import numpy as np
 
 from . import datunits as DU
+from . import langdll
 from . import slp
 
 PACMAN_UNIT = 860
@@ -24,7 +25,8 @@ PACMAN_TIME = 30  # seconds
 PACMAN_BUTTON = 1
 PACMAN_HP = 250  # the Monkey Boy has 50; a unit from a Wonder should last a bit longer
 UNIT_ICONS = 50730  # the unit icon sheet in interfac.drs
-PACMAN_ICON = 159  # the Monkey Boy's icon in that sheet
+PACMAN_NAME = "Pac-Man"
+HELP_STRINGS = 79000  # the .dat stores help text ids 79000 above the string's id in the language files
 
 
 @dataclass
@@ -32,6 +34,7 @@ class DatPatch:
     data: bytes  # the recompressed .dat
     civs: int  # civilisations patched
     notes: list[str]
+    pacman_strings: dict[str, int] = None  # the Monkey Boy's text ids: name, creation, help (if Pac-Man was patched)
 
 
 def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
@@ -40,17 +43,19 @@ def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
     return patch, notes[0]
 
 
-def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True
+def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None
               ) -> tuple[Optional[DatPatch], list[str]]:
-    """All .dat changes: Pac-Man at the Wonder, and the Javelina's own sprites. Returns (patch, notes)."""
+    """All .dat changes: Pac-Man at the Wonder (with icon `icon`, if given), and the Javelina's own sprites.
+
+    Returns (patch, notes)."""
     try:
         data = bytearray(DU.decompress(raw))
         civs = DU.read_units(bytes(data))
     except Exception as exc:  # a .dat we cannot read exactly is left alone
         return None, [f"not changed: could not read the unit tables ({exc})"]
-    notes, changed, pac_done = [], False, False
+    notes, changed, pac_done, strings = [], False, False, None
     if pacman:
-        msg = _pacman(data, civs, graphics)
+        msg, strings = _pacman(data, civs, graphics, icon)
         pac_done = msg.startswith("Pac-Man (unit")
         changed |= pac_done
         notes.append(msg)
@@ -65,11 +70,11 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         pac = units[PACMAN_UNIT] if len(units) > PACMAN_UNIT else None
         if pac_done and pac is not None and pac.type >= 70 and pac.values["train_location"] != WONDER_UNIT:
             return None, notes + ["not changed: the patched file did not read back as expected"]
-    return DatPatch(DU.compress(bytes(data)), len(civs.units), notes), notes
+    return DatPatch(DU.compress(bytes(data)), len(civs.units), notes, strings if pac_done else None), notes
 
 
-def _pacman(data: bytearray, civs, graphics: dict) -> str:
-    patched = 0
+def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple[str, Optional[dict[str, int]]]:
+    patched, strings = 0, None
     for units in civs.units:
         if len(units) <= max(PACMAN_UNIT, WONDER_UNIT):
             continue
@@ -78,14 +83,21 @@ def _pacman(data: bytearray, civs, graphics: dict) -> str:
             continue
         gfx = graphics.get(pac.values["standing"][0])
         if gfx is not None and not gfx.name.lower().startswith("mkyby"):
-            return f"Pac-Man at the Wonder: not changed, unit {PACMAN_UNIT} is {pac.name!r} ({gfx.name})"
+            return f"Pac-Man at the Wonder: not changed, unit {PACMAN_UNIT} is {pac.name!r} ({gfx.name})", None
         DU.patch(data, pac, enabled=1, train_location=WONDER_UNIT, button=PACMAN_BUTTON, cost=PACMAN_COST,
                  train_time=PACMAN_TIME, hit_points=PACMAN_HP)
+        if icon is not None:
+            DU.patch(data, pac, icon=icon)
+        if strings is None:
+            strings = {"name": pac.values["name_id"], "creation": pac.values["creation_id"]}
+            if pac.values["help_id"] > HELP_STRINGS:
+                strings["help"] = pac.values["help_id"] - HELP_STRINGS
         patched += 1
     if not patched:
-        return "Pac-Man at the Wonder: not changed, no civilisation has both the Monkey Boy and the Wonder"
+        return "Pac-Man at the Wonder: not changed, no civilisation has both the Monkey Boy and the Wonder", None
     return (f"Pac-Man (unit {PACMAN_UNIT}) trainable at the Wonder (unit {WONDER_UNIT}) for {patched} "
-            f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points")
+            f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points"
+            + (f", icon {icon}" if icon is not None else "")), strings
 
 
 # The Javelina (unit 822) borrows the Wild Boar's sprites in The Conquerors; its own graphics
@@ -176,17 +188,23 @@ def icon_sheets(archives: list[tuple[str, object]]) -> list[tuple[str, object, b
     return out
 
 
-def icon_sheet(data: bytes, quant) -> tuple[Optional[bytes], str]:
-    """The unit icon sheet with Pac-Man's icon in the Monkey Boy's slot."""
+def new_icon_index(sheets: list[tuple[str, object, bytes]]) -> int:
+    """The icon number for Pac-Man: just past the longest copy of the sheet."""
+    return max(slp.info(sheet).num_frames for _, _, sheet in sheets)
+
+
+def add_icon(data: bytes, index: int, quant) -> tuple[Optional[bytes], str]:
+    """The unit icon sheet with Pac-Man's icon added as icon `index` (blank icons fill any gap before it)."""
     try:
         info = slp.info(data)
     except ValueError as exc:
         return None, f"not changed ({exc})"
-    if info.num_frames <= PACMAN_ICON:
-        return None, f"not changed: this sheet has {info.num_frames} icons, not {PACMAN_ICON + 1}"
-    w, h = info.sizes[PACMAN_ICON][:2]
-    if not (16 <= w <= 96 and 16 <= h <= 96):
-        return None, f"not changed: icon {PACMAN_ICON} is {w}x{h} pixels"
+    if info.num_frames > index:
+        return None, f"not changed: this sheet already has an icon {index}"
+    sizes = [(w, h) for w, h, _, _ in info.sizes if 16 <= w <= 96 and 16 <= h <= 96]
+    if not sizes:
+        return None, "not changed: no icon in this sheet has a usable size"
+    w, h = max(set(sizes), key=sizes.count)  # the size most icons have
     frame = pacman_icon(min(w, h))
     lut = {k: int(quant.indices(np.array([rgb], np.int64))[0]) for k, rgb in ICON_COLOURS.items()}
     px = np.vectorize(lut.get)(frame.pixels).astype(np.int16)
@@ -195,4 +213,43 @@ def icon_sheet(data: bytes, quant) -> tuple[Optional[bytes], str]:
         y0, x0 = (h - px.shape[0]) // 2, (w - px.shape[1]) // 2
         full[y0:y0 + px.shape[0], x0:x0 + px.shape[1]] = px
         px = full
-    return slp.replace_frame(data, PACMAN_ICON, slp.SlpFrame(px, (0, 0))), f"icon {PACMAN_ICON} ({w}x{h}) is now Pac-Man"
+    blank = slp.SlpFrame(np.full((1, 1), slp.TRANSPARENT, np.int16), (0, 0))
+    frames = [blank] * (index - info.num_frames) + [slp.SlpFrame(px, (0, 0))]
+    return slp.append_frames(data, frames), f"Pac-Man is icon {index} ({w}x{h})"
+
+
+def rename_pacman(files: dict[str, bytes], strings: dict[str, int]) -> tuple[dict[str, bytes], list[str]]:
+    """Pac-Man's name in the language files: his name string becomes "Pac-Man", and the old name is replaced
+    in his button and help texts. `files` maps file name -> contents; returns the changed files and notes."""
+    order = [n for n in langdll.FILES if n in files] + [n for n in files if n not in langdll.FILES]
+    old = None
+    for name in order:  # the name the game shows comes from the first file that has it
+        try:
+            old = langdll.read_string(files[name], strings["name"])
+        except (langdll.DllError, struct.error):
+            continue
+        if old:
+            break
+    if not old:
+        return {}, [f"Pac-Man's name: not changed, string {strings['name']} is in none of the language files "
+                    f"({', '.join(order) or 'none found'})"]
+    changed, notes = {}, []
+    for name in order:
+        data = files[name]
+        try:
+            for key, sid in strings.items():
+                text = langdll.read_string(data, sid)
+                if not text:
+                    continue
+                new = PACMAN_NAME if key == "name" else text.replace(old, PACMAN_NAME)
+                if new != text:
+                    data = langdll.set_string(data, sid, new)
+        except (langdll.DllError, struct.error) as exc:
+            notes.append(f"Pac-Man's name: {name} not changed ({exc})")
+            continue
+        if data != files[name]:
+            changed[name] = data
+    if changed:
+        notes.insert(0, f"Pac-Man's name: {old!r} is now {PACMAN_NAME!r} in {', '.join(changed)} "
+                        f"(strings {', '.join(str(v) for v in strings.values())})")
+    return changed, notes

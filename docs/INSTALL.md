@@ -73,8 +73,8 @@ next to `build_mod.bat`. You have two options:
 | `build_mod.bat "<game>" --only buildings,walls,wonders,nature,decorations,projectiles` | build only buildings and scenery (any of these groups) |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs` (no mod exe needed); a backup is kept as `graphics.drs.aom-backup` |
-| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, the rules file and the icons) |
-| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder) |
+| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, the rules file, the icons and the language files) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder, and the cheat unit keeps its name and icon) |
 | `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man at the Wonder, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
@@ -103,15 +103,22 @@ next to `build_mod.bat`. You have two options:
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.
 * Still original: cliffs, bridges, terrain, fire and explosions, ships sinking,
-  and the game's interface. Unit names are unchanged.
+  and the game's interface. Unit names are unchanged, except Pac-Man's.
 
 ## Easter eggs
 
 **Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
 first button trains **Pac-Man** (200 food, 100 gold, 30 seconds, 250 hit
-points), with his own Pac-Man icon. This works for every civilisation. It is
-the only change the mod makes to the game's rules; `--no-wonder-pacman`
-leaves the rules alone. His name in the game is still the cheat unit's.
+points), with his own Pac-Man icon, and the game calls him **Pac-Man**. This
+works for every civilisation. It is the only change the mod makes to the
+game's rules; `--no-wonder-pacman` leaves the rules alone.
+
+His name lives in the game's language files (`language_x1_p1.dll`,
+`language_x1.dll`, `language.dll`, in the game's main folder). `build_mod_direct.bat`
+renames him there, keeping a backup of each file it changes, and
+`restore_original.bat` puts them back. The UserPatch mod exe only reads its
+own `language_x1_p1.dll`; the report says whether his name could be changed
+there.
 
 > Multiplayer: because the rules change, every player needs the same build
 > of the mod, or the game goes out of sync.
