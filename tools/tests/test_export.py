@@ -42,8 +42,52 @@ def fake_palette() -> bytes:
     return f"JASC-PAL\r\n0100\r\n256\r\n{body}\r\n".encode()
 
 
-def fake_dat(graphics: list[dict]) -> bytes:
-    """A minimal empires2_x1_p1.dat: header sections plus the given graphics."""
+def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1) -> bytes:
+    """One unit record in the Conquerors layout (mirrors aom.datunits)."""
+    nb = name.encode()
+    b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 0))
+    b += struct.pack("<hhhhbhfb", standing, -1, -1, -1, 0, 30, 4.0, 0)
+    b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, -1, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
+    b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
+    b += struct.pack("<iiibbbbbbbBbhbBfff", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
+    b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
+    if utype >= 20:
+        b += struct.pack("<f", 1.0)
+    if utype >= 30:
+        b += struct.pack("<hhfbhbfbfffff", -1, -1, 0.0, 0, -1, 0, 0.0, 0, 0, 0, 0, 0, 0)
+    if utype >= 40:
+        b += struct.pack("<hffhhbhhb", -1, 0, 0, -1, -1, 0, -1, -1, 0)
+    if utype >= 50:
+        b += struct.pack("<hHHhfffhhbhfffbffhhhff", 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0)
+    if utype >= 70:
+        b += struct.pack("<hhhhhhhhhhhbffbbifbfffiibh", 0, 25, 1, 3, 25, 1, 4, 1, 0, 20, -1, 0, 0, 0, 2, 0, -1, 0, 0,
+                         0, 0, 0, -1, -1, 0, 0)
+    if utype == 80:
+        b += struct.pack("<hhbhbhhhhb", -1, -1, 0, 0, 0, -1, -1, -1, -1, 0) + bytes(40)
+        b += struct.pack("<hhhhbffh", -1, -1, -1, -1, 0, 0, 0, -1) + bytes(6)
+    return bytes(b)
+
+
+def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0) -> bytes:
+    """Civilisations with unit tables: filler units, the Wonder (276) and Furious the Monkey Boy (860)."""
+    out = bytearray()
+    for c in range(civs):
+        out += struct.pack("<b20sHhh", 1, f"civ{c}".encode(), 4, 1, 1) + struct.pack("<4f", 1, 2, 3, 4)
+        out += struct.pack("<bH", 0, slots)
+        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860)]
+        out += struct.pack(f"<{slots}i", *[1 if u in present else 0 for u in range(slots)])
+        for u in present:
+            if u == 276:
+                out += _unit_bytes(u, 80, "WNDR")
+            elif u == 860:
+                out += _unit_bytes(u, 70, "mkyby", monkey_graphic)
+            else:
+                out += _unit_bytes(u, 10, f"U{u}")
+    return bytes(out)
+
+
+def fake_dat(graphics: list[dict], civs: bytes = b"") -> bytes:
+    """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and unit tables)."""
     b = bytearray(b"VER 5.7\0")
     restrictions, terrains = 2, 3
     b += struct.pack("<HH", restrictions, terrains)
@@ -62,6 +106,7 @@ def fake_dat(graphics: list[dict]) -> bytes:
         b += struct.pack("<bhbb", 0, gid, g.get("mirror", 1), 0)
         for d in g.get("deltas", []):
             b += struct.pack("<hhihhhh", d, 0, 0, 0, 0, -1, 0)
+    b += civs
     c = zlib.compressobj(9, zlib.DEFLATED, -15)
     return c.compress(bytes(b)) + c.flush()
 
@@ -71,6 +116,8 @@ def fake_game(root: Path) -> Path:
     data.mkdir(parents=True)
     interfac = Drs()
     interfac.put(50500, fake_palette(), "bina")
+    icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
+    interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.write(data / "interfac.drs")
     graphics = Drs()
     table = []
@@ -116,9 +163,11 @@ def fake_game(root: Path) -> Path:
               {"name": "GOLDM_NN", "slp": 2561, "frames": 1, "angles": 7, "mirror": 0, "deltas": [base + 7, -1]},
               {"name": "BLAC2N1E", "slp": 2219, "frames": 23, "angles": 1, "mirror": 0},
               {"name": "ABGAL_ANE", "slp": 2219, "frames": 1, "angles": 16, "mirror": 0}]
+    table.append({"name": "mkyby_FN", "slp": 5299, "frames": 15, "angles": 8})
+    graphics.put(5299, build_mod.blank(15 * 5))
     graphics.put(40000, b"not a sprite we touch")
     graphics.write(data / "graphics.drs")
-    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table))
+    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=len(table) - 1)))
     return root
 
 
@@ -200,6 +249,19 @@ def test_full_build(tmp: Path):
     wall = slp.decode(out.get(2098))
     assert len({f.pixels.tobytes() for f in wall}) == 5  # five different wall pieces
     assert "BUILDINGS AND SCENERY" in report and "BRKS2NNE" in report and "FOAK_NN" in report
+    # Pac-Man can be trained at the Wonder, and has his own icon
+    from aom import datunits
+    units = datunits.read_units(datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes()))
+    for civ in units.units:
+        pac = civ[860]
+        assert pac.values["enabled"] == 1 and pac.values["train_location"] == 276 and pac.values["button"] == 1
+        assert pac.values["cost"][:2] == (0, 200) and civ[4].values["enabled"] == 0  # nothing else changes
+    icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
+    icons_after = slp.decode(Drs(mod / "Data" / "interfac.drs").get(50730))
+    assert len(icons_after) == len(icons_before)
+    assert np.array_equal(icons_after[0].pixels, icons_before[0].pixels)
+    assert not np.array_equal(icons_after[159].pixels, icons_before[159].pixels)
+    assert "trainable at the Wonder" in report
     assert "6 x 8 angles mirrored  [dat, plus 2 unused frames]" in report
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
@@ -220,11 +282,14 @@ def test_find_game(tmp: Path):
 def test_direct_mode_and_restore(tmp: Path):
     game = fake_game(tmp / "aoe2")
     before = (game / "Data" / "graphics.drs").read_bytes()
-    assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia", "--jobs", "1"]) == 0
+    dat_before = (game / "Data" / "empires2_x1_p1.dat").read_bytes()
+    assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia,pacman", "--jobs", "1"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() != before
     assert (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).read_bytes() == before
+    assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() != dat_before
     assert build_mod.main(["--game", str(game), "--restore"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() == before
+    assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() == dat_before
 
 
 def main() -> None:

@@ -133,6 +133,16 @@ stone with gold trim (and corner towers on the Town Center).
 | Map decorations | rocks, grass and flowers, cactus, hay bales, yurts, tents, ruins, graves, mob heads on posts, a statue, signposts, torches, waving banners, the relic as a golden reliquary |
 | Animals | Hawk → Phantom · Macaw → Parrot · Jaguar → Ocelot · Horse → horse · fish → cod, salmon, tropical fish and pufferfish · Marlin → Dolphin |
 
+### Easter eggs
+
+Pac-Man takes Furious the Monkey Boy's slot (unit 860): a voxel ball whose
+jaw chomps as he runs and attacks, and who dies the arcade way. A ghost in
+the owner's team colour takes the VDML cheat guy's. Pac-Man is also the one
+rule change: every civilisation can train him at a finished Wonder
+(`gameplay.py` patches his unit in the `.dat`: enabled, trained at the
+Wonder, 200 food and 100 gold, 30 s, 250 hit points) and his button gets a
+Pac-Man icon.
+
 ### Projectiles
 
 Arrows are Minecraft arrows (flint tip, white fletching), pitched as they

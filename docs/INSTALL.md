@@ -73,7 +73,8 @@ next to `build_mod.bat`. You have two options:
 | `build_mod.bat "<game>" --only buildings,walls,wonders,nature,decorations,projectiles` | build only buildings and scenery (any of these groups) |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs` (no mod exe needed); a backup is kept as `graphics.drs.aom-backup` |
-| `restore_original.bat` | undo `build_mod_direct.bat` |
+| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, the rules file and the icons) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder) |
 
 ## What to expect in this test
 
@@ -101,9 +102,18 @@ next to `build_mod.bat`. You have two options:
 
 ## Easter eggs
 
-Two hidden cheat units are replaced. In a single-player game, press **Enter**,
-type the cheat and press **Enter** again; the unit appears next to your Town
-Center:
+**Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
+first button trains **Pac-Man** (200 food, 100 gold, 30 seconds, 250 hit
+points), with his own Pac-Man icon. This works for every civilisation. It is
+the only change the mod makes to the game's rules; `--no-wonder-pacman`
+leaves the rules alone. His name in the game is still the cheat unit's.
+
+> Multiplayer: because the rules change, every player needs the same build
+> of the mod, or the game goes out of sync.
+
+**Cheats.** Two hidden cheat units are replaced. In a single-player game,
+press **Enter**, type the cheat and press **Enter** again; the unit appears
+next to your Town Center:
 
 | Cheat | You get |
 |---|---|

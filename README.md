@@ -9,7 +9,8 @@ the bombard. Creepers are the petards, and the fleet sails under team-coloured
 wool. All 90 units are modelled, and every building too: houses, town centers,
 castles, walls and gates in five Minecraft village styles that upgrade with
 each age, the eighteen wonders, and the whole map (forests, gold and stone,
-berry bushes, animals, fish and decorations).
+berry bushes, animals, fish and decorations). And an easter egg: build a
+Wonder and it trains Pac-Man.
 
 ![battle](previews/battle.png)
 
@@ -78,6 +79,9 @@ tools/aom/slp.py         SLP 2.0N sprite encoder/decoder
 tools/aom/drs.py         DRS archive reader/writer
 tools/aom/palette.py     game palette and colour matching
 tools/aom/datfile.py     graphics table reader for empires2_x1_p1.dat
+tools/aom/datunits.py    reads and patches the civilisations' unit tables in the .dat
+tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change and his icon
+tools/aom/easter.py      Pac-Man and the ghost
 tools/aom/slpmap.py      which original sprite id each unit render replaces
 tools/aom/spritemap.py   finds buildings, walls, trees and decorations by name in the .dat
 tools/aom/export.py      renders an animation in the original sprite's frame layout

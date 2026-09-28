@@ -125,11 +125,15 @@ class Game:
         self.graphics = Drs(backup if backup.exists() else self.graphics_path)  # always start from the original
         self.patch = self._drs("gamedata_x1_p1.drs")
         interfac = self._drs("interfac.drs")
+        self.interfac = interfac
         if interfac is None or interfac.get(50500, "bina") is None:
             raise SystemExit("Could not find the game palette (interfac.drs, 50500).")
         self.palette = parse_jasc(interfac.get(50500, "bina"))
         self.graphics_table: dict[int, Graphic] = {}
         dat = pick(self.data, "empires2_x1_p1.dat")
+        if dat is not None and dat.with_name(dat.name + BACKUP).exists():
+            dat = dat.with_name(dat.name + BACKUP)  # always start from the original rules
+        self.dat_path = dat
         try:
             self.graphics_table = read_graphics(dat) if dat else {}
             log(f"graphics table: {len(self.graphics_table)} graphics read from {dat.name}")
@@ -309,6 +313,8 @@ def main(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="plan and report only, write nothing")
     ap.add_argument("--restore", action="store_true", help="undo --mode direct from the backups")
     ap.add_argument("--no-exe", action="store_true", help="do not run UserPatch's SetupAoC.exe to create the mod exe")
+    ap.add_argument("--no-wonder-pacman", action="store_true",
+                    help="leave the game rules alone (Pac-Man then only comes with the cheat)")
     args = ap.parse_args(argv)
 
     report: list[str] = []
@@ -412,6 +418,8 @@ def main(argv=None) -> int:
         raise SystemExit(f"Windows would not let us write {exc.filename}.\n"
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
+    if not args.no_wonder_pacman and (only is None or "pacman" in only):
+        apply_gameplay(game, args.mode, log)
     exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
     write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics)
     log(f"done in {time.time() - started:.0f}s")
@@ -504,6 +512,51 @@ def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Pat
         tmp.replace(live)
         log(f"patched {live}")
     return game.data
+
+
+def write_game_file(game: Game, mode: str, name: str, data: bytes, log) -> None:
+    """Write a changed Data file: into the mod's Data folder, or over the game's own file (backed up once)."""
+    if mode == "upmod":
+        games = pick(game.root, "Games") or (game.root / "Games")
+        path = games / MOD / "Data" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        log(f"wrote {path}")
+        return
+    live = pick(game.data, name) or (game.data / name)
+    backup = live.with_name(live.name + BACKUP)
+    if live.exists() and not backup.exists():
+        shutil.copy2(live, backup)
+        log(f"backed up {live.name} -> {backup.name}")
+    tmp = live.with_name(live.name + ".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(live)
+    log(f"patched {live}")
+
+
+def apply_gameplay(game: Game, mode: str, log) -> None:
+    """Pac-Man at the Wonder: the .dat rule change and his unit icon."""
+    from aom import gameplay
+    if game.dat_path is None:
+        log("Pac-Man at the Wonder: no .dat found, skipped")
+        return
+    patch, msg = gameplay.wonder_pacman(game.dat_path.read_bytes(), game.graphics_table)
+    log(f"Pac-Man at the Wonder: {msg}")
+    if patch is None:
+        return
+    write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
+    sheet = game.interfac.get(gameplay.UNIT_ICONS) if game.interfac is not None else None
+    if sheet is None:
+        log("Pac-Man icon: the unit icon sheet is not in interfac.drs, icon unchanged")
+        return
+    new_sheet, msg = gameplay.icon_sheet(sheet, Quantiser(game.palette))
+    log(f"Pac-Man icon: {msg}")
+    if new_sheet is not None:
+        game.interfac.put(gameplay.UNIT_ICONS, new_sheet)
+        tmp = game.data / "interfac.drs.aom-new"
+        game.interfac.write(tmp)
+        write_game_file(game, mode, "interfac.drs", tmp.read_bytes(), log)
+        tmp.unlink()
 
 
 def restore(root: Path) -> int:

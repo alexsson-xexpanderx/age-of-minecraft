@@ -115,6 +115,27 @@ def encode(frames: list[SlpFrame]) -> bytes:
     return header + bytes(infos) + bytes(body)
 
 
+def replace_frame(data: bytes, index: int, frame: SlpFrame) -> bytes:
+    """A copy of an SLP with one frame swapped; every other frame keeps its original bytes."""
+    version, n = struct.unpack_from("<4si", data, 0)
+    if version != b"2.0N" or not 0 <= index < n:
+        raise ValueError("cannot replace that frame")
+    h, w = frame.pixels.shape
+    edges, rows = _encode_frame(frame)
+    outline_off = len(data)
+    cmd_table_off = outline_off + len(edges)
+    data_off = cmd_table_off + 4 * h
+    offsets, commands = bytearray(), bytearray()
+    for r in rows:
+        offsets += struct.pack("<I", data_off + len(commands))
+        commands += r
+    out = bytearray(data)
+    old_palette, old_props = struct.unpack_from("<II", data, 32 + 32 * index + 8)
+    struct.pack_into("<IIIIiiii", out, 32 + 32 * index, cmd_table_off, outline_off, old_palette, old_props, w, h,
+                     frame.hotspot[0], frame.hotspot[1])
+    return bytes(out + edges + offsets + commands)
+
+
 # --------------------------------------------------------------------------- reading
 
 @dataclass
