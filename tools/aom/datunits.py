@@ -60,7 +60,7 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "button": "b", "cost": "hhhhhhhhh", "creatable_type": "b", "hotkey": "i", "name_id": "H",
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
            "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h",
-           "terrain_restriction": "h",
+           "terrain_restriction": "h", "speed": "f",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
 
 
@@ -136,7 +136,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.skip(name_len)
     r.take("hh")  # copy id, base id
     if utype >= 20:  # flags and up: speed
-        r.one("f")
+        f["speed"] = r.p
+        v["speed"] = r.one("f")  # tiles per second
     if utype >= 30:  # dead units / fish: movement
         f["walking"] = r.p
         v["walking"] = r.take("hh")

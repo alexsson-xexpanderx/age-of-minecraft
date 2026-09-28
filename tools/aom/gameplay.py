@@ -37,6 +37,9 @@ PACMAN_COST = (0, 500, 1, 3, 500, 1, 4, 1, 0)  # 500 food, 500 gold, 1 populatio
 PACMAN_TIME = 30  # seconds
 PACMAN_BUTTON = 1
 PACMAN_HP = 250  # the Monkey Boy has 50; a unit from a Wonder should last a bit longer
+# tiles per second: faster than any unit, the cheats' Cobra Car (4.5) included; the fastest units you can train are
+# the Demolition Ship (1.6, 1.84 after Dry Dock) and the Hussar (1.5, 1.65 after Husbandry). The Monkey Boy has 0.99.
+PACMAN_SPEED = 5.0
 INFANTRY = 6  # unit class: foot soldiers board ships, garrison, and get the Blacksmith's infantry upgrades
 MILITIA = 74
 LAND = 7  # the Militia's terrain restriction: land, beaches and shallows (the Monkey Boy's 1 has no beaches)
@@ -132,7 +135,8 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
         militia = units[MILITIA]
         land = militia.values["terrain_restriction"] if militia is not None else LAND
         DU.patch(data, pac, enabled=1, train_location=WONDER_UNIT, button=PACMAN_BUTTON, cost=PACMAN_COST,
-                 train_time=PACMAN_TIME, hit_points=PACMAN_HP, terrain_restriction=land, **{"class": INFANTRY})
+                 train_time=PACMAN_TIME, hit_points=PACMAN_HP, speed=PACMAN_SPEED, terrain_restriction=land,
+                 **{"class": INFANTRY})
         if icon is not None:
             DU.patch(data, pac, icon=icon)
         if strings is None:
@@ -143,7 +147,8 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
     if not patched:
         return "Pac-Man at the Wonder: not changed, no civilisation has both the Monkey Boy and the Wonder", None
     return (f"Pac-Man (unit {PACMAN_UNIT}) trainable at the Wonder (unit {WONDER_UNIT}) for {patched} "
-            f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points"
+            f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points, "
+            f"speed {PACMAN_SPEED:g} (faster than any unit)"
             + (f", icon {icon}" if icon is not None else "")
             + "; he walks on beaches like the Militia, so ships can unload him"), strings
 
