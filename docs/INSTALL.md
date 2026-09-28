@@ -22,9 +22,17 @@ extract it anywhere, for example to your Desktop.
 
 ## 3. Build it
 
-Drag your **Age of Empires II** folder onto **`build_mod.bat`**. The folder
-is the one that contains `Data`, `age2_x1` and `SetupAoC.exe`, usually
-`C:\Program Files (x86)\Microsoft Games\Age of Empires II`.
+Open the extracted folder and **double-click `build_mod.bat`**. Leave it in
+that folder: it needs the `tools` folder next to it.
+
+* It looks for your game in the usual places, for example
+  `C:\Program Files (x86)\Microsoft Games\Age of Empires II`.
+* If it can't find the game, it asks for the folder. Open your
+  **Age of Empires II** folder in File Explorer (the one with the `Data`
+  folder inside), click the address bar at the top, copy the path, paste it
+  into the black window and press Enter.
+* Tip: if you extract the mod *inside* your Age of Empires II folder, it
+  always finds the game.
 
 The build takes about one to five minutes, depending on your PC. It writes:
 
@@ -35,10 +43,9 @@ Games\AgeOfMinecraft\aom_report.txt      what was replaced, what was skipped, an
 age2_x1\AgeOfMinecraft.exe               created by UserPatch's SetupAoC.exe
 ```
 
-> If your game is under *Program Files*, Windows may block writing there.
-> In that case, open **Command Prompt as administrator**, `cd` to the
-> extracted folder, and run
-> `build_mod.bat "C:\Program Files (x86)\Microsoft Games\Age of Empires II"`.
+> If your game is under *Program Files*, Windows may block writing there and
+> the window says so. Then right-click `build_mod.bat` and choose
+> **Run as administrator**.
 
 ## 4. Play
 

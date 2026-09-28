@@ -20,9 +20,9 @@ the game, and [docs/UNITS.md](docs/UNITS.md) for the full unit list.
 
 ## Try it in your game
 
-You need AoE2: The Conquerors with UserPatch 1.5, and Python 3. Drag your
-*Age of Empires II* folder onto **`build_mod.bat`**, then start
-`age2_x1\AgeOfMinecraft.exe`. The build reads your own game files and
+You need AoE2: The Conquerors with UserPatch 1.5, and Python 3.
+Double-click **`build_mod.bat`** (it finds your game or asks for the folder),
+then start `age2_x1\AgeOfMinecraft.exe`. The build reads your own game files and
 writes a separate UserPatch mod, so your normal game stays untouched. Full
 steps and options are in [docs/INSTALL.md](docs/INSTALL.md).
 

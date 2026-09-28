@@ -1,5 +1,6 @@
 """Build the Age of Minecraft mod for your own AoE2: The Conquerors + UserPatch 1.5.
 
+    python tools/build_mod.py            (finds the game, or asks for its folder)
     python tools/build_mod.py --game "C:\\Program Files (x86)\\Microsoft Games\\Age of Empires II"
 
 It reads your game's palette, sprite frame counts and graphics table, renders
@@ -154,6 +155,47 @@ class Game:
         return blanks
 
 
+COMMON_INSTALLS = [
+    r"C:\Program Files (x86)\Microsoft Games\Age of Empires II",
+    r"C:\Program Files\Microsoft Games\Age of Empires II",
+    r"C:\Program Files (x86)\Age of Empires II",
+    r"C:\Program Files\Age of Empires II",
+    r"C:\Games\Age of Empires II",
+    r"D:\Games\Age of Empires II",
+    r"C:\Age of Empires II",
+]
+
+
+def is_game(folder: Path) -> bool:
+    data = pick(folder, "Data")
+    return data is not None and pick(data, "graphics.drs") is not None
+
+
+def find_game(start: Path = Path(__file__).resolve()) -> Optional[Path]:
+    """The game folder: one this mod was unpacked into, or a usual install location."""
+    for folder in [start, *start.parents]:
+        if is_game(folder):
+            return folder
+    for c in COMMON_INSTALLS:
+        if is_game(Path(c)):
+            return Path(c)
+    return None
+
+
+def ask_for_game(log) -> Path:
+    found = find_game()
+    if found is not None:
+        log(f"found your game at {found}")
+        return found
+    print("Could not find Age of Empires II automatically.")
+    print("In File Explorer, open your Age of Empires II folder (the one with the Data folder),")
+    print("click the address bar at the top, copy the path, paste it here and press Enter.")
+    answer = Path(input("Game folder: ").strip().strip('"')).expanduser()
+    if not is_game(answer):
+        raise SystemExit(f"{answer} does not look like the game folder (no Data\\graphics.drs inside).")
+    return answer
+
+
 # --------------------------------------------------------------------------- rendering (worker processes)
 
 _STATE: dict = {}
@@ -177,7 +219,7 @@ def _render(job) -> tuple[int, bytes, int]:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Build the Age of Minecraft mod from your own AoE2 install.")
-    ap.add_argument("--game", required=True, type=Path, help="your Age of Empires II folder")
+    ap.add_argument("--game", type=Path, help="your Age of Empires II folder (found automatically if left out)")
     ap.add_argument("--mode", choices=("upmod", "direct"), default="upmod",
                     help="upmod: separate UserPatch mod (default); direct: patch Data\\graphics.drs (with backup)")
     ap.add_argument("--only", help="comma-separated unit keys (see docs/UNITS.md), e.g. militia,archer,villager")
@@ -193,7 +235,7 @@ def main(argv=None) -> int:
         print(msg)
         report.append(msg)
 
-    game_root = args.game.expanduser()
+    game_root = args.game.expanduser() if args.game else ask_for_game(log)
     if args.restore:
         return restore(game_root)
     game = Game(game_root, log)

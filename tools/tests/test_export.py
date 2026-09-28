@@ -163,6 +163,14 @@ def test_full_build(tmp: Path):
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
 
+def test_find_game(tmp: Path):
+    game = fake_game(tmp / "Age of Empires II")
+    unpacked = game / "age-of-minecraft" / "tools" / "build_mod.py"  # mod unzipped inside the game folder
+    unpacked.parent.mkdir(parents=True)
+    assert build_mod.find_game(unpacked) == game
+    assert build_mod.is_game(game) and not build_mod.is_game(tmp)
+
+
 def test_direct_mode_and_restore(tmp: Path):
     game = fake_game(tmp / "aoe2")
     before = (game / "Data" / "graphics.drs").read_bytes()
