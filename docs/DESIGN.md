@@ -116,7 +116,7 @@ stone with gold trim (and corner towers on the Town Center).
 | Watch / Guard Tower, Keep | wooden lookout → stone tower with battlements → keep with an overhanging top |
 | Bombard Tower | a squat deepslate tower with dispensers and TNT |
 | Outpost | a lookout post with a torch |
-| Palisade / Stone / Fortified Wall | spruce stakes / cobblestone wall / stone bricks with battlements; diagonal walls are block staircases |
+| Palisade / Stone / Fortified Wall | spruce stakes / cobblestone wall / stone bricks with battlements; diagonal walls are block staircases; ends and corners are pillars filling the tile, so every wall line joins up |
 | Gates | an arch with an iron-bar portcullis, down when shut and up when open, between two towers |
 | Castle | curtain walls, four corner towers, a gatehouse and a keep, in the civilisation's style |
 | Wonders | one per civilisation: Westminster, Chartres, Hagia Sophia, the Temple of Heaven, Templo Mayor, Tikal, Hwangnyongsa and the rest |
@@ -212,9 +212,10 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    count, angle count and mirroring are read from the player's
    `graphics.drs` and `.dat`, and the sprite is rendered in exactly that
    layout. Extra layers of composite sprites (ram heads, sails, building
-   shadows, roof pieces, flags) are blanked. Wall frames are matched to our
-   wall pieces by comparing outlines, and forest trees are grown to the
-   height of the tree they replace.
+   shadows, roof pieces, flags) are blanked. Each wall frame gets the piece
+   the game draws in it (frame 0 "/", 1 "\\", 2 the post at ends and
+   corners, 3 "--", 4 "|"), and forest trees are grown to the height of the
+   tree they replace.
 5. **Install** as a UserPatch 1.5 data mod: `Games\AgeOfMinecraft.xml`,
    `Games\AgeOfMinecraft\Data\graphics.drs`, and
    `age2_x1\AgeOfMinecraft.exe` made by `SetupAoC.exe -g:AgeOfMinecraft`.

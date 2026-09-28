@@ -1,15 +1,20 @@
 """Walls, gates, towers and the castle.
 
-Wall graphics in the game hold five pieces, one per "angle": a post and a
-straight segment in each of four screen directions. Our pieces:
+Wall graphics in the game hold five pieces, one per "angle". The game picks
+the angle from the wall's line: frame 0 runs along the map's y axis (screen
+"/"), frame 1 along its x axis (screen "\\"), frame 2 is the post used at
+both ends of a line and at its corners, frame 3 runs diagonally across the
+screen ("--") and frame 4 up and down it ("|"). Gates use the same order
+(letters A to D, without the post). Our pieces, in that order:
 
-    post  a pillar                      x  along model x   (screen "/")
-    y     along model y (screen "\\")   v  along x = y     (screen "|")
-    h     along x = -y (screen "--")
+    x     along model x (screen "/")    y  along model y (screen "\\")
+    post  a pillar filling the tile     h  along x = -y (screen "--")
+    v     along x = y (screen "|")
 
-Straight pieces are one block thick; diagonal ones are Minecraft block
-staircases, so a diagonal wall looks the way it would in Minecraft. The
-build matches each original wall frame to the piece with the same outline.
+Straight pieces are one block thick and reach just past the tile's edges, so
+neighbours join up; diagonal ones are Minecraft block staircases whose end
+blocks meet the next tile's at the corner. The post fills its whole tile, so
+a wall arriving from any side meets it.
 """
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ from .structures import flag, team_banner, torch
 from .styles import Style, style_for
 
 B = V.BLOCK
-PIECES = ("post", "x", "y", "v", "h")
+PIECES = ("x", "y", "post", "h", "v")  # the game's frame order
 
 
 def _cell(name: str) -> V.Structure:
@@ -29,7 +34,7 @@ def _cell(name: str) -> V.Structure:
 
 
 def _piece_cells(piece: str) -> list[tuple[int, int]]:
-    return {"post": [(1, 1)], "x": [(0, 1), (1, 1), (2, 1)], "y": [(1, 0), (1, 1), (1, 2)],
+    return {"post": [(x, y) for x in range(3) for y in range(3)], "x": [(0, 1), (1, 1), (2, 1)], "y": [(1, 0), (1, 1), (1, 2)],
             "v": [(0, 0), (1, 1), (2, 2)], "h": [(2, 0), (1, 1), (0, 2)]}[piece]
 
 
@@ -73,18 +78,25 @@ def wall_piece(kind: str, style: str, piece: str, damage: int = 0, progress: flo
             continue
         if kind == "palisade":
             s.set(x, y, height, "spruce_log", "post")  # sharpened stakes
+        elif piece == "post":
+            continue  # the pillar gets its own top below
         elif kind == "stone":
             if not damage or rng.random() > 0.4:
                 s.set(x, y, height, top, "wall")
         elif (x + y) % 2 == 0 and (not damage or rng.random() > 0.5):
             s.set(x, y, height, top)
     if piece == "post" and progress >= 1:
-        x, y = cells[0]
-        extra = {"palisade": 1, "stone": 1, "fortified": 2}[kind]
-        for z in range(height, height + extra):
-            s.set(x, y, z, top if kind != "palisade" else "spruce_log")
-        if kind != "palisade":
-            s.set(x, y, height + extra, top, "slab")
+        if kind == "palisade":  # the middle stake stands a log taller
+            s.set(1, 1, height, "spruce_log")
+            s.set(1, 1, height + 1, "spruce_log", "post")
+        else:  # a pillar one block taller than the wall, with a battlement on its corners
+            for x in range(3):
+                for y in range(3):
+                    if not damage or rng.random() > 0.3 * damage:
+                        s.set(x, y, height, body)
+            for x, y in ((0, 0), (2, 0), (0, 2), (2, 2)):
+                if not damage or rng.random() > 0.4:
+                    s.set(x, y, height + 1, top, "wall" if kind == "stone" else "full")
     if damage >= 2:
         for (x, y) in cells:
             if rng.random() < 0.5:

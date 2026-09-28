@@ -265,6 +265,8 @@ def test_full_build(tmp: Path):
     assert out.get(2219) == orig.get(2219)  # shared with a ship: left alone
     wall = slp.decode(out.get(2098))
     assert len({f.pixels.tobytes() for f in wall}) == 5  # five different wall pieces
+    w = [f.pixels.shape[1] for f in wall]  # in the game's order: "/", "\", the post, "--", "|"
+    assert w[3] > 1.5 * w[4] and w[2] > w[0] > w[4]
     assert "BUILDINGS AND SCENERY" in report and "BRKS2NNE" in report and "FOAK_NN" in report
     # Pac-Man can be trained at the Wonder, and has his own icon
     from aom import datunits

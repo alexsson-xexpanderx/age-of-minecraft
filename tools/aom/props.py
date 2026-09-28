@@ -6,8 +6,7 @@ the original SLP's frames are organised:
     mode "variants"  each frame is a different variant (trees in a forest, house styles)
     mode "anim"      frames are an animation (flags, torches), angles are variants
     mode "facing"    angles are directions the object faces (signposts, the relic)
-    mode "match"     each frame is one of several pieces; pick the one whose outline
-                     matches the original frame (wall pieces)
+    mode "pieces"    each angle is one wall piece, in the game's fixed order (walls)
     mode "overlay"   an animated layer drawn over a static base (mill sails, forge smoke):
                      only the pixels that differ from the base are kept
 
@@ -144,12 +143,6 @@ def build(spec: dict, variant: int = 0, count: int = 1, t: float = 0.0, fit: Opt
     raise KeyError(m)
 
 
-def candidates(spec: dict, t: float = 0.0) -> list[Part]:
-    """Pieces to choose from in `match` mode."""
-    return [build({**spec, "piece": piece, "progress": spec.get("progress", 1.0) if "stages" not in spec
-                   else max(0.25, t)}) for piece in FT.PIECES]
-
-
 # --------------------------------------------------------------------------- rendering
 
 SHADOWS = {"on": True}
@@ -178,69 +171,26 @@ def frame_fit(frame: slp.SlpFrame) -> dict:
             "left": float(hx - xs.min()), "right": float(xs.max() - hx)}
 
 
-def _iou(a: np.ndarray, ah: tuple, b: np.ndarray, bh: tuple) -> float:
-    """Overlap of two masks aligned on their hotspots."""
-    x0 = min(-ah[0], -bh[0])
-    y0 = min(-ah[1], -bh[1])
-    x1 = max(a.shape[1] - ah[0], b.shape[1] - bh[0])
-    y1 = max(a.shape[0] - ah[1], b.shape[0] - bh[1])
-    A = np.zeros((y1 - y0, x1 - x0), bool)
-    Bm = np.zeros_like(A)
-    A[-ah[1] - y0:-ah[1] - y0 + a.shape[0], -ah[0] - x0:-ah[0] - x0 + a.shape[1]] = a
-    Bm[-bh[1] - y0:-bh[1] - y0 + b.shape[0], -bh[0] - x0:-bh[0] - x0 + b.shape[1]] = b
-    union = (A | Bm).sum()
-    return float((A & Bm).sum() / union) if union else 0.0
-
-
 def _shifted(frame: slp.SlpFrame, shift) -> slp.SlpFrame:
     if not shift:
         return frame
     return slp.SlpFrame(frame.pixels, (frame.hotspot[0] - int(round(shift[0])), frame.hotspot[1] - int(round(shift[1]))))
 
 
-def _match_pieces(spec, orig, used, F, stored, quant, cache) -> list[slp.SlpFrame]:
-    """For every frame, the wall piece whose outline best matches the original frame.
-
-    Frames that form one complete set of pieces (5 angles, one per piece) are
-    matched one-to-one, so every piece is used exactly once per set.
-    """
-    from itertools import permutations
-
-    def rendered_at(t):
-        key = round(t, 3)
-        if key not in cache:
-            outs = []
-            for c in candidates(spec, t):
-                f, cam = _render(c, HEADING)
-                outs.append(_crop(_codes(f, quant), cam.origin))
-            cache[key] = outs
-        return cache[key]
-
-    picks: list = [None] * used
-    groups: dict[float, list[int]] = {}
+def _wall_pieces(spec, used, F, stored, quant, cache) -> list[slp.SlpFrame]:
+    """Every frame's wall piece: angle a shows FT.PIECES[a]; walls being built grow over an angle's frames."""
+    out = []
     for k in range(used):
         a, fi = divmod(k, F)
         t = fi / max(1, F - 1) if F > 1 and k < F * stored else 1.0
-        groups.setdefault(round(t, 3), []).append(k)
-    for t, ks in groups.items():
-        pieces = rendered_at(t)
-        if orig is None:
-            for i, k in enumerate(ks):
-                picks[k] = pieces[i % len(pieces)]
-            continue
-        scores = np.zeros((len(ks), len(pieces)))
-        for i, k in enumerate(ks):
-            if k < len(orig):
-                om, oh = solid_mask(orig[k])
-                scores[i] = [_iou(om, oh, r.pixels >= 0, r.hotspot) for r in pieces]
-        if len(ks) == len(pieces):
-            best = max(permutations(range(len(pieces))), key=lambda perm: sum(scores[i, j] for i, j in enumerate(perm)))
-            for i, k in enumerate(ks):
-                picks[k] = pieces[best[i]]
-        else:
-            for i, k in enumerate(ks):
-                picks[k] = pieces[int(np.argmax(scores[i]))]
-    return picks
+        piece = FT.PIECES[a % len(FT.PIECES)]
+        progress = max(0.25, t) if spec.get("stages") else spec.get("progress", 1.0)
+        key = (piece, round(progress, 3))
+        if key not in cache:
+            f, cam = _render(build({**spec, "piece": piece, "progress": progress}), HEADING)
+            cache[key] = _crop(_codes(f, quant), cam.origin)
+        out.append(cache[key])
+    return out
 
 
 def render_static(spec: dict, num_frames: int, frames_per_angle: int, angle_count: int, mirroring: bool,
@@ -250,8 +200,8 @@ def render_static(spec: dict, num_frames: int, frames_per_angle: int, angle_coun
     F = max(1, frames_per_angle)
     hs = headings(angle_count, mirroring)
     stored = len(hs)
-    used = num_frames if mode in ("variants", "match", "static") else min(num_frames, F * stored)
-    orig = slp.decode(original) if original and (spec.get("fit") or mode == "match") else None
+    used = num_frames if mode in ("variants", "pieces", "static") else min(num_frames, F * stored)
+    orig = slp.decode(original) if original and spec.get("fit") else None
     shift = spec.get("shift")
     SHADOWS["on"] = spec.get("shadow", True)  # projectiles fly: the game draws their shadows separately
     out: list[slp.SlpFrame] = []
@@ -271,10 +221,9 @@ def render_static(spec: dict, num_frames: int, frames_per_angle: int, angle_coun
             codes_f, codes_b = _codes(ff, quant), _codes(fb, quant)
             layer = np.where(codes_f != codes_b, codes_f, slp.TRANSPARENT).astype(np.int16)
             out.append(_shifted(_crop(layer, cam.origin), shift))
-    elif mode == "match":
-        picks = _match_pieces(spec, orig, used, F, stored, quant, cache)
-        for k in range(used):
-            out.append(_shifted(picks[k], shift))
+    elif mode == "pieces":
+        for piece in _wall_pieces(spec, used, F, stored, quant, cache):
+            out.append(_shifted(piece, shift))
     else:
         for k in range(used):
             a, fi = divmod(k, F)

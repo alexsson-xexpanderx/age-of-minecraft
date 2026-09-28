@@ -142,7 +142,7 @@ def plan(graphics: dict, taken: set[int] = frozenset()) -> Plan:
             style = STYLE_OF[m.group(3) or "G"]
             wall_layer = "1" if kind == "palisade" else "N"
             if m.group(2) == wall_layer:
-                add(g, {"model": "wall", "kind": kind, "style": style, "mode": "match"})
+                add(g, {"model": "wall", "kind": kind, "style": style, "mode": "pieces"})
             else:
                 blank(g, "wall shadow or flag", r"^WALL")
             continue
@@ -150,7 +150,7 @@ def plan(graphics: dict, taken: set[int] = frozenset()) -> Plan:
         if m:
             if m.group(3) == "N":
                 add(g, {"model": "wall", "kind": "stone" if m.group(1) == "1" else "fortified",
-                        "style": m.group(4), "damage": "ABC".index(m.group(2)) + 1, "mode": "match"},
+                        "style": m.group(4), "damage": "ABC".index(m.group(2)) + 1, "mode": "pieces"},
                     "damaged wall")
             else:
                 blank(g, "damaged wall shadow", r"^WDS")
@@ -159,7 +159,7 @@ def plan(graphics: dict, taken: set[int] = frozenset()) -> Plan:
         if m:
             if m.group(2) == "N":
                 add(g, {"model": "wall", "kind": "stone" if m.group(1) == "2" else "fortified",
-                        "style": m.group(3), "mode": "match", "stages": True}, "wall being built")
+                        "style": m.group(3), "mode": "pieces", "stages": True}, "wall being built")
             else:
                 blank(g, "wall construction shadow", r"^WCON")
             continue

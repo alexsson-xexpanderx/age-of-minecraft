@@ -47,6 +47,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/village.png` | a Dark Age village with fields, a forest and mines |
 | `previews/buildings.png` | every building in the five village styles and the ages |
 | `previews/fortifications.png` | walls, gates, towers and castles |
+| `previews/walls.png` | wall lines in every direction and with corners, placed as the game places them |
 | `previews/wonders.png` | the eighteen wonders and the scenario monuments |
 | `previews/nature.png` | trees, resources and map decorations |
 | `previews/player_colors.png` | a unit in all 8 player colours |

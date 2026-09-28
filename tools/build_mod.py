@@ -398,8 +398,7 @@ def main(argv=None) -> int:
                 skipped.append((Target(sp.slp, sp.source, "static"), str(exc)))
                 continue
             frames, angles, mirrored, _, _ = game.layout(sp.slp, n)
-            needs = sp.spec.get("fit") or sp.spec.get("mode") == "match"
-            original = game.original(sp.spec.get("fit_slp", sp.slp)) if needs else None
+            original = game.original(sp.spec.get("fit_slp", sp.slp)) if sp.spec.get("fit") else None
             jobs.append(("static", sp.slp, sp.spec, n, frames, angles, mirrored, original))
             statics.append((sp, n))
         static_blanks = {s: why for s, why in sprite_plan.blanks.items()

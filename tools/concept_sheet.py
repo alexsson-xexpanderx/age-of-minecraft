@@ -13,6 +13,7 @@ Writes into previews/ by default:
     buildings.png       every building in the five village styles
     wonders.png         the eighteen wonders and the scenario monuments
     fortifications.png  walls, gates, towers and castles
+    walls.png           wall lines in every direction, with corners, as the game places them
     nature.png          trees, resources and map decorations
 and docs/UNITS.md, the full unit list.
 """
@@ -341,6 +342,38 @@ def fortifications_sheet(out: Path) -> None:
     structure_sheet("Walls, gates, towers and castles", rows, out)
 
 
+def wall_line(kind: str, style: str, tiles: list[tuple[float, float]]) -> list[tuple[dict, float, float]]:
+    """Wall tiles along a path, with the piece the game picks for each: posts at the ends and corners."""
+    from aom.fortifications import PIECES
+    spots = []
+    for k, (i, j) in enumerate(tiles):
+        before = tiles[k - 1] if k else None
+        after = tiles[k + 1] if k + 1 < len(tiles) else None
+        if before is None or after is None or (i - before[0], j - before[1]) != (after[0] - i, after[1] - j):
+            piece = "post"
+        else:
+            di, dj = after[0] - i, after[1] - j
+            if di < 0 or (di == 0 and dj < 0):
+                di, dj = -di, -dj
+            # i runs along screen "\\" (the game's frame 1), j along "/" (frame 0); diagonals are frames 3 and 4
+            piece = PIECES[{(1, 0): 1, (0, 1): 0, (1, -1): 3, (1, 1): 4}[(di, dj)]]
+        spots.append(({"model": "wall", "kind": kind, "style": style, "piece": piece}, i, j))
+    return spots
+
+
+def walls_scene(out: Path) -> None:
+    """Palisade, stone and fortified walls, one row each: "--", "\\" and "|" lines, then a corner."""
+    spots = []
+    for n, (kind, style) in enumerate((("palisade", "G"), ("stone", "E"), ("fortified", "W"))):
+        o = 6 * n  # the next row, lower down the screen
+        spots += wall_line(kind, style, [(o + k, o - k) for k in range(4)])
+        spots += wall_line(kind, style, [(o + 4 + k, o - 6) for k in range(4)])
+        spots += wall_line(kind, style, [(o + 6 + k, o - 10 + k) for k in range(4)])
+        spots += wall_line(kind, style, [(o + 8, o - 13), (o + 8, o - 12), (o + 8, o - 11), (o + 9, o - 11),
+                                         (o + 10, o - 11)])
+    compose(place_buildings(spots), out, k=1)
+
+
 def nature_sheet(out: Path) -> None:
     rows = [("Forests", [(f, {"model": "tree", "forest": f, "variant": v})
                          for f, v in (("oak", 0), ("oak", 4), ("forest", 1), ("pine", 0), ("snow", 2), ("palm", 1),
@@ -378,7 +411,8 @@ def battle_scene(out: Path, units: dict[str, Unit]) -> None:
     placed = place_buildings([(B("CSTL", "W", 3), 1.5, 1.5), (B("HOUS", "W", 3), -2.0, 5.0),
                               (B("WCTW", "W", 3, level=2), 5.0, -1.0)])
     for k in range(4):
-        placed += place_buildings([({"model": "wall", "kind": "stone", "style": "W", "piece": "y"}, 4.2, k - 0.3)])
+        placed += place_buildings([({"model": "wall", "kind": "stone", "style": "W",
+                                     "piece": "post" if k in (0, 3) else "x"}, 4.2, k - 0.3)])
     army = [
         ("knight", 1, 5.2, 5.0, 7, "attack", 0.5), ("paladin", 1, 4.4, 6.0, 7, "idle", 0),
         ("crossbowman", 1, 2.4, 5.6, 7, "attack", 0.5), ("hand_cannoneer", 1, 5.8, 3.2, 7, "idle", 0),
@@ -470,6 +504,7 @@ def main() -> None:
     buildings_sheet(out / "buildings.png")
     wonders_sheet(out / "wonders.png")
     fortifications_sheet(out / "fortifications.png")
+    walls_scene(out / "walls.png")
     nature_sheet(out / "nature.png")
     unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")
