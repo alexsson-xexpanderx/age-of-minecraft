@@ -33,7 +33,9 @@ from . import slp
 
 PACMAN_UNIT = 860
 WONDER_UNIT = 276
-PACMAN_COST = (0, 200, 1, 3, 100, 1, 4, 1, 0)  # 200 food, 100 gold, 1 population
+# (resource, amount, paid) x 3: 500 food (0), 500 gold (3), 500 stone (2). A unit has only three cost slots, so
+# stone takes the one that usually holds "1 population headroom": Pac-Man takes no population space.
+PACMAN_COST = (0, 500, 1, 3, 500, 1, 2, 500, 1)
 PACMAN_TIME = 30  # seconds
 PACMAN_BUTTON = 1
 PACMAN_HP = 250  # the Monkey Boy has 50; a unit from a Wonder should last a bit longer
@@ -143,7 +145,8 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
     if not patched:
         return "Pac-Man at the Wonder: not changed, no civilisation has both the Monkey Boy and the Wonder", None
     return (f"Pac-Man (unit {PACMAN_UNIT}) trainable at the Wonder (unit {WONDER_UNIT}) for {patched} "
-            f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points"
+            f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_COST[7]} stone, "
+            f"{PACMAN_TIME} s, {PACMAN_HP} hit points"
             + (f", icon {icon}" if icon is not None else "")
             + "; he walks on beaches like the Militia, so ships can unload him"), strings
 

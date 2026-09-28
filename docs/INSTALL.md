@@ -108,8 +108,10 @@ next to `build_mod.bat`. You have two options:
 ## Easter eggs
 
 **Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
-first button trains **Pac-Man** (200 food, 100 gold, 30 seconds, 250 hit
-points), with his own Pac-Man icon, and the game calls him **Pac-Man**. This
+first button trains **Pac-Man** (500 food, 500 gold, 500 stone, 30 seconds,
+250 hit points), with his own Pac-Man icon, and the game calls him **Pac-Man**.
+He takes no population space (a unit has only three cost slots, and stone
+needs the one that usually holds the population). This
 works for every civilisation. He is infantry, not a wild animal like the cheat
 unit: he boards Transport Ships (and gets off again on any shore), walks on
 beaches, garrisons like a foot soldier, and gets the

@@ -296,7 +296,8 @@ def test_full_build(tmp: Path):
     for civ in units.units:
         pac = civ[860]
         assert pac.values["enabled"] == 1 and pac.values["train_location"] == 276 and pac.values["button"] == 1
-        assert pac.values["cost"][:2] == (0, 200) and civ[4].values["enabled"] == 0  # nothing else changes
+        assert pac.values["cost"] == (0, 500, 1, 3, 500, 1, 2, 500, 1)  # 500 food, 500 gold, 500 stone
+        assert civ[4].values["enabled"] == 0  # nothing else changes
         assert pac.values["icon"] == 170  # his own icon, added to the sheet
         assert pac.values["class"] == 6  # infantry, not a predator animal: ships take him
         assert pac.values["terrain_restriction"] == 7  # the Militia's: he may stand on the beach ships unload onto
