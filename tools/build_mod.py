@@ -124,14 +124,22 @@ class Game:
                 return drs.get(slp_id)
         return None
 
-    def layout(self, slp_id: int, num_frames: int) -> tuple[int, int, bool, str]:
-        """(frames per angle, angle count, mirrored, source) matching the original sprite."""
-        for g in self.by_slp.get(slp_id, []):
-            if g.stored_angles * max(1, g.frame_count) == num_frames:
-                return max(1, g.frame_count), max(1, g.angle_count), bool(g.mirroring), "dat"
+    def layout(self, slp_id: int, num_frames: int) -> tuple[int, int, bool, int, str]:
+        """(frames per angle, angle count, mirrored, extra frames, source) matching the original sprite.
+
+        The game finds a frame as angle * frames per angle + frame, using the counts in the .dat, so
+        the .dat wins. Some original files carry a few frames more than the .dat uses; those are
+        filled with copies of the last frame so the file keeps its frame count."""
+        fits = [(g.stored_angles * max(1, g.frame_count), g) for g in self.by_slp.get(slp_id, [])]
+        fits = [(used, g) for used, g in fits if used <= num_frames]
+        if fits:
+            used, g = max(fits, key=lambda f: f[0])
+            extra = num_frames - used
+            source = f"dat, plus {extra} unused frames" if extra else "dat"
+            return max(1, g.frame_count), max(1, g.angle_count), bool(g.mirroring), extra, source
         if num_frames % 5 == 0:
-            return num_frames // 5, 8, True, "guessed 8 mirrored angles"
-        return num_frames, 1, False, "guessed 1 angle"
+            return num_frames // 5, 8, True, 0, "guessed 8 mirrored angles"
+        return num_frames, 1, False, 0, "guessed 1 angle"
 
     def name_targets(self, known: set[int]) -> list[Target]:
         """Sprites for units missing from the id list, found by their internal graphic names."""
@@ -240,11 +248,12 @@ def _init(palette) -> None:
 
 
 def _render(job) -> tuple[int, bytes, int]:
-    slp_id, unit_key, action, frames, angles, mirrored = job
+    slp_id, unit_key, action, frames, angles, mirrored, extra = job
     units = _STATE["units"]
     if unit_key not in units:
         units[unit_key] = ROSTER[unit_key]()
     out = render_frames(units[unit_key], action, frames, angles, mirrored, _STATE["quant"])
+    out += [out[-1]] * extra
     return slp_id, slp.encode(out), len(out)
 
 
@@ -291,8 +300,8 @@ def main(argv=None) -> int:
         except ValueError as exc:
             skipped.append((t, str(exc)))
             continue
-        frames, angles, mirrored, source = game.layout(t.slp, info.num_frames)
-        jobs.append((t.slp, t.unit, t.action, frames, angles, mirrored))
+        frames, angles, mirrored, extra, source = game.layout(t.slp, info.num_frames)
+        jobs.append((t.slp, t.unit, t.action, frames, angles, mirrored, extra))
         planned.append((t, info.num_frames, frames, angles, mirrored, source))
 
     target_slps = {j[0] for j in jobs}

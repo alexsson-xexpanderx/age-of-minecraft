@@ -83,9 +83,12 @@ next to `build_mod.bat`. You have two options:
   before and after it, and for ships a hull, a shadow and up to seven sails.
   The build reads these layers from your `.dat` and hides the extra ones, so
   only the Minecraft sprite shows.
-* The Halberdier, Javelina and Elite Eagle Warrior are found by their
-  internal names in your `.dat`. If they still look original, your
-  `aom_report.txt` shows their names so they can be mapped exactly.
+* The Elite Eagle Warrior uses the Eagle Warrior's sprites, as in the
+  original game.
+* A few original sprite files hold a frame or two more than the game uses.
+  The build follows the game's own frame layout for those and fills the
+  unused frames, so every direction still lines up.
+* Ships sink with the original wreck animation for now.
 * Unit names in the game are unchanged for now.
 * Buildings are unchanged; they come after the units.
 

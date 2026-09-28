@@ -91,8 +91,16 @@ TARGETS: list[Target] = [
     Target(3679, "villager_shepherd", "idle", "female"), Target(3681, "villager_shepherd", "walk", "female"),
     Target(3841, "villager_shepherd", "work", "female"), Target(3677, "villager_shepherd", "attack", "female"),
     Target(3678, "villager_shepherd", "die", "female"), Target(4656, "villager_shepherd", "decay", "female"),
-    # fisherman
+    Target(1467, "villager_builder", "decay", "female repairer"),
+    # fisherman (fishing from the shore)
+    Target(3573, "villager_fisherman", "die", "male"), Target(3574, "villager_fisherman", "idle", "male"),
+    Target(3575, "villager_fisherman", "work", "male"), Target(3576, "villager_fisherman", "walk", "male"),
+    Target(3979, "villager_fisherman", "decay", "male"), Target(3572, "villager_fisherman", "decay", "male"),
     Target(3980, "villager_fisherman", "carry", "male fish"),
+    Target(3567, "villager_fisherman", "die", "female"), Target(3568, "villager_fisherman", "idle", "female"),
+    Target(3569, "villager_fisherman", "work", "female"), Target(3570, "villager_fisherman", "walk", "female"),
+    Target(3978, "villager_fisherman", "decay", "female"), Target(3566, "villager_fisherman", "decay", "female"),
+    Target(3565, "villager_fisherman", "carry", "female fish"),
     # monks and king
     *_set("monk", 768, 771, 774, 775, 779), Target(776, "monk", "attack", "second copy"),
     Target(3824, "monk", "die", "with relic"), Target(3827, "monk", "idle", "with relic"),
@@ -104,7 +112,7 @@ TARGETS: list[Target] = [
     # ---------------------------------------------------------------- infantry
     *_std("militia", 987), *_std("man_at_arms", 1038), *_std("long_swordsman", 1175),
     *_std("two_handed", 2800), *_std("champion", 3085),
-    *_std("spearman", 867), *_std("pikeman", 2826),
+    *_std("spearman", 867), *_std("pikeman", 2826), *_std("halberdier", 2787),
     *_set("eagle_warrior", 4826, 4827, 4828, 4829, 4830),
     # ---------------------------------------------------------------- archers
     *_std("archer", 2), *_std("crossbowman", 186), *_std("arbalest", 2698),
@@ -126,7 +134,8 @@ TARGETS: list[Target] = [
     *_set("plumed_archer", 4871, 4872, 4873, 4874, 4875), *_std("conquistador", 4716),
     *_std("war_wagon", 5204),
     Target(5218, "turtle_ship", "attack"), Target(5219, "turtle_ship", "idle"), Target(5220, "turtle_ship", "walk"),
-    Target(689, "longboat", "idle", "used for standing, moving and attacking"),
+    Target(689, "longboat", "attack"), Target(695, "longboat", "idle"), Target(699, "longboat", "walk"),
+    Target(692, "longboat", "die"), Target(696, "longboat", "decay"),
     # ---------------------------------------------------------------- siege
     # the walk sprites here are the turning wheels; the static body is a layer and gets blanked
     *_std("battering_ram", 173), *_std("capped_ram", 1683), *_std("siege_ram", 3029),
@@ -159,7 +168,10 @@ TARGETS: list[Target] = [
     Target(342, "deer", "idle"), Target(336, "deer", "idle", "attack sprite"),
     # ---------------------------------------------------------------- petard (its death is the shared explosion)
     Target(4497, "petard", "idle"), Target(4498, "petard", "walk"),
-    *_set("wild_boar", 2555, 2556, 2557, 2558, 2559),
+    *_set("wild_boar", 2555, 2556, 2557, 2558, 2559), Target(3577, "wild_boar", "run"),
+    # javelina (BOARJ in the .dat)
+    Target(5157, "javelina", "attack"), Target(5158, "javelina", "die"), Target(5159, "javelina", "idle"),
+    Target(5160, "javelina", "run"), Target(5161, "javelina", "decay"), Target(5162, "javelina", "walk"),
 ]
 
 # Layered parts of the originals that must disappear once the base sprite is ours.
@@ -177,13 +189,13 @@ BLANK: list[tuple[int, str]] = [
 # Units whose sprite ids are not in the community list: matched at build time by the
 # internal graphic name in the player's .dat (prefix + action suffix, e.g. HALBD_AN).
 NAME_PREFIXES: dict[str, list[str]] = {
-    "halberdier": ["HALB", "HLBRD", "HALBD", "HLBDR"],
-    "javelina": ["JAVEL", "JAVLN", "PECCA", "JVLNA"],
+    "halberdier": ["HLBDM", "HALB", "HLBRD", "HALBD", "HLBDR"],
+    "javelina": ["BOARJ", "JAVEL", "JAVLN", "PECCA", "JVLNA"],
     "elite_eagle_warrior": ["EEAGL", "EAGLE_E", "UEAGL"],
     "petard": ["PETARD", "PETRD", "SABOT"],
 }
 # Units drawn by another unit's sprites in the original game.
-SHARED = {"elite_cannon_galleon": "cannon_galleon"}
+SHARED = {"elite_cannon_galleon": "cannon_galleon", "elite_eagle_warrior": "eagle_warrior"}
 
 SUFFIX_ACTIONS = {"AN": "attack", "DN": "die", "FN": "idle", "SN": "decay", "WN": "walk", "RN": "run",
                   "CN": "carry"}

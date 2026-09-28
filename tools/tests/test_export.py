@@ -77,7 +77,8 @@ def fake_game(root: Path) -> Path:
     # militia (5 sprites), archer (5), a battering ram with a separate swinging head and wheels
     for s, frames, angles in [(987, 10, 8), (990, 10, 8), (993, 6, 8), (994, 5, 8), (997, 10, 8),
                               (2, 10, 8), (5, 10, 8), (8, 6, 8), (9, 5, 8), (12, 10, 8)]:
-        graphics.put(s, build_mod.blank(frames * 5))
+        extra = 2 if s == 8 else 0  # like the real archer: two frames more than the .dat uses
+        graphics.put(s, build_mod.blank(frames * 5 + extra))
         table.append({"name": f"UNIT_{s}", "slp": s, "frames": frames, "angles": angles})
     # battering ram as in the real .dat: each action is [layer 0, own sprite, layer 1]
     for s in (171, 172, 173, 176, 180, 181, 182, 183):
@@ -158,7 +159,7 @@ def test_full_build(tmp: Path):
     out = Drs(mod / "Data" / "graphics.drs")
     orig = Drs(game / "Data" / "graphics.drs")
     assert out.get(40000) == orig.get(40000)  # untouched files are copied as they were
-    for s in (987, 993, 2, 173, 183, 176):
+    for s in (987, 993, 2, 8, 173, 183, 176):
         assert slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
         assert out.get(s) != orig.get(s)
     for s in (171, 172, 181, 182):  # the ram's extra layers are blanked, same frame count
@@ -168,6 +169,7 @@ def test_full_build(tmp: Path):
     assert out.get(9100) == orig.get(9100)  # shared explosion is left alone
     report = (mod / "aom_report.txt").read_text()
     assert "REPLACED" in report and "BTRAM_AN" in report and "found by name HALBD_AN" in report
+    assert "6 x 8 angles mirrored  [dat, plus 2 unused frames]" in report
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
 
