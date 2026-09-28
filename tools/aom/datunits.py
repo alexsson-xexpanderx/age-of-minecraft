@@ -9,6 +9,10 @@ openage (unit types 10 to 80, Age of Kings and later).
 The civilisations are located by their headers (count, name, resources,
 unit pointer table), and every civ's units are parsed completely: they must
 end exactly where the next civilisation begins, which verifies the layout.
+
+The units' task lists (what a unit can do: attack, garrison, gather...) are
+shared by all civilisations and stored just before them, one "unit header"
+per unit id; they are found by parsing back from the civilisations.
 """
 from __future__ import annotations
 
@@ -55,7 +59,7 @@ class UnitRecord:
 FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h", "train_location": "h",
            "button": "b", "cost": "hhhhhhhhh", "creatable_type": "b", "hotkey": "i", "name_id": "H",
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
-           "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h"}
+           "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -69,6 +73,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     v["name_id"] = r.one("H")
     f["creation_id"] = r.p
     v["creation_id"] = r.one("H")
+    f["class"] = r.p
     v["class"] = r.one("h")
     f["standing"] = r.p
     v["standing"] = r.take("hh")
@@ -223,6 +228,7 @@ def _civ_header(data: bytes, h: int) -> Optional[tuple[int, int, int]]:
 class CivUnits:
     tables: list[tuple[int, int]]  # (pointer table offset, unit count) per civ
     units: list[list[Optional[UnitRecord]]]
+    start: int = 0  # offset of the civilisation count, where the civilisations block begins
 
 
 def _parse_civs(data: bytes, first: int, n_civs: int) -> CivUnits:
@@ -268,10 +274,76 @@ def read_units(data: bytes) -> CivUnits:
             continue
         tried += 1
         try:
-            return _parse_civs(data, h, n_civs)
+            civs = _parse_civs(data, h, n_civs)
         except (DatLayoutError, struct.error):
             continue
+        civs.start = h - 2
+        return civs
     raise DatLayoutError(f"could not find the civilisations' unit tables ({tried} candidates checked)")
+
+
+# a task: type, id, is default, action, target class, target unit, terrain, resources in/multiplier/out/unused,
+# work values 1 and 2, work range, auto search, search wait, targeting, combat level, gather type, work flag 2,
+# target diplomacy, carry check, pick for construction, moving/proceeding/working/carrying graphics,
+# gathering and deposit sounds
+TASK = struct.Struct("<hhbhhhhhhhhfffbfbbhhbbbhhhhhh")
+GARRISON = 3  # task action: enter a unit or building of the target class
+TRANSPORT = 20  # unit class of the Transport Ship
+
+
+@dataclass
+class UnitHeaders:
+    offsets: list[int]  # per unit id: offset of its "exists" byte
+    tasks: list[Optional[list[tuple]]]  # per unit id: its tasks (None if the unit has no header)
+
+
+def _parse_headers(data: bytes, at: int, n: int) -> tuple[UnitHeaders, int]:
+    p = at + 4
+    offsets, tasks = [], []
+    for _ in range(n):
+        offsets.append(p)
+        exists = data[p]
+        p += 1
+        if exists not in (0, 1):
+            raise DatLayoutError("not a unit header")
+        if not exists:
+            tasks.append(None)
+            continue
+        count = struct.unpack_from("<H", data, p)[0]
+        p += 2
+        if count > 500:
+            raise DatLayoutError("not a unit header")
+        tasks.append([TASK.unpack_from(data, p + TASK.size * k) for k in range(count)])
+        p += TASK.size * count
+    return UnitHeaders(offsets, tasks), p
+
+
+def read_unit_headers(data: bytes, civs: CivUnits, search: int = 4_000_000) -> UnitHeaders:
+    """Every unit's task list: the block of unit headers that ends exactly where the civilisations begin."""
+    n = civs.tables[0][1]
+    pattern = struct.pack("<I", n)
+    at = civs.start
+    while True:
+        at = data.rfind(pattern, max(0, civs.start - search), at)
+        if at < 0:
+            raise DatLayoutError("could not find the units' task lists")
+        try:
+            heads, end = _parse_headers(data, at, n)
+        except (DatLayoutError, struct.error, IndexError):
+            continue
+        if end == civs.start:
+            return heads
+
+
+def add_task(data: bytearray, heads: UnitHeaders, uid: int, task: tuple) -> None:
+    """Append a task to a unit's task list (the file grows; offsets after it move)."""
+    tasks = heads.tasks[uid]
+    if tasks is None:
+        raise DatLayoutError(f"unit {uid} has no task list")
+    at = heads.offsets[uid]
+    struct.pack_into("<H", data, at + 1, len(tasks) + 1)
+    end = at + 3 + TASK.size * len(tasks)
+    data[end:end] = TASK.pack(*task)
 
 
 def decompress(raw: bytes) -> bytes:

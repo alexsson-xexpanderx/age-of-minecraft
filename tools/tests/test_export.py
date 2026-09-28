@@ -45,7 +45,7 @@ def fake_palette() -> bytes:
 def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1) -> bytes:
     """One unit record in the Conquerors layout (mirrors aom.datunits)."""
     nb = name.encode()
-    b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 0))
+    b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 10 if uid == 860 else 0))
     b += struct.pack("<hhhhbhfb", standing, -1, -1, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
     b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
@@ -70,8 +70,19 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
 
 def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0) -> bytes:
     """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860), and the
-    Javelina (822) borrowing the Wild Boar's sprites, with its carcass (823) and the boar's (356)."""
-    out = bytearray(struct.pack("<H", civs))
+    Javelina (822) borrowing the Wild Boar's sprites, with its carcass (823) and the boar's (356).
+
+    Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
+    (860) can only attack."""
+    from aom.datunits import TASK
+    attack = (1, 0, 0, 7, -1, -1, -1, -1, -1, -1, -1, 0.0, 0.0, 0.0, 0, 0.0, 0, 0, 0, 0, 5, 0, 0, -1, -1, -1, -1, -1, -1)
+    board = (1, 1, 0, 3, 20, -1, -1, -1, -1, -1, -1, 0.0, 0.0, 1.0, 0, 0.0, 0, 0, 0, 0, 4, 0, 0, -1, -1, -1, -1, -1, -1)
+    out = bytearray(struct.pack("<I", slots))
+    for u in range(slots):
+        tasks = [attack, board] if u == 74 else [attack] if u == 860 else []
+        out += struct.pack("<bH", 1, len(tasks)) + b"".join(TASK.pack(*t) for t in tasks) if u % 2 == 0 or u in (
+            276, 860, 823) else b"\0"
+    out += struct.pack("<H", civs)
     rng = np.random.default_rng(5)
     for c in range(civs):
         out += struct.pack("<b20sHhh", 1, [b"Gaia", b"British", b"French"][c % 3], 4, 1, 1)
@@ -282,6 +293,11 @@ def test_full_build(tmp: Path):
         assert pac.values["enabled"] == 1 and pac.values["train_location"] == 276 and pac.values["button"] == 1
         assert pac.values["cost"][:2] == (0, 200) and civ[4].values["enabled"] == 0  # nothing else changes
         assert pac.values["icon"] == 170  # his own icon, added to the sheet
+        assert pac.values["class"] == 6  # infantry, not a predator animal: ships take him
+    heads = datunits.read_unit_headers(datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes()), units)
+    assert [(t[1], t[3], t[4]) for t in heads.tasks[860]] == [(0, 7, -1), (1, 3, 20)]  # the Militia's boarding task
+    assert len(heads.tasks[74]) == 2 and heads.tasks[861] is None
+    assert "boarding task added" in report
     icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     icons_after = slp.decode(Drs(mod / "Data" / "interfac.drs").get(50730))
     assert len(icons_after) == len(icons_before) + 1

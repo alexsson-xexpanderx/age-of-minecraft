@@ -110,7 +110,9 @@ next to `build_mod.bat`. You have two options:
 **Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
 first button trains **Pac-Man** (200 food, 100 gold, 30 seconds, 250 hit
 points), with his own Pac-Man icon, and the game calls him **Pac-Man**. This
-works for every civilisation. It is the only change the mod makes to the
+works for every civilisation. He is infantry, not a wild animal like the cheat
+unit: he boards Transport Ships, garrisons like a foot soldier, and gets the
+Blacksmith's infantry upgrades and your civilisation's infantry bonuses. It is the only change the mod makes to the
 game's rules; `--no-wonder-pacman` leaves the rules alone.
 
 His name lives in the game's language files (`language_x1_p1.dll`,

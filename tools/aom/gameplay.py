@@ -5,6 +5,10 @@ chat cheat still spawns him. Here every civilisation also gets him enabled,
 trained at the Wonder (unit 276), which exists only once a Wonder stands.
 He gets his own icon, added at the end of the unit icon sheet (so no other
 unit's icon changes), and his name in the language files becomes "Pac-Man".
+
+The Monkey Boy is a "predator animal" (unit class 10), and Transport Ships
+do not take animals. Pac-Man becomes infantry (class 6, like the Militia),
+and gets the Militia's "board a Transport Ship" task if he lacks it.
 """
 from __future__ import annotations
 
@@ -24,6 +28,8 @@ PACMAN_COST = (0, 200, 1, 3, 100, 1, 4, 1, 0)  # 200 food, 100 gold, 1 populatio
 PACMAN_TIME = 30  # seconds
 PACMAN_BUTTON = 1
 PACMAN_HP = 250  # the Monkey Boy has 50; a unit from a Wonder should last a bit longer
+INFANTRY = 6  # unit class: foot soldiers board ships, garrison, and get the Blacksmith's infantry upgrades
+MILITIA = 74
 UNIT_ICONS = 50730  # the unit icon sheet in interfac.drs
 PACMAN_NAME = "Pac-Man"
 HELP_STRINGS = 79000  # the .dat stores help text ids 79000 above the string's id in the language files
@@ -63,13 +69,21 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         msg = _javelina(data, civs, graphics)
         changed |= msg.startswith("Javelina: its own")
         notes.append(msg)
+    if pac_done:  # last: it can grow the file, which moves the civilisations' records
+        notes.append(_boarding(data, civs))
     if not changed:
         return None, notes
     check = DU.read_units(bytes(data))  # read everything back: same layout, new values
     for units in check.units:
         pac = units[PACMAN_UNIT] if len(units) > PACMAN_UNIT else None
-        if pac_done and pac is not None and pac.type >= 70 and pac.values["train_location"] != WONDER_UNIT:
+        if pac_done and pac is not None and pac.type >= 70 and (pac.values["train_location"] != WONDER_UNIT
+                                                                 or pac.values["class"] != INFANTRY):
             return None, notes + ["not changed: the patched file did not read back as expected"]
+    if pac_done:
+        try:
+            DU.read_unit_headers(bytes(data), check)
+        except DU.DatLayoutError:
+            return None, notes + ["not changed: the patched task lists did not read back as expected"]
     return DatPatch(DU.compress(bytes(data)), len(civs.units), notes, strings if pac_done else None), notes
 
 
@@ -85,7 +99,7 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
         if gfx is not None and not gfx.name.lower().startswith("mkyby"):
             return f"Pac-Man at the Wonder: not changed, unit {PACMAN_UNIT} is {pac.name!r} ({gfx.name})", None
         DU.patch(data, pac, enabled=1, train_location=WONDER_UNIT, button=PACMAN_BUTTON, cost=PACMAN_COST,
-                 train_time=PACMAN_TIME, hit_points=PACMAN_HP)
+                 train_time=PACMAN_TIME, hit_points=PACMAN_HP, **{"class": INFANTRY})
         if icon is not None:
             DU.patch(data, pac, icon=icon)
         if strings is None:
@@ -98,6 +112,25 @@ def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple
     return (f"Pac-Man (unit {PACMAN_UNIT}) trainable at the Wonder (unit {WONDER_UNIT}) for {patched} "
             f"civilisations: {PACMAN_COST[1]} food, {PACMAN_COST[4]} gold, {PACMAN_TIME} s, {PACMAN_HP} hit points"
             + (f", icon {icon}" if icon is not None else "")), strings
+
+
+def _boarding(data: bytearray, civs) -> str:
+    """Give Pac-Man the task that lets a unit board a Transport Ship, if he does not have it."""
+    try:
+        heads = DU.read_unit_headers(bytes(data), civs)
+    except DU.DatLayoutError as exc:
+        return f"Pac-Man on ships: infantry now; his task list was not checked ({exc})"
+    tasks = heads.tasks[PACMAN_UNIT] if len(heads.tasks) > PACMAN_UNIT else None
+    if tasks is None:
+        return "Pac-Man on ships: infantry now; he has no task list to add boarding to"
+    if any(t[3] == DU.GARRISON and t[4] == DU.TRANSPORT for t in tasks):
+        return "Pac-Man on ships: infantry now, so Transport Ships take him (he already has the boarding task)"
+    militia = heads.tasks[MILITIA] or []
+    board = next((t for t in militia if t[3] == DU.GARRISON and t[4] == DU.TRANSPORT), None)
+    if board is None:
+        return "Pac-Man on ships: infantry now; no boarding task to copy from the Militia"
+    DU.add_task(data, heads, PACMAN_UNIT, (board[0], len(tasks)) + board[2:])
+    return "Pac-Man on ships: infantry now, and the Militia's boarding task added, so Transport Ships take him"
 
 
 # The Javelina (unit 822) borrows the Wild Boar's sprites in The Conquerors; its own graphics
