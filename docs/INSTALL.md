@@ -34,7 +34,7 @@ that folder: it needs the `tools` folder next to it.
 * Tip: if you extract the mod *inside* your Age of Empires II folder, it
   always finds the game.
 
-The build takes about one to five minutes, depending on your PC. It writes:
+The build takes about two to ten minutes, depending on your PC. It writes:
 
 ```
 Games\AgeOfMinecraft.xml                 the UserPatch mod definition
@@ -70,17 +70,25 @@ next to `build_mod.bat`. You have two options:
 | Command | What it does |
 |---|---|
 | `build_mod.bat "<game>" --only militia,archer,villager` | build only some units, for a quick test (keys are listed in [UNITS.md](UNITS.md)) |
+| `build_mod.bat "<game>" --only buildings,walls,wonders,nature,decorations,projectiles` | build only buildings and scenery (any of these groups) |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs` (no mod exe needed); a backup is kept as `graphics.drs.aom-backup` |
 | `restore_original.bat` | undo `build_mod_direct.bat` |
 
-## What to expect in this first test
+## What to expect in this test
 
 * All unit sprites are replaced: standing, walking, attacking, dying and
   decaying, plus villager work and carry animations. Male and female
   villagers share the Minecraft villager models.
-* Original sprites are built in layers: a main sprite with a layer drawn
-  before and after it, and for ships a hull, a shadow and up to seven sails.
+* All buildings are replaced, in the five village styles (West European,
+  Central European, Middle Eastern, Asian, Meso-American) and every age, with
+  walls, gates, towers, castles, docks, farms and the eighteen wonders.
+* The map is replaced too: forests, chopped trees, gold and stone mines,
+  berry bushes, rocks, plants, animals, fish and decorations.
+* Projectiles: Minecraft arrows and bolts, spinning axes, snowballs from the
+  snow golem skirmishers, cobblestone from mangonels and TNT from the bombard
+  cannon. Their ground shadows are the game's own.
+* Original sprites are built in layers (shadows, flags, roof pieces, sails).
   The build reads these layers from your `.dat` and hides the extra ones, so
   only the Minecraft sprite shows.
 * The Elite Eagle Warrior uses the Eagle Warrior's sprites, as in the
@@ -88,9 +96,8 @@ next to `build_mod.bat`. You have two options:
 * A few original sprite files hold a frame or two more than the game uses.
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.
-* Ships sink with the original wreck animation for now.
-* Unit names in the game are unchanged for now.
-* Buildings are unchanged; they come after the units.
+* Still original: cliffs, bridges, terrain, fire and explosions, ships sinking,
+  and the game's interface. Unit names are unchanged.
 
 **Please send back** `Games\AgeOfMinecraft\aom_report.txt` and a few
 screenshots. The report lists your game's full graphics table, so anything

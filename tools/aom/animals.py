@@ -148,7 +148,116 @@ def wolf(key: str = "wolf") -> Unit:
     return _animal(key, "Wolf", "Wolf", root, attack="bite")
 
 
+def ocelot(key: str = "jaguar") -> Unit:
+    """The wild jaguar as an ocelot: a lean spotted cat."""
+    p = Painter(key)
+    fur = p.speckle("#e6c060", ("#6a4a20", 0.14), ("#f2d88a", 0.1))
+    head = p.skin((5, 5, 4), fur, front=p.grid(["fffff", "gKfKg", "fffff", "fwwwf"],
+                                               {"f": "#e6c060", "g": "#3fa34a", "K": "#1a1a1a", "w": "#f2e6c8"}))
+    leg = p.skin((2, 2, 6), fur)
+    root = Part("root")
+    root.add(
+        Part("torso", pivot=(0, 0, 6), boxes=[cuboid((-2, -8, 6), (4, 16, 6), p.skin((4, 16, 6), fur))]).add(
+            Part("head", pivot=(0, 7, 11), boxes=[cuboid((-2.5, 7, 9), (5, 5, 4), head),
+                                                  cuboid((-1.5, 12, 9), (3, 1, 2), solid("#f2e6c8")),
+                                                  cuboid((-2.5, 9, 13), (1, 1, 1), solid("#e6c060")),
+                                                  cuboid((1.5, 9, 13), (1, 1, 1), solid("#e6c060"))]),
+            Part("tail", pivot=(0, -8, 10), rot=(-50, 0, 0), boxes=[cuboid((-0.5, -9, 9), (1, 1, 8),
+                                                                        p.skin((1, 1, 8), fur))])),
+        *_legs(p, leg, (2, 2, 6), 5, -6, 1.2, 6),
+    )
+    return _animal(key, "Ocelot", "Jaguar", root, attack="bite")
+
+
+def wild_horse(key: str = "horse") -> Unit:
+    from .mounted import horse
+    return Unit(key, "Horse", "Horse", "cavalry", Part("root").add(horse(Painter(key), "chestnut")),
+                group="animal", attack="none")
+
+
+def phantom(key: str = "hawk") -> Unit:
+    """The hawk as a phantom: a flat, wide-winged flyer with glowing green eyes."""
+    p = Painter(key)
+    hide = p.speckle("#43518a", ("#36406e", 0.3), ("#5a6aa8", 0.1))
+    head = p.skin((7, 5, 3), hide, front=p.grid(["hhhhhhh", "gghhhgg", "hhhhhhh"],
+                                               {"h": "#43518a", "g": "#9ef04a"}))
+    wing = p.skin((12, 9, 1), p.speckle("#43518a", ("#36406e", 0.3), ("#8a9ac8", 0.12)))
+    tip = p.skin((10, 6, 1), p.speckle("#5a6aa8", ("#43518a", 0.3)))
+    body = Part("torso", boxes=[cuboid((-2.5, -4.5, -1.5), (5, 9, 3), p.skin((5, 9, 3), hide)),
+                                cuboid((-3.5, 4.5, -1.5), (7, 5, 3), head),
+                                cuboid((-1.5, -9.5, -1), (3, 5, 2), p.skin((3, 5, 2), hide)),
+                                cuboid((-1, -13.5, -0.5), (2, 4, 1), p.skin((2, 4, 1), hide))])
+    wr = Part("wing_r", pivot=(2.5, 0, 0), boxes=[cuboid((2.5, -4.5, 0), (12, 9, 1), wing)])
+    wr.add(Part("tip_r", pivot=(14.5, 0, 0), boxes=[cuboid((14.5, -3, 0), (10, 6, 1), tip)]))
+    wl = Part("wing_l", pivot=(-2.5, 0, 0), boxes=[cuboid((-14.5, -4.5, 0), (12, 9, 1), wing)])
+    wl.add(Part("tip_l", pivot=(-14.5, 0, 0), boxes=[cuboid((-24.5, -3, 0), (10, 6, 1), tip)]))
+    body.add(wr, wl)
+    root = Part("root", offset=(0, 0, 48)).add(body)
+    return Unit(key, "Phantom", "Hawk", "flyer", root, group="animal", attack="none")
+
+
+def parrot(key: str = "macaw") -> Unit:
+    """The macaw as a red Minecraft parrot."""
+    p = Painter(key)
+    red = p.speckle("#d6231f", ("#b01a18", 0.25))
+    head = p.skin((2, 3, 3), red, front=p.grid(["rr", "KK", "rr"], {"r": "#d6231f", "K": "#1a1a1a"}))
+    wing = p.skin((1, 5, 4), p.bands((2, "#d6231f"), (1, "#f2c200"), (1, "#2f6ad0")))
+    body = Part("torso", pivot=(0, 0, 0), boxes=[
+        cuboid((-1.5, -1.5, -3), (3, 3, 6), p.skin((3, 3, 6), red)),
+        cuboid((-1, 1, 3), (2, 3, 3), head),
+        cuboid((-0.5, 4, 4), (1, 2, 1.5), solid("#3a3a3a")),
+        cuboid((-1, -3, -5), (2, 2, 4), p.skin((2, 2, 4), p.bands((2, "#2f6ad0"), (2, "#f2c200"))))])
+    body.add(Part("wing_r", pivot=(1.5, 0, 2), boxes=[cuboid((1.5, -2.5, -2), (1, 5, 4), wing)]),
+             Part("wing_l", pivot=(-1.5, 0, 2), boxes=[cuboid((-2.5, -2.5, -2), (1, 5, 4), wing)]))
+    root = Part("root", offset=(0, 0, 40)).add(Part("pitch", rot=(-60, 0, 0)).add(body))
+    return Unit(key, "Parrot", "Macaw", "flyer", root, group="animal", attack="none", scale=1.3)
+
+
+FISH = {  # key: (name, replaces, body, belly, fin)
+    "fish_perch": ("Cod", "Fish (Perch)", "#b5905a", "#e0cfa8", "#8a6a3e"),
+    "fish_salmon": ("Salmon", "Fish (Salmon)", "#a8352a", "#d8886a", "#5a6a4a"),
+    "fish_tuna": ("Tropical Fish", "Fish (Tuna)", "#f08a24", "#f2f2f2", "#f2f2f2"),
+    "fish_dorado": ("Pufferfish", "Fish (Dorado)", "#e6c436", "#f2e6a0", "#c89a2a"),
+    "fish_snapper": ("Tropical Fish", "Fish (Snapper)", "#d64a6a", "#f2d0d8", "#4a8ad6"),
+    "fish_shore": ("Cod", "Shore Fish", "#9a8a6a", "#d8ccb0", "#6a5a3e"),
+}
+
+
+def fish(key: str) -> Unit:
+    name, replaces, body_c, belly, fin = FISH[key]
+    p = Painter(key)
+    side = p.grid(["bbbbbbbb", "bKbbbbbb", "wwwwwwww"], {"b": body_c, "K": "#1a1a1a", "w": belly})
+    body = p.skin((3, 8, 3), body_c, right=side)
+    torso = Part("torso", boxes=[cuboid((-1.5, -4, 0), (3, 8, 3), body),
+                                 cuboid((-0.5, -1, 3), (1, 3, 2), solid(fin))])
+    torso.add(Part("tail", pivot=(0, -4, 1.5), boxes=[cuboid((-0.5, -8, 0), (1, 4, 4), solid(fin))]))
+    root = Part("root").add(torso)
+    return Unit(key, name, replaces, "swimmer", root, group="animal", attack="none", scale=1.6)
+
+
+def dolphin(key: str = "marlin") -> Unit:
+    """The marlin (deep-sea fish) as a dolphin that leaps out of the water."""
+    p = Painter(key)
+    skin = p.speckle("#6f8aa6", ("#5a7390", 0.3))
+    side = p.grid(["ssssssssssss", "ssKsssssssss", "wwwwwwwwwwww"], {"s": "#6f8aa6", "K": "#1a1a1a", "w": "#d8e0e8"})
+    body = p.skin((5, 12, 5), skin, right=side)
+    torso = Part("torso", boxes=[cuboid((-2.5, -6, 0), (5, 12, 5), body),
+                                 cuboid((-1.5, 6, 0.5), (3, 4, 3), p.skin((3, 4, 3), skin)),
+                                 cuboid((-0.5, -1, 5), (1, 4, 4), solid("#5a7390")),
+                                 cuboid((-5, 1, 1), (10, 3, 1), solid("#5a7390"))])
+    torso.add(Part("tail", pivot=(0, -6, 2.5), boxes=[cuboid((-1, -11, 1.5), (2, 5, 2), solid("#5a7390")),
+                                                      cuboid((-4, -12, 2), (8, 2, 1), solid("#5a7390"))]))
+    return Unit(key, "Dolphin", "Marlin", "swimmer", Part("root").add(torso), group="animal", attack="none",
+                scale=1.3)
+
+
 ANIMALS = {
+    "jaguar": ocelot,
+    "horse": wild_horse,
+    "hawk": phantom,
+    "macaw": parrot,
+    "marlin": dolphin,
+    **{k: (lambda k=k: fish(k)) for k in FISH},
     "sheep": sheep,
     "turkey": chicken,
     "deer": goat,

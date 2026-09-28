@@ -62,62 +62,92 @@ and an animation sample in `previews/anim_<group>.gif`.
 
 Buildings are made of real Minecraft-scale blocks, at the same scale as the
 units: a unit is 2 blocks tall, as in Minecraft. One AoE2 tile comes to about
-2.8 blocks at the render scale, so:
+2.83 blocks at the render scale, so:
 
 | Footprint | Blocks | Examples |
 |---|---|---|
+| 1×1 tile | 3×3 | towers, wall pieces, gate towers |
 | 2×2 tiles | 5×5 | House, Mill, Lumber / Mining Camp |
-| 3×3 tiles | 8×8 | Barracks, Archery Range, Stable, Market |
-| 4×4 tiles | 11×11 | Town Center, Castle |
+| 3×3 tiles | 8×8 | Barracks, Archery Range, Stable, Blacksmith, Monastery, University, Dock, Farm |
+| 4×4 tiles | 11×11 | Town Center, Castle, Market, Siege Workshop |
 | 5×5 tiles | 14×14 | Wonder |
 
 Buildings are drawn from a single angle (their south-west and south-east
-walls face the camera). Team colour shows on wool roof ridges, banners, and
-the flag on top.
+walls face the camera). Team colour shows on banners, flags and the bell
+tower's wool cap. All sheets: `previews/buildings.png`,
+`previews/fortifications.png`, `previews/wonders.png`, `previews/nature.png`.
+
+### Five village styles, four ages
+
+AoE2 draws buildings in five regional styles plus a shared Dark Age look.
+Each becomes a Minecraft village style, and each age upgrades the materials:
+
+| AoE2 style | Minecraft style | Materials |
+|---|---|---|
+| Dark Age (everyone) | log cabins | oak logs, cobblestone, thatched hay roofs |
+| West European | Plains village | oak and cobblestone, then half-timbered plaster under brick roofs |
+| Central European | Taiga village | spruce and mossy stone under slate (deepslate tile) roofs |
+| Middle Eastern | Desert village | sandstone with crenellated flat roofs, terracotta domes, striped awnings |
+| Asian | cherry and bamboo | white walls, red pillars, dark roofs with upturned eaves |
+| Meso-American | Jungle temple | mossy stone bricks, jungle wood, thatch, gold |
+
+Ages: Feudal is planks and cobblestone, Castle stone bricks, Imperial polished
+stone with gold trim (and corner towers on the Town Center).
 
 ### Building mapping
 
-| AoE2 building | Minecraft build | |
-|---|---|---|
-| House | Plains-village cottage: cobblestone base, log corners, stair roof | ✅ |
-| Town Center | Village hall with a bell tower (the village meeting point) | ✅ |
-| Barracks | Armourer's hall with armour stands and a blast furnace | 🧱 |
-| Archery Range | Fletcher's hut with target blocks | 🧱 |
-| Stable | Stable with hay bales and fences | 🧱 |
-| Blacksmith | Weaponsmith with an anvil, grindstone and lava forge | 🧱 |
-| Market | Trading stalls with emeralds | 🧱 |
-| Mill | Farmer's hut with a composter and hay | 🧱 |
-| Farm | Wheat field with a water channel | 🧱 |
-| Lumber Camp / Mining Camp | Log pile with a chopping block / mineshaft with rails and a minecart | 🧱 |
-| Monastery | Cleric's temple with a brewing stand | 🧱 |
-| University | Library with bookshelves and an enchanting table | 🧱 |
-| Siege Workshop | Workshop with pistons, TNT and dispensers | 🧱 |
-| Dock | Oak pier with a boat | 🧱 |
-| Watch Tower line | Pillager-outpost-style watch tower | 🧱 |
-| Palisade / Stone Wall / Gate | Oak fence / cobblestone wall / fence gate and iron door | 🧱 |
-| Castle | Stone-brick keep with crenellations | 🧱 |
-| Wonder | Beacon pyramid of iron, gold and diamond blocks, with the light beam | 🧱 |
-| Trees, gold, stone, berries | Oak trees, gold ore, stone boulders, sweet berry bushes | 🧱 |
+| AoE2 building | Minecraft build |
+|---|---|
+| House | a cottage (three variants, like the game's three house frames) |
+| Town Center | village hall with a bell tower; domed in the desert, stepped in the jungle |
+| Mill | windmill with turning wool sails (Dark Age: a grinding hut with a grindstone) |
+| Farm | farmland around a water channel; the wheat shrinks as the farm runs out |
+| Lumber / Mining Camp | an open shed with log piles and a chopping block / a minecart on rails with ore |
+| Barracks | a hall with a fenced training yard and armour stands |
+| Archery Range | target blocks on hay bales and a fletching table |
+| Stable | a barn with hay, a water trough and a paddock |
+| Blacksmith | a stone forge with a chimney, anvil, blast furnace, lava and rising smoke |
+| Market | stalls with striped wool awnings, barrels, chests and an emerald block |
+| Monastery | a chapel with stained glass and a bell tower |
+| University | a library of bookshelves with an enchanting table |
+| Siege Workshop | pistons, dispensers, TNT and logs |
+| Dock | a plank pier with a boathouse, barrels and a crane |
+| Fish Trap | a ring of fences and nets with fish |
+| Watch / Guard Tower, Keep | wooden lookout → stone tower with battlements → keep with an overhanging top |
+| Bombard Tower | a squat deepslate tower with dispensers and TNT |
+| Outpost | a lookout post with a torch |
+| Palisade / Stone / Fortified Wall | spruce stakes / cobblestone wall / stone bricks with battlements; diagonal walls are block staircases |
+| Gates | an arch with an iron-bar portcullis, down when shut and up when open, between two towers |
+| Castle | curtain walls, four corner towers, a gatehouse and a keep, in the civilisation's style |
+| Wonders | one per civilisation: Westminster, Chartres, Hagia Sophia, the Temple of Heaven, Templo Mayor, Tikal, Hwangnyongsa and the rest |
+| Building sites, rubble | scaffolding on a foundation; scattered cobblestone and gravel |
 
-### Ages and architecture sets
+### Nature and decorations
 
-AoE2 changes how buildings look by age and by civilisation. Minecraft has a
-natural answer for both:
+| AoE2 | Minecraft |
+|---|---|
+| Forests | oak, birch and dark oak; spruce; snowy spruce; palms; jungle trees; bamboo. Each tree is grown to the height of the original so forests keep their look. |
+| Chopped trees | a stump beside the felled trunk |
+| Gold / Stone mines | heaps of gold ore and raw gold / stone, cobblestone, andesite and diorite |
+| Forage bushes | sweet berry bushes |
+| Map decorations | rocks, grass and flowers, cactus, hay bales, yurts, tents, ruins, graves, mob heads on posts, a statue, signposts, torches, waving banners, the relic as a golden reliquary |
+| Animals | Hawk → Phantom · Macaw → Parrot · Jaguar → Ocelot · Horse → horse · fish → cod, salmon, tropical fish and pufferfish · Marlin → Dolphin |
 
-* **Ages as materials**: Dark Age oak and dirt paths → Feudal cobblestone →
-  Castle stone bricks → Imperial polished stone, quartz and gold trim.
-* **Civilisations as village biomes**: Western European → Plains, Eastern
-  European → Taiga, Middle Eastern → Desert, Asian → Savanna / Snowy,
-  Meso-American → Jungle.
+### Projectiles
+
+Arrows are Minecraft arrows (flint tip, white fletching), pitched as they
+climb and dive; scorpions shoot bigger bolts; throwing axemen and mamelukes
+throw spinning axes and swords; the snow golem skirmishers throw snowballs;
+mangonels hurl cobblestone, trebuchets mossy boulders, and the bombard cannon
+fires TNT.
 
 ### Construction and destruction
 
-AoE2 needs construction stages, damage and rubble sprites for each building.
-Since the buildings are made of blocks, these come almost free:
-
-* **construction**: the building rises layer by layer, the way a player builds
-* **damage**: blocks missing, with fire
-* **rubble**: scattered blocks and a crater
+* **construction**: scaffolding on a foundation (the game raises the finished
+  building through it); walls and gates rise in stages with scaffolding on top
+* **damage**: walls lose blocks at each damage level; the game's own fires
+  still burn on damaged buildings
+* **rubble**: scattered cobblestone, gravel and broken planks
 
 ## Animations
 
@@ -167,10 +197,14 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    (shown when a unit is behind a building). The hotspot sits at the unit's
    feet.
 4. **Match the original** (`build_mod.py`, on the player's PC). For each
-   original sprite (ids in `slpmap.py`), the frame count, angle count and
-   mirroring are read from the player's `graphics.drs` and `.dat`, and the
-   animation is rendered in exactly that layout. Extra layers of composite
-   sprites (ram heads, sails) are blanked.
+   original sprite (unit ids in `slpmap.py`; buildings, walls, trees and
+   decorations found by name in the `.dat` by `spritemap.py`), the frame
+   count, angle count and mirroring are read from the player's
+   `graphics.drs` and `.dat`, and the sprite is rendered in exactly that
+   layout. Extra layers of composite sprites (ram heads, sails, building
+   shadows, roof pieces, flags) are blanked. Wall frames are matched to our
+   wall pieces by comparing outlines, and forest trees are grown to the
+   height of the tree they replace.
 5. **Install** as a UserPatch 1.5 data mod: `Games\AgeOfMinecraft.xml`,
    `Games\AgeOfMinecraft\Data\graphics.drs`, and
    `age2_x1\AgeOfMinecraft.exe` made by `SetupAoC.exe -g:AgeOfMinecraft`.
@@ -183,11 +217,7 @@ See [INSTALL.md](INSTALL.md) for how to run it.
 * Villager: idle villagers keep their arms crossed, and working villagers
   uncross them. Is that the look you want, or should they always have free
   arms?
-* Creeper: team-colour speckles, or plain green with only its feet in team
-  colour?
-* Scale: are infantry at ≈ 45 px the right size next to the original
-  buildings, or should they be a little smaller?
-* Buildings: should the roofs keep the team-coloured wool ridge, or only
-  show banners (closer to the original game)?
-* Which civilisation style should be the first full building set? (Plains
-  is started.)
+* Scale: are infantry at ≈ 45 px the right size next to the buildings, or
+  should they be a little smaller?
+* Hawk: a Minecraft phantom is the closest flying mob; a parrot-like bird of
+  prey would be the alternative.

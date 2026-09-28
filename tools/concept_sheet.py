@@ -9,7 +9,11 @@ Writes into previews/ by default:
     scene.png           two armies, in-game size, 2x zoom
     battle.png          siege and cavalry assaulting a town, 2x zoom
     harbor.png          the fleet on the water, 2x zoom
-    village.png         Town Center and houses with villagers, 2x zoom
+    village.png         a Dark Age village with fields, a forest and mines, 2x zoom
+    buildings.png       every building in the five village styles
+    wonders.png         the eighteen wonders and the scenario monuments
+    fortifications.png  walls, gates, towers and castles
+    nature.png          trees, resources and map decorations
 and docs/UNITS.md, the full unit list.
 """
 from __future__ import annotations
@@ -23,7 +27,8 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aom.animation import DIRECTIONS, pose  # noqa: E402
-from aom.buildings import BUILDING_HEADING, BUILDINGS, block_types  # noqa: E402
+from aom import props  # noqa: E402
+from aom.voxel import BUILDING_HEADING  # noqa: E402
 from aom.colors import PLAYER_COLORS  # noqa: E402
 from aom.geometry import Pose  # noqa: E402
 from aom.render import SHADOW, Camera, Frame, fit_camera, render  # noqa: E402
@@ -156,7 +161,8 @@ ANIMATIONS = {  # group -> [(unit, action, direction index)]
                 ("samurai", "attack", 1), ("war_elephant", "attack", 1), ("janissary", "attack", 1),
                 ("mangudai", "walk", 1), ("tarkan", "walk", 2)],
     "animals": [("sheep", "walk", 1), ("wolf", "attack", 1), ("wild_boar", "attack", 2), ("deer", "walk", 1),
-                ("turkey", "walk", 1), ("petard", "attack", 1)],
+                ("turkey", "walk", 1), ("jaguar", "attack", 1), ("hawk", "walk", 1), ("macaw", "walk", 2),
+                ("marlin", "idle", 1), ("fish_tuna", "idle", 1), ("petard", "attack", 1)],
 }
 
 
@@ -235,16 +241,120 @@ def place_units(army, units: dict[str, Unit]) -> list[tuple[Frame, int, int, int
     return placed
 
 
+def building(spec: dict, variant: int = 0, t: float = 0.0) -> Frame:
+    root = props.build(spec, variant=variant, count=3, t=t)
+    return render(root, BUILDING_HEADING, camera=fit_camera(root, BUILDING_HEADING))
+
+
 def place_buildings(spots, player: int = 1) -> list[tuple[Frame, int, int, int]]:
-    types = block_types()
+    """spots: (spec, tile i, tile j[, variant])."""
     placed = []
-    for key, i, j in spots:
-        root = BUILDINGS[key]().part(types)
-        cam = fit_camera(root, BUILDING_HEADING)
-        placed.append((render(root, BUILDING_HEADING, camera=cam), player, *tile_xy(i, j)))
+    for spot in spots:
+        spec, i, j = spot[:3]
+        placed.append((building(spec, spot[3] if len(spot) > 3 else 0), player, *tile_xy(i, j)))
     return placed
 
 
+def B(code: str, style: str = "W", age: int = 2, **kw) -> dict:
+    return {"model": "building", "code": code, "style": style, "age": age, **kw}
+
+
+def structure_sheet(title: str, rows: list[tuple[str, list[tuple[str, dict]]]], out: Path, k: int = 1,
+                    player: int = 1) -> None:
+    """A labelled grid of buildings: one row per entry, each a list of (caption, spec)."""
+    cells = [[(cap, framed(building(spec, spec.get("variant", 0)), player, 1, 3)) for cap, spec in items]
+             for _, items in rows]
+    head = 34
+    col_w = max(img.shape[1] for row in cells for _, img in row) + 12
+    row_h = [max(img.shape[0] for _, img in row) + 22 for row in cells]
+    label_w = 150
+    w = label_w + col_w * max(len(r) for r in cells)
+    h = head + sum(row_h)
+    canvas = Image.new("RGB", (w, h), PAPER)
+    d = ImageDraw.Draw(canvas)
+    d.text((10, 8), title, fill=INK, font=font(20))
+    y = head
+    for (label, _), row, rh in zip(rows, cells, row_h):
+        d.text((10, y + rh // 2 - 8), label, fill=INK, font=font(14))
+        for n, (cap, img) in enumerate(row):
+            x = label_w + n * col_w
+            canvas.paste(Image.fromarray(img), (x + (col_w - img.shape[1]) // 2, y + rh - img.shape[0] - 4))
+            d.text((x + 4, y + 2), cap, fill=MUTED, font=font(11))
+        y += rh
+    if k > 1:
+        canvas = canvas.resize((canvas.width * k, canvas.height * k), Image.NEAREST)
+    # a 256-colour palette keeps these big sheets small; the pixel art survives it
+    canvas.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, optimize=True)
+
+
+STYLES = [("W", "West European"), ("E", "Central European"), ("M", "Middle Eastern"), ("F", "Asian"),
+          ("X", "Meso-American")]
+
+
+def buildings_sheet(out: Path) -> None:
+    types = [("House", "HOUS", 3), ("Town Center", "RTWC", 3), ("Mill", "MILL", 3), ("Lumber camp", "SMIL", 2),
+             ("Mining camp", "MINE", 2), ("Barracks", "BRKS", 3), ("Archery range", "ARRG", 3),
+             ("Stable", "STBL", 3), ("Blacksmith", "BLAC", 3), ("Market", "MRKT", 3), ("Monastery", "CRCH", 3),
+             ("University", "UNIV", 3), ("Siege workshop", "SIWS", 3), ("Dock", "DOCK", 3)]
+    rows = [("Dark Age", [(name, B(code, "G", 1)) for name, code, _ in types
+                          if code in ("HOUS", "RTWC", "MILL", "DOCK")])]
+    rows.append(("Feudal (West)", [(name, B(code, "W", 2)) for name, code, _ in types[:8]]))
+    for key, label in STYLES:
+        rows.append((label, [(name, B(code, key, age)) for name, code, age in types]))
+    rows.append(("Imperial", [(label, B("RTWC", key, 4)) for key, label in STYLES]
+                 + [(f"University {key}", B("UNIV", key, 4)) for key, _ in STYLES[:3]]))
+    structure_sheet("Buildings: one design per building, five village styles, materials upgrade with each age",
+                    rows, out)
+
+
+def wonders_sheet(out: Path) -> None:
+    from aom.wonders import WONDERS
+    names = {"B": "Britons", "R": "Franks", "H": "Goths", "U": "Teutons", "I": "Vikings", "L": "Celts",
+             "Y": "Byzantines", "P": "Persians", "S": "Saracens", "T": "Turks", "J": "Japanese", "Z": "Chinese",
+             "N": "Mongols", "K": "Koreans", "C": "Spanish", "G": "Huns", "A": "Aztecs", "M": "Mayans"}
+    letters = list(WONDERS)
+    rows = [("", [(names[k], {"model": "wonder", "letter": k}) for k in letters[i:i + 6]])
+            for i in range(0, len(letters), 6)]
+    rows.append(("Monuments", [(n.replace("_", " "), {"model": "monument", "name": n}) for n in
+                               ("dome_of_the_rock", "small_pyramid", "large_pyramid", "cathedral_monument",
+                                "mosque", "tower_of_flies")]))
+    structure_sheet("Wonders and scenario monuments", rows, out)
+
+
+def fortifications_sheet(out: Path) -> None:
+    from aom.fortifications import PIECES
+    rows = []
+    for kind in ("palisade", "stone", "fortified"):
+        rows.append((f"{kind.title()} wall", [(p, {"model": "wall", "kind": kind, "style": "W", "piece": p})
+                                              for p in PIECES]))
+    rows.append(("Gates", [(f"{st} {'open' if o else 'shut'}", {"model": "gate", "style": st, "age": 3,
+                                                                 "direction": d, "open": o})
+                           for st, d, o in (("W", "x", False), ("E", "y", True), ("M", "h", False),
+                                            ("F", "v", True))]
+                 + [(f"tower {st}", {"model": "gate_tower", "style": st, "age": 3}) for st in "WX"]))
+    rows.append(("Towers", [(n, B("WCTW", "W", min(4, lv + 1), level=lv)) for lv, n in
+                            ((1, "watch"), (2, "guard"), (3, "keep"), (4, "bombard"))]
+                 + [("outpost", {"model": "outpost"})]))
+    rows.append(("Castles", [(label, B("CSTL", key, 3)) for key, label in STYLES]))
+    structure_sheet("Walls, gates, towers and castles", rows, out)
+
+
+def nature_sheet(out: Path) -> None:
+    rows = [("Forests", [(f, {"model": "tree", "forest": f, "variant": v})
+                         for f, v in (("oak", 0), ("oak", 4), ("forest", 1), ("pine", 0), ("snow", 2), ("palm", 1),
+                                      ("jungle", 0), ("bamboo", 0))]),
+            ("Resources", [("gold", {"model": "ore", "kind": "gold"}), ("gold", {"model": "ore", "kind": "gold",
+                                                                                 "variant": 3}),
+                           ("stone", {"model": "ore", "kind": "stone"}), ("berries", {"model": "berry_bush"}),
+                           ("stump", {"model": "stump"}), ("farm", B("FARM", "G", 1, stage=1.0)),
+                           ("fish trap", {"model": "fish_trap", "stage": 1.0})]),
+            ("Decorations", [(n, {"model": "gaia", "name": n}) for n in
+                             ("yurt", "pavilion", "ruins", "statue", "graves", "heads", "stone_head", "rug")]
+             + [("cactus", {"model": "cactus", "variant": 2}), ("rocks", {"model": "rock", "variant": 1}),
+                ("flowers", {"model": "plants", "flowers": True})])]
+    structure_sheet("Trees, resources and decorations", rows, out)
+    
+    
 def army_scene(out: Path, units: dict[str, Unit]) -> None:
     army = [
         ("villager", 1, 1.3, 2.0, 0, "idle", 0), ("villager_lumberjack", 1, 2.2, 1.4, 1, "carry", 0.25),
@@ -262,8 +372,11 @@ def army_scene(out: Path, units: dict[str, Unit]) -> None:
 
 
 def battle_scene(out: Path, units: dict[str, Unit]) -> None:
-    """Red siege and cavalry storming a blue town."""
-    placed = place_buildings([("town_center", 2.5, 2.5), ("house", -1.5, 5.5), ("house", 6.0, -1.0)])
+    """Red siege and cavalry storming a blue castle town."""
+    placed = place_buildings([(B("CSTL", "W", 3), 1.5, 1.5), (B("HOUS", "W", 3), -2.0, 5.0),
+                              (B("WCTW", "W", 3, level=2), 5.0, -1.0)])
+    for k in range(4):
+        placed += place_buildings([({"model": "wall", "kind": "stone", "style": "W", "piece": "y"}, 4.2, k - 0.3)])
     army = [
         ("knight", 1, 5.2, 5.0, 7, "attack", 0.5), ("paladin", 1, 4.4, 6.0, 7, "idle", 0),
         ("crossbowman", 1, 2.4, 5.6, 7, "attack", 0.5), ("hand_cannoneer", 1, 5.8, 3.2, 7, "idle", 0),
@@ -280,30 +393,45 @@ def battle_scene(out: Path, units: dict[str, Unit]) -> None:
 
 def harbor_scene(out: Path, units: dict[str, Unit]) -> None:
     """The fleet off the coast; tiles with i >= 3 are water."""
-    placed = place_buildings([("house", 0.5, 2.0), ("house", 0.5, 6.0)])
+    placed = place_buildings([(B("DOCK", "W", 3), 3.5, 4.5), (B("HOUS", "W", 2), 0.5, 2.0),
+                              (B("HOUS", "W", 2), 0.5, 7.0, 1)])
+    placed += place_buildings([({"model": "fish_trap", "stage": 1.0}, 4.5, 9.5)], player=1)
     fleet = [
         ("villager_fisherman", 1, 2.0, 4.0, 7, "idle", 0), ("trade_cart", 1, 1.6, 8.2, 7, "idle", 0),
         ("fishing_ship", 1, 4.4, 2.2, 7, "idle", 0), ("fishing_ship", 1, 4.2, 7.6, 1, "idle", 0.5),
-        ("transport_ship", 1, 5.0, 4.8, 3, "idle", 0.2), ("trade_cog", 1, 6.4, 1.2, 1, "walk", 0.3),
+        ("transport_ship", 1, 5.0, 6.8, 3, "idle", 0.2), ("trade_cog", 1, 6.4, 1.2, 1, "walk", 0.3),
         ("galley", 1, 6.6, 6.4, 7, "walk", 0.1), ("war_galley", 1, 7.4, 3.4, 7, "attack", 0.5),
         ("galleon", 2, 10.4, 2.2, 3, "attack", 0.4), ("cannon_galleon", 2, 10.2, 6.2, 3, "attack", 0.5),
         ("fire_ship", 2, 8.8, 8.4, 3, "walk", 0.3), ("demolition_ship", 2, 9.2, 4.6, 2, "walk", 0.6),
         ("longboat", 2, 12.4, 4.4, 3, "walk", 0.2), ("turtle_ship", 2, 12.4, 8.6, 3, "idle", 0),
+        ("marlin", 7, 11.0, 10.4, 1, "idle", 0.7), ("fish_tuna", 7, 7.4, 10.2, 1, "idle", 0.2),
     ]
     compose(placed + place_units(fleet, units), out, shore=3.0)
 
 
 def village_scene(out: Path, units: dict[str, Unit]) -> None:
-    placed = place_buildings([("town_center", 4.0, 4.0), ("house", -0.5, 6.0), ("house", 3.0, -0.5),
-                              ("house", 8.5, 1.5)])
+    """A Dark Age start: Town Center, houses, a mill with fields, a lumber camp at the forest, mines."""
+    placed = place_buildings([(B("RTWC", "G", 1), 4.0, 4.0), (B("HOUS", "G", 1), -0.5, 6.0),
+                              (B("HOUS", "G", 1), 3.0, -0.5, 1), (B("HOUS", "G", 1), 8.5, 1.0, 2),
+                              (B("MILL", "W", 2), 9.0, 7.5), (B("FARM", "G", 1, stage=1.0), 9.0, 10.5),
+                              (B("FARM", "G", 1, stage=0.5), 12.0, 7.5), (B("SMIL", "W", 2), -1.5, 10.5),
+                              (B("MINE", "W", 2), 4.0, 11.0)])
+    for k, (i, j) in enumerate(((-3.5, 12.5), (-2.5, 13.5), (-3.5, 14.5), (-4.5, 13.5), (-1.5, 14.5), (-4.5, 11.5),
+                                (-2.5, 15.5), (-5.5, 14.5))):
+        placed += place_buildings([({"model": "tree", "forest": "oak", "height": 110 + 12 * (k % 3)}, i, j, k)], 7)
+    placed += place_buildings([({"model": "ore", "kind": "gold"}, 5.0, 13.5, 1), ({"model": "ore", "kind": "gold"},
+                                                                                6.0, 13.5, 3),
+                               ({"model": "ore", "kind": "stone"}, 2.0, 13.5, 2),
+                               ({"model": "berry_bush"}, 12.5, 2.0, 0), ({"model": "berry_bush"}, 13.5, 2.0, 1),
+                               ({"model": "berry_bush"}, 13.0, 3.0, 2)], 7)
     folk = [
-        ("villager_builder", 1, 6.9, 5.2, 7, "attack", 0.3), ("villager_farmer", 1, 7.4, 3.8, 1, "attack", 0.6),
-        ("villager_lumberjack", 1, 2.6, 7.6, 3, "carry", 0.6), ("villager", 1, 1.6, 1.4, 0, "idle", 0),
-        ("villager_shepherd", 1, 7.0, 6.6, 1, "attack", 0.2),
-        ("sheep", 1, 7.2, 7.3, 1, "idle", 0), ("sheep", 1, 7.9, 7.3, 6, "walk", 0.4),
-        ("sheep", 1, 6.6, 7.9, 3, "idle", 0), ("scout_cavalry", 1, 4.6, 7.4, 0, "idle", 0),
-        ("villager_gold_miner", 1, 5.4, 8.2, 0, "walk", 0.3), ("turkey", 7, 9.2, 5.6, 2, "idle", 0),
-        ("petard", 2, 10.4, 5.2, 2, "walk", 0.3), ("wolf", 7, 10.6, 3.2, 2, "walk", 0.5),
+        ("villager_builder", 1, 6.9, 5.2, 7, "attack", 0.3), ("villager_farmer", 1, 9.4, 10.0, 1, "attack", 0.6),
+        ("villager_lumberjack", 1, -2.4, 12.0, 3, "attack", 0.6), ("villager", 1, 1.6, 1.4, 0, "idle", 0),
+        ("villager_shepherd", 1, 7.0, 6.6, 1, "attack", 0.2), ("villager_forager", 1, 12.0, 2.8, 2, "attack", 0.3),
+        ("sheep", 1, 7.2, 7.3, 1, "idle", 0), ("sheep", 1, 7.9, 6.9, 6, "walk", 0.4),
+        ("villager_gold_miner", 1, 5.4, 12.6, 0, "attack", 0.3), ("scout_cavalry", 1, 4.6, 7.8, 0, "idle", 0),
+        ("deer", 7, 12.4, 12.6, 2, "idle", 0), ("wolf", 7, 13.6, 10.2, 2, "walk", 0.5),
+        ("hawk", 7, 6.0, 1.0, 1, "walk", 0.25),
     ]
     compose(placed + place_units(folk, units), out)
 
@@ -337,6 +465,10 @@ def main() -> None:
     battle_scene(out / "battle.png", units)
     harbor_scene(out / "harbor.png", units)
     village_scene(out / "village.png", units)
+    buildings_sheet(out / "buildings.png")
+    wonders_sheet(out / "wonders.png")
+    fortifications_sheet(out / "fortifications.png")
+    nature_sheet(out / "nature.png")
     unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")
 

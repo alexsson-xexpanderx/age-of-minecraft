@@ -36,6 +36,34 @@ from aom.export import blank, render_frames  # noqa: E402
 from aom.palette import Quantiser, parse_jasc  # noqa: E402
 from aom.roster import ROSTER  # noqa: E402
 from aom.slpmap import BLANK, NAME_PREFIXES, SHARED, SUFFIX_ACTIONS, TARGETS, Target  # noqa: E402
+from aom import spritemap  # noqa: E402
+
+# --only also accepts these groups of buildings and scenery
+STATIC_GROUPS = {"buildings", "walls", "wonders", "nature", "decorations", "projectiles"}
+
+
+def static_group(spec: dict) -> str:
+    m = spec["model"]
+    if m in ("wall", "gate", "gate_tower", "gate_site"):
+        return "walls"
+    if m in ("wonder", "monument"):
+        return "wonders"
+    if m in ("tree", "stump", "ore", "berry_bush", "rock", "plants", "cactus"):
+        return "nature"
+    if m in ("gaia", "haystack"):
+        return "decorations"
+    if m == "projectile":
+        return "projectiles"
+    return "buildings"
+
+
+def blank_group(why: str) -> str:
+    """The --only group a hidden layer belongs to, from the reason the sprite map gives."""
+    for words, group in (("wall gate", "walls"), ("wonder monument", "wonders"), ("tree forest mine", "nature"),
+                         ("javelin", "projectiles"), ("flag decoration", "decorations")):
+        if any(w in why for w in words.split()):
+            return group
+    return "buildings"
 
 MOD = "AgeOfMinecraft"
 BACKUP = ".aom-backup"
@@ -248,13 +276,25 @@ def _init(palette) -> None:
 
 
 def _render(job) -> tuple[int, bytes, int]:
-    slp_id, unit_key, action, frames, angles, mirrored, extra = job
+    if job[0] == "static":
+        _, slp_id, spec, num_frames, frames, angles, mirrored, original = job
+        from aom.props import render_static
+        out = render_static(spec, num_frames, frames, angles, mirrored, _STATE["quant"], original)
+        return slp_id, slp.encode(out), len(out)
+    _, slp_id, unit_key, action, frames, angles, mirrored, extra = job
     units = _STATE["units"]
     if unit_key not in units:
         units[unit_key] = ROSTER[unit_key]()
     out = render_frames(units[unit_key], action, frames, angles, mirrored, _STATE["quant"])
     out += [out[-1]] * extra
     return slp_id, slp.encode(out), len(out)
+
+
+def _safe_render(job):
+    try:
+        return _render(job)
+    except Exception:
+        return job[1], None, traceback.format_exc()
 
 
 # --------------------------------------------------------------------------- main
@@ -284,8 +324,8 @@ def main(argv=None) -> int:
     log(f"palette: {len(game.palette)} colours")
 
     only = set(args.only.split(",")) if args.only else None
-    if only and not only <= set(ROSTER):
-        raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER)))}")
+    if only and not only <= set(ROSTER) | STATIC_GROUPS:
+        raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER) - STATIC_GROUPS))}")
     targets = list(TARGETS) + game.name_targets({t.slp for t in TARGETS})
     targets = [t for t in targets if only is None or t.unit in only]
 
@@ -301,26 +341,60 @@ def main(argv=None) -> int:
             skipped.append((t, str(exc)))
             continue
         frames, angles, mirrored, extra, source = game.layout(t.slp, info.num_frames)
-        jobs.append((t.slp, t.unit, t.action, frames, angles, mirrored, extra))
+        jobs.append(("unit", t.slp, t.unit, t.action, frames, angles, mirrored, extra))
         planned.append((t, info.num_frames, frames, angles, mirrored, source))
 
-    target_slps = {j[0] for j in jobs}
+    # buildings, walls, trees and decorations, found by name in the graphics table
+    statics: list[tuple[spritemap.Sprite, int]] = []
+    static_blanks: dict[int, str] = {}
+    if game.graphics_table and (only is None or only & STATIC_GROUPS):
+        taken = {t.slp for t in TARGETS} | {j[1] for j in jobs} | {s for s, _ in BLANK}
+        sprite_plan = spritemap.plan(game.graphics_table, taken)
+        spritemap.resolve_offsets(sprite_plan, game.graphics_table)
+        wanted = (lambda spec: True) if only is None else (lambda spec: static_group(spec) in only)
+        for sp in sprite_plan.sprites.values():
+            if not wanted(sp.spec):
+                continue
+            data = game.original(sp.slp)
+            if data is None:
+                continue
+            try:
+                n = slp.info(data).num_frames
+            except ValueError as exc:
+                skipped.append((Target(sp.slp, sp.source, "static"), str(exc)))
+                continue
+            frames, angles, mirrored, _, _ = game.layout(sp.slp, n)
+            needs = sp.spec.get("fit") or sp.spec.get("mode") == "match"
+            original = game.original(sp.spec.get("fit_slp", sp.slp)) if needs else None
+            jobs.append(("static", sp.slp, sp.spec, n, frames, angles, mirrored, original))
+            statics.append((sp, n))
+        static_blanks = {s: why for s, why in sprite_plan.blanks.items()
+                         if only is None or blank_group(why) in only}
+
+    target_slps = {j[1] for j in jobs}
     blanks = {} if only else {s: why for s, why in BLANK}
     if not only:
         blanks.update(game.delta_blanks(target_slps))
+    blanks.update(static_blanks)
     blanks = {s: why for s, why in blanks.items() if s not in target_slps and game.original(s) is not None}
 
-    log(f"plan: {len(jobs)} sprites to render, {len(blanks)} layers to blank, {len(skipped)} skipped")
+    log(f"plan: {len(jobs) - len(statics)} unit sprites and {len(statics)} building/scenery sprites to render, "
+        f"{len(blanks)} layers to blank, {len(skipped)} skipped")
     if args.dry_run:
-        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt")
+        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics)
         return 0
 
     started = time.time()
     rendered: dict[int, bytes] = {}
-    jobs.sort(key=lambda j: -j[3] * (j[4] // 2 + 1))  # big animations first
+    failed: list[tuple[int, str]] = []
+    jobs.sort(key=lambda j: -(j[4] * (j[5] // 2 + 1) if j[0] == "unit" else j[3] * 4))  # big ones first
     with mp.Pool(args.jobs, initializer=_init, initargs=(game.palette,)) as pool:
-        for n, (slp_id, data, count) in enumerate(pool.imap_unordered(_render, jobs), 1):
-            rendered[slp_id] = data
+        for n, (slp_id, data, count) in enumerate(pool.imap_unordered(_safe_render, jobs), 1):
+            if data is None:  # one broken sprite must not stop the whole build: keep the original
+                failed.append((slp_id, count))
+                log(f"  could not render sprite {slp_id}; keeping the original. Details:\n{count}")
+            else:
+                rendered[slp_id] = data
             if n % 20 == 0 or n == len(jobs):
                 print(f"  rendered {n}/{len(jobs)} sprites ({time.time() - started:.0f}s)")
     for s in blanks:
@@ -339,7 +413,7 @@ def main(argv=None) -> int:
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
     exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
-    write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt")
+    write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics)
     log(f"done in {time.time() - started:.0f}s")
     log("")
     log("RESULT")
@@ -446,12 +520,19 @@ def restore(root: Path) -> int:
     return 0
 
 
-def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path) -> None:
+def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=()) -> None:
     lines = ["Age of Minecraft build report", "=" * 30, *header, "", "REPLACED (slp, unit, action, frames x angles)"]
     for t, n, frames, angles, mirrored, source in sorted(planned, key=lambda p: p[0].slp):
         m = " mirrored" if mirrored else ""
         lines.append(f"  {t.slp:6d}  {t.unit:24s} {t.action:7s} {n:4d} frames = {frames} x {angles} angles{m}"
                      f"  [{source}] {t.note}")
+    lines += ["", "BUILDINGS AND SCENERY (slp, found by, model, frames)"]
+    for sp, n in sorted(statics, key=lambda x: x[0].slp):
+        spec = sp.spec
+        what = spec["model"] + "".join(f" {k}={spec[k]}" for k in ("code", "style", "age", "kind", "forest",
+                                                                     "letter", "name", "direction", "open",
+                                                                     "part", "anchor_offset", "half") if k in spec)
+        lines.append(f"  {sp.slp:6d}  {sp.source:14s} {what:60s} {n:3d} frames [{spec.get('mode')}] {sp.note}")
     lines += ["", "BLANKED LAYERS"] + [f"  {s:6d}  {why}" for s, why in sorted(blanks.items())]
     lines += ["", "SKIPPED"] + [f"  {t.slp:6d}  {t.unit:24s} {t.action:7s} {why}" for t, why in skipped]
     covered = {p[0].unit for p in planned}

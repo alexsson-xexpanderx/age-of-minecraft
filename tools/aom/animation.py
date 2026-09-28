@@ -259,6 +259,29 @@ def pose(unit, action: str, t: float) -> Pose:
             _add(p, "arm", a)
             _add(p, "counterweight", -a)
             _add(p, "sling", -a)
+    elif rig == "flyer":  # flapping flight; gliding holds the wings out and banks
+        if action == "attack" or action == "idle":  # gliding
+            _add(p, "wing_r", ry=-8 + 3 * s)
+            _add(p, "wing_l", ry=8 - 3 * s)
+            _add(p, "torso", ry=10 * s)
+        else:
+            flap = 45 * s
+            _add(p, "wing_r", ry=-flap)
+            _add(p, "wing_l", ry=flap)
+            _add(p, "tip_r", ry=-0.5 * flap)
+            _add(p, "tip_l", ry=0.5 * flap)
+            _move(p, "torso", dz=-2 * s)
+    elif rig == "swimmer":  # a fish circling under the surface, leaping now and then
+        a = 2 * math.pi * t
+        _move(p, "root", dx=10 * math.cos(a), dy=10 * math.sin(a))
+        _add(p, "root", rz=math.degrees(a))
+        _add(p, "tail", rz=25 * math.sin(4 * a))
+        u = (t - 0.55) / 0.3
+        if 0 <= u <= 1:
+            _move(p, "root", dz=-2 + 22 * math.sin(math.pi * u))
+            _add(p, "torso", rx=40 * math.cos(math.pi * u))
+        else:
+            _move(p, "root", dz=-2)
     elif rig == "ship":
         _add(p, "root", ry=3 * s)
         _move(p, "root", dz=0.6 * s)

@@ -95,6 +95,27 @@ def fake_game(root: Path) -> Path:
     for s, name in ((9000, "HALBD_AN"), (9003, "HALBD_DN"), (9100, "PETARD_DN"), (9101, "BLAST_NN")):
         graphics.put(s, build_mod.blank(10 * 5))
         table.append({"name": name, "slp": s if s != 9101 else 9100, "frames": 10, "angles": 8})
+    # buildings and scenery, found by their names: a barracks with its shadow and flag layers, a stone
+    # wall with its five pieces, an oak forest, a gold mine, and a flag sprite shared with a ship
+    for s, frames in ((130, 1), (122, 1), (126, 1), (2098, 5), (2090, 5), (4652, 14), (2296, 14), (2561, 7),
+                      (4479, 7), (2219, 1)):
+        pieces = []
+        for k in range(frames):
+            px = np.full((40 + 6 * k, 30 + 8 * (k % 5)), 60, np.int16)
+            pieces.append(slp.SlpFrame(px, (px.shape[1] // 2, px.shape[0] - 4)))
+        graphics.put(s, slp.encode(pieces))
+    base = len(table)
+    table += [{"name": "BRKS2N0E", "slp": 122, "frames": 1, "angles": 1, "mirror": 0},
+              {"name": "BRKS2N1E", "slp": 126, "frames": 1, "angles": 1, "mirror": 0},
+              {"name": "BRKS2NNE", "slp": 130, "frames": 1, "angles": 1, "mirror": 0, "deltas": [base, -1, base + 1]},
+              {"name": "WALL2N0E", "slp": 2090, "frames": 1, "angles": 5, "mirror": 0},
+              {"name": "WALL2NNE", "slp": 2098, "frames": 1, "angles": 5, "mirror": 0, "deltas": [-1, base + 3]},
+              {"name": "FOAK_N0", "slp": 2296, "frames": 1, "angles": 14, "mirror": 0},
+              {"name": "FOAK_NN", "slp": 4652, "frames": 1, "angles": 14, "mirror": 0, "deltas": [base + 5, -1]},
+              {"name": "GOLDM_N0", "slp": 4479, "frames": 1, "angles": 7, "mirror": 0},
+              {"name": "GOLDM_NN", "slp": 2561, "frames": 1, "angles": 7, "mirror": 0, "deltas": [base + 7, -1]},
+              {"name": "BLAC2N1E", "slp": 2219, "frames": 23, "angles": 1, "mirror": 0},
+              {"name": "ABGAL_ANE", "slp": 2219, "frames": 1, "angles": 16, "mirror": 0}]
     graphics.put(40000, b"not a sprite we touch")
     graphics.write(data / "graphics.drs")
     (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table))
@@ -169,6 +190,16 @@ def test_full_build(tmp: Path):
     assert out.get(9100) == orig.get(9100)  # shared explosion is left alone
     report = (mod / "aom_report.txt").read_text()
     assert "REPLACED" in report and "BTRAM_AN" in report and "found by name HALBD_AN" in report
+    # buildings and scenery
+    for s in (130, 2098, 4652, 2561):
+        assert out.get(s) != orig.get(s)
+        assert slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
+    for s in (122, 126, 2090, 2296, 4479):  # their shadow and flag layers are hidden
+        assert all((f.pixels == slp.TRANSPARENT).all() for f in slp.decode(out.get(s)))
+    assert out.get(2219) == orig.get(2219)  # shared with a ship: left alone
+    wall = slp.decode(out.get(2098))
+    assert len({f.pixels.tobytes() for f in wall}) == 5  # five different wall pieces
+    assert "BUILDINGS AND SCENERY" in report and "BRKS2NNE" in report and "FOAK_NN" in report
     assert "6 x 8 angles mirrored  [dat, plus 2 unused frames]" in report
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 

@@ -169,6 +169,19 @@ TARGETS: list[Target] = [
     # ---------------------------------------------------------------- petard (its death is the shared explosion)
     Target(4497, "petard", "idle"), Target(4498, "petard", "walk"),
     *_set("wild_boar", 2555, 2556, 2557, 2558, 2559), Target(3577, "wild_boar", "run"),
+    # jaguar (GJAGR), wild horse, hawk and macaw (their shadows are separate layers, blanked below)
+    Target(4831, "jaguar", "attack"), Target(4832, "jaguar", "die"), Target(4833, "jaguar", "idle"),
+    Target(4834, "jaguar", "decay"), Target(4835, "jaguar", "walk"),
+    Target(4837, "horse", "idle"), Target(4836, "horse", "die"), Target(4838, "horse", "decay"),
+    Target(4839, "horse", "walk"),
+    Target(578, "hawk", "walk", "flying"), Target(576, "hawk", "idle", "gliding"),
+    Target(5045, "macaw", "walk", "flying"), Target(5043, "macaw", "idle", "gliding"),
+    # fish (animated in place) and the marlin
+    Target(420, "fish_perch", "idle"), Target(1910, "fish_dorado", "idle"), Target(1911, "fish_salmon", "idle"),
+    Target(1912, "fish_perch", "idle"), Target(1913, "fish_snapper", "idle"), Target(3549, "fish_tuna", "idle"),
+    Target(1905, "marlin", "idle"), Target(1906, "marlin", "idle"),
+    # the Meso-American priest carrying a relic
+    Target(5290, "monk", "idle", "with relic"), Target(5291, "monk", "walk", "with relic"),
     # javelina (BOARJ in the .dat)
     Target(5157, "javelina", "attack"), Target(5158, "javelina", "die"), Target(5159, "javelina", "idle"),
     Target(5160, "javelina", "run"), Target(5161, "javelina", "decay"), Target(5162, "javelina", "walk"),
@@ -179,6 +192,7 @@ BLANK: list[tuple[int, str]] = [
     (446, "fishing ship nets"),
     (5238, "war wagon body"), (5239, "war wagon body"), (5240, "war wagon body"),
     (5168, "turtle ship shadow"), (5176, "turtle ship shadow"), (5182, "turtle ship shadow"),
+    (577, "hawk shadow"), (575, "hawk shadow"), (5044, "macaw shadow"), (5042, "macaw shadow"),
     # ship hull shadows (also used by the sinking animations, which is why the .dat check keeps them)
     *[(s, "ship shadow") for s in (4336, 4501, 4502, 4503, 4508, 4509, 4510, 4514, 4515, 4516, 4517)],
     # sails, by civilisation style (East, Asian, Middle Eastern, West, Meso)
