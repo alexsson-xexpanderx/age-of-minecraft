@@ -49,11 +49,21 @@ age2_x1\AgeOfMinecraft.exe               created by UserPatch's SetupAoC.exe
 
 ## 4. Play
 
-Start **`age2_x1\AgeOfMinecraft.exe`**. If it wasn't created, run
-`SetupAoC.exe -g:AgeOfMinecraft` in your game folder once, and it will
-appear.
+Start **`age2_x1\AgeOfMinecraft.exe`**. Your normal `age2_x1.exe` stays
+exactly as it was.
 
-Your normal `age2_x1.exe` stays exactly as it was.
+**No `AgeOfMinecraft.exe`?** The end of the black window (under **RESULT**)
+says why. Everything shown there is also saved to **`aom_build_log.txt`**,
+next to `build_mod.bat`. You have two options:
+
+1. Make the exe yourself. Open your game folder in File Explorer, type `cmd`
+   in the address bar and press Enter, then run
+   `SetupAoC.exe -g:AgeOfMinecraft`. This needs UserPatch's installer
+   `SetupAoC.exe` in that folder.
+2. Skip the exe: double-click **`build_mod_direct.bat`**. It puts the
+   Minecraft sprites into your normal game, so you start the game as usual.
+   Your original `graphics.drs` is backed up first, and
+   **`restore_original.bat`** puts it back.
 
 ## Options
 
@@ -61,8 +71,8 @@ Your normal `age2_x1.exe` stays exactly as it was.
 |---|---|
 | `build_mod.bat "<game>" --only militia,archer,villager` | build only some units, for a quick test (keys are listed in [UNITS.md](UNITS.md)) |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
-| `build_mod.bat "<game>" --mode direct` | if the UserPatch mod doesn't start: put the sprites straight into `Data\graphics.drs`. A backup is kept as `graphics.drs.aom-backup`. |
-| `build_mod.bat "<game>" --restore` | undo `--mode direct` |
+| `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs` (no mod exe needed); a backup is kept as `graphics.drs.aom-backup` |
+| `restore_original.bat` | undo `build_mod_direct.bat` |
 
 ## What to expect in this first test
 

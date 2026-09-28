@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 from typing import Optional
 
@@ -295,27 +296,61 @@ def main(argv=None) -> int:
         raise SystemExit(f"Windows would not let us write {exc.filename}.\n"
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
-    if args.mode == "upmod" and not args.no_exe:
-        make_exe(game.root, log)
+    exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
     write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt")
     log(f"done in {time.time() - started:.0f}s")
+    log("")
+    log("RESULT")
+    log(f"  sprites: {len(rendered)} written ({'direct into Data' if args.mode == 'direct' else out_dir})")
+    if args.mode == "direct":
+        log("  To play: start the game as usual. To undo: double-click restore_original.bat")
+    elif exe_ok:
+        log(f"  To play: start {game.root / 'age2_x1' / (MOD + '.exe')}")
+    else:
+        log("  The mod exe is missing. Two ways to play:")
+        log(f"   1. In your game folder, open a command prompt and run:  SetupAoC.exe -g:{MOD}")
+        log(f"      then start age2_x1\\{MOD}.exe")
+        log("   2. Or skip the exe: double-click build_mod_direct.bat (puts the sprites into your normal game,")
+        log("      keeps a backup; restore_original.bat undoes it)")
     return 0
 
 
-def make_exe(root: Path, log) -> None:
+def find_setup(root: Path) -> Optional[Path]:
+    """UserPatch's installer, SetupAoC.exe: in the game folder or one folder below it."""
+    folders = [root] + sorted(d for d in root.iterdir() if d.is_dir())
+    for folder in folders:
+        hit = pick(folder, "SetupAoC.exe")
+        if hit is not None:
+            return hit
+    return None
+
+
+def make_exe(root: Path, log) -> bool:
     """UserPatch starts a data mod through its own exe: SetupAoC.exe -g:<mod> creates age2_x1\\<mod>.exe."""
-    setup = pick(root, "SetupAoC.exe")
     exe = root / "age2_x1" / f"{MOD}.exe"
-    manual = f'In your game folder run:  SetupAoC.exe -g:{MOD}   then start  age2_x1\\{MOD}.exe'
-    if setup is None or os.name != "nt":
-        log("To play: " + manual)
-        return
+    setup = find_setup(root)
+    if setup is None:
+        log(f"mod exe: SetupAoC.exe (the UserPatch installer) is not in {root}, so the mod exe can't be made.")
+        return False
+    if os.name != "nt":
+        log(f"mod exe: on Windows, run  {setup.name} -g:{MOD}  in {setup.parent}")
+        return False
+    log(f"mod exe: running {setup} -g:{MOD}")
+    log("         (if a UserPatch window opens, click its Install / Run button and wait for it to finish)")
     try:
-        subprocess.run([str(setup), f"-g:{MOD}"], cwd=root, timeout=180, check=False)
+        done = subprocess.run([str(setup), f"-g:{MOD}"], cwd=setup.parent, timeout=600, check=False,
+                              capture_output=True, text=True, errors="replace")
+        log(f"mod exe: SetupAoC.exe finished with code {done.returncode}")
+        for line in (done.stdout + done.stderr).strip().splitlines()[-20:]:
+            log("         " + line)
     except (OSError, subprocess.SubprocessError) as exc:
-        log(f"Could not run SetupAoC.exe ({exc}). " + manual)
-        return
-    log(f"To play: start {exe}" if exe.exists() else "SetupAoC.exe ran but no mod exe appeared. " + manual)
+        log(f"mod exe: could not run SetupAoC.exe ({exc})")
+    if exe.exists():
+        return True
+    folder = pick(root, "age2_x1")
+    found = sorted(p.name for p in folder.iterdir() if p.suffix.lower() == ".exe") if folder else []
+    log(f"mod exe: {exe} was not created. Exes in age2_x1: {', '.join(found) or 'none'}")
+    return False
 
 
 def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Path:
@@ -389,6 +424,46 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
     print(f"report: {path}")
 
 
+class _Tee:
+    """Show output in the window and keep a copy in aom_build_log.txt."""
+
+    def __init__(self, stream, fh):
+        self.stream, self.fh = stream, fh
+
+    def write(self, text):
+        self.stream.write(text)
+        self.fh.write(text)
+        self.fh.flush()
+
+    def flush(self):
+        self.stream.flush()
+        self.fh.flush()
+
+
+def cli() -> int:
+    log_path = Path(__file__).resolve().parent.parent / "aom_build_log.txt"
+    try:
+        fh = open(log_path, "w", encoding="utf-8")
+    except OSError:
+        log_path = Path.home() / "aom_build_log.txt"
+        fh = open(log_path, "w", encoding="utf-8")
+    sys.stdout, sys.stderr = _Tee(sys.stdout, fh), _Tee(sys.stderr, fh)
+    print(f"Age of Minecraft build - a copy of this output is saved to {log_path}")
+    try:
+        return main()
+    except SystemExit as exc:
+        if isinstance(exc.code, str):
+            print("\nERROR: " + exc.code)
+            return 1
+        return exc.code or 0
+    except Exception:
+        traceback.print_exc()
+        print(f"\nERROR: the build crashed. Please send {log_path}")
+        return 1
+    finally:
+        print(f"\n(log saved to {log_path})")
+
+
 if __name__ == "__main__":
     mp.freeze_support()
-    sys.exit(main())
+    sys.exit(cli())
