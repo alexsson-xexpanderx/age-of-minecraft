@@ -65,6 +65,69 @@ Unique-unit ideas: Teutonic Knight → netherite knight · Berserk / Throwing
 Axeman → Vindicator · Samurai → Piglin Brute · Woad Raider → Zombie ·
 War Elephant → Iron Golem · Mameluke → Blaze.
 
+## Buildings
+
+![village](../previews/village.png)
+
+Buildings are made of real Minecraft-scale blocks, at the same scale as the
+units: a unit is 2 blocks tall, as in Minecraft. One AoE2 tile comes to about
+2.8 blocks at the render scale, so:
+
+| Footprint | Blocks | Examples |
+|---|---|---|
+| 2×2 tiles | 5×5 | House, Mill, Lumber / Mining Camp |
+| 3×3 tiles | 8×8 | Barracks, Archery Range, Stable, Market |
+| 4×4 tiles | 11×11 | Town Center, Castle |
+| 5×5 tiles | 14×14 | Wonder |
+
+Buildings are drawn from a single angle (their south-west and south-east
+walls face the camera). Team colour shows on wool roof ridges, banners, and
+the flag on top.
+
+### Building mapping
+
+| AoE2 building | Minecraft build | |
+|---|---|---|
+| House | Plains-village cottage: cobblestone base, log corners, stair roof | ✅ |
+| Town Center | Village hall with a bell tower (the village meeting point) | ✅ |
+| Barracks | Armourer's hall with armour stands and a blast furnace | 🧱 |
+| Archery Range | Fletcher's hut with target blocks | 🧱 |
+| Stable | Stable with hay bales and fences | 🧱 |
+| Blacksmith | Weaponsmith with an anvil, grindstone and lava forge | 🧱 |
+| Market | Trading stalls with emeralds | 🧱 |
+| Mill | Farmer's hut with a composter and hay | 🧱 |
+| Farm | Wheat field with a water channel | 🧱 |
+| Lumber Camp / Mining Camp | Log pile with a chopping block / mineshaft with rails and a minecart | 🧱 |
+| Monastery | Cleric's temple with a brewing stand | 🧱 |
+| University | Library with bookshelves and an enchanting table | 🧱 |
+| Siege Workshop | Workshop with pistons, TNT and dispensers | 🧱 |
+| Dock | Oak pier with a boat | 🧱 |
+| Watch Tower line | Pillager-outpost-style watch tower | 🧱 |
+| Palisade / Stone Wall / Gate | Oak fence / cobblestone wall / fence gate and iron door | 🧱 |
+| Castle | Stone-brick keep with crenellations | 🧱 |
+| Wonder | Beacon pyramid of iron, gold and diamond blocks, with the light beam | 🧱 |
+| Trees, gold, stone, berries | Oak trees, gold ore, stone boulders, sweet berry bushes | 🧱 |
+
+### Ages and architecture sets
+
+AoE2 changes how buildings look by age and by civilisation. Minecraft has a
+natural answer for both:
+
+* **Ages as materials**: Dark Age oak and dirt paths → Feudal cobblestone →
+  Castle stone bricks → Imperial polished stone, quartz and gold trim.
+* **Civilisations as village biomes**: Western European → Plains, Eastern
+  European → Taiga, Middle Eastern → Desert, Asian → Savanna / Snowy,
+  Meso-American → Jungle.
+
+### Construction and destruction
+
+AoE2 needs construction stages, damage and rubble sprites for each building.
+Since the buildings are made of blocks, these come almost free:
+
+* **construction**: the building rises layer by layer, the way a player builds
+* **damage**: blocks missing, with fire
+* **rubble**: scattered blocks and a crater
+
 ## Animations
 
 AoE2 needs a set of sprites for each unit: **stand, walk, attack, die and
@@ -115,5 +178,7 @@ modding tools are only needed at step 4.
   colour?
 * Scale: are infantry at ≈ 45 px the right size next to the original
   buildings, or should they be a little smaller?
-* Buildings: stop at units, or also do block-built houses, town centres and
-  castles?
+* Buildings: should the roofs keep the team-coloured wool ridge, or only
+  show banners (closer to the original game)?
+* Which civilisation style should be the first full building set? (Plains
+  is started.)

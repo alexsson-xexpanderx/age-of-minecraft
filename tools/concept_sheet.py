@@ -5,7 +5,8 @@
 Writes into previews/ by default:
     roster.png         every unit, all 8 directions, 2x zoom
     player_colors.png  one unit in all 8 player colours
-    scene.png          in-game mock-up on AoE2-sized grass tiles, 2x zoom
+    scene.png          in-game mock-up of two armies, 2x zoom
+    village.png        Town Center and houses with villagers, 2x zoom
     animations.gif     walk / attack / death cycles, 3x zoom
 """
 from __future__ import annotations
@@ -20,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aom.animation import DIRECTIONS, pose  # noqa: E402
 from aom.colors import PLAYER_COLORS  # noqa: E402
-from aom.render import SHADOW, Camera, Frame, render  # noqa: E402
+from aom.buildings import BUILDING_HEADING, BUILDINGS, block_types  # noqa: E402
+from aom.render import SHADOW, Camera, Frame, fit_camera, render  # noqa: E402
 from aom.units import ROSTER, Unit  # noqa: E402
 
 TILE_W, TILE_H = 96, 48  # AoE2 tile size at 1x
@@ -113,14 +115,41 @@ def player_sheet(unit: Unit, out: Path, k: int = 3) -> None:
 
 # --------------------------------------------------------------------------- in-game scene
 
-def scene(out: Path, k: int = 2) -> None:
-    """Two small armies on grass, drawn at the size they would have in game."""
+def tile_xy(i: float, j: float) -> tuple[int, int]:
+    """Screen position of map tile (i, j); AoE2 tiles are 96x48 diamonds."""
+    return int((i - j) * TILE_W / 2), int((i + j) * TILE_H / 2)
 
-    def tile_xy(i: float, j: float) -> tuple[int, int]:
-        """Screen position of map tile (i, j); AoE2 tiles are 96x48 diamonds."""
-        return int((i - j) * TILE_W / 2), int((i + j) * TILE_H / 2)
 
-    # (unit, player, tile i, tile j, direction index, action, t)
+def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, margin: int = 24) -> None:
+    """Draw (frame, player, x, y) sprites, hotspot at map pixel (x, y), on grass cropped to fit."""
+    items = [(f, player, x - f.hotspot[0], y - f.hotspot[1], y) for f, player, x, y in placed]
+    x0 = min(x for _, _, x, _, _ in items) - margin
+    y0 = min(y for _, _, _, y, _ in items) - margin
+    x1 = max(x + f.kind.shape[1] for f, _, x, _, _ in items) + margin
+    y1 = max(y + f.kind.shape[0] for f, _, _, y, _ in items) + margin
+    canvas = grass(x1 - x0, y1 - y0, 3)
+    for f, _, x, y, _ in items:  # shadows go under every sprite
+        shadow = np.zeros((*f.kind.shape, 4), np.uint8)
+        shadow[f.kind == SHADOW] = (0, 0, 0, 102)
+        blend(canvas, shadow, x - x0, y - y0)
+    for f, player, x, y, _ in sorted(items, key=lambda it: it[4]):  # back to front
+        blend(canvas, f.to_rgba(player, shadow_alpha=0), x - x0, y - y0)
+    Image.fromarray(zoom(canvas, k)).save(out)
+
+
+def place_units(army, units: dict[str, Unit]) -> list[tuple[Frame, int, int, int]]:
+    """army: (unit, player, tile i, tile j, direction index, action, t)."""
+    cam = Camera(width=96, height=96, origin=(48, 80))
+    placed = []
+    for key, player, i, j, dir_idx, action, t in army:
+        u = units[key]
+        f = render(u.root, DIRECTIONS[dir_idx][1], pose(u.rig, action, t), cam)
+        placed.append((f, player, *tile_xy(i, j)))
+    return placed
+
+
+def army_scene(out: Path, units: dict[str, Unit]) -> None:
+    """Two small armies, drawn at the size they would have in game."""
     army = [
         ("villager", 1, 1.3, 2.0, 0, "idle", 0), ("villager", 1, 2.2, 1.4, 1, "walk", 0.25),
         ("sheep", 1, 1.0, 3.2, 1, "idle", 0), ("sheep", 1, 1.6, 3.8, 6, "idle", 0),
@@ -133,29 +162,25 @@ def scene(out: Path, k: int = 2) -> None:
         ("man_at_arms", 2, 4.6, 2.4, 3, "idle", 0), ("villager", 2, 6.6, 6.6, 4, "walk", 0.1),
         ("sheep", 2, 7.4, 6.8, 2, "idle", 0),
     ]
-    units = {key: make() for key, make in ROSTER.items()}
-    cam = Camera(width=96, height=96, origin=(48, 80))
-    placed = []
-    for key, player, i, j, dir_idx, action, t in army:
-        u = units[key]
-        f = render(u.root, DIRECTIONS[dir_idx][1], pose(u.rig, action, t), cam)
-        cx, cy = tile_xy(i, j)
-        placed.append((cy, f, player, cx - f.hotspot[0], cy - f.hotspot[1]))
+    compose(place_units(army, units), out)
 
-    # Crop the canvas to the units' bounding box plus a margin.
-    margin = 24
-    x0 = min(x for *_, x, _ in placed) - margin
-    y0 = min(y for *_, y in placed) - margin
-    x1 = max(x + f.kind.shape[1] for _, f, _, x, _ in placed) + margin
-    y1 = max(y + f.kind.shape[0] for _, f, _, _, y in placed) + margin
-    canvas = grass(x1 - x0, y1 - y0, 3)
-    for _, f, player, x, y in placed:  # shadows go under every unit
-        shadow = np.zeros((*f.kind.shape, 4), np.uint8)
-        shadow[f.kind == SHADOW] = (0, 0, 0, 102)
-        blend(canvas, shadow, x - x0, y - y0)
-    for _, f, player, x, y in sorted(placed, key=lambda p: p[0]):
-        blend(canvas, f.to_rgba(player, shadow_alpha=0), x - x0, y - y0)
-    Image.fromarray(zoom(canvas, k)).save(out)
+
+def village_scene(out: Path, units: dict[str, Unit]) -> None:
+    """A starting town: Town Center, houses, villagers and sheep."""
+    types = block_types()
+    placed = []
+    for key, i, j in (("town_center", 4.0, 4.0), ("house", -0.5, 6.0), ("house", 3.0, -0.5), ("house", 8.5, 1.5)):
+        root = BUILDINGS[key]().part(types)
+        cam = fit_camera(root, BUILDING_HEADING)
+        placed.append((render(root, BUILDING_HEADING, camera=cam), 1, *tile_xy(i, j)))
+    folk = [
+        ("villager", 1, 6.9, 5.2, 7, "walk", 0.2), ("villager", 1, 7.4, 3.8, 1, "idle", 0),
+        ("villager", 1, 2.6, 7.6, 3, "walk", 0.6), ("villager", 1, 1.6, 1.4, 0, "idle", 0),
+        ("sheep", 1, 7.2, 6.9, 1, "idle", 0), ("sheep", 1, 7.9, 7.3, 6, "walk", 0.4),
+        ("sheep", 1, 6.6, 7.6, 3, "idle", 0), ("militia", 1, 4.6, 7.2, 0, "idle", 0),
+        ("skeleton_archer", 1, 5.4, 7.6, 0, "idle", 0), ("creeper", 2, 10.4, 5.2, 2, "walk", 0.3),
+    ]
+    compose(placed + place_units(folk, units), out)
 
 
 # --------------------------------------------------------------------------- animations
@@ -189,10 +214,11 @@ def animations(out: Path, k: int = 3, frames: int = 12) -> None:
 def main() -> None:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent / "previews"
     out.mkdir(parents=True, exist_ok=True)
-    units = [make() for make in ROSTER.values()]
-    roster_sheet(units, out / "roster.png")
-    player_sheet(ROSTER["champion"](), out / "player_colors.png")
-    scene(out / "scene.png")
+    units = {key: make() for key, make in ROSTER.items()}
+    roster_sheet(list(units.values()), out / "roster.png")
+    player_sheet(units["champion"], out / "player_colors.png")
+    army_scene(out / "scene.png", units)
+    village_scene(out / "village.png", units)
     animations(out / "animations.gif")
     print(f"previews written to {out}")
 
