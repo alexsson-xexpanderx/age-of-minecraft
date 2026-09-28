@@ -66,7 +66,6 @@ class Frame:
     rgb: np.ndarray  # (H, W, 3) colour of SOLID pixels, 0..1
     light: np.ndarray  # (H, W) lightness of PLAYER pixels, 0..1
     hotspot: tuple[int, int]
-    depth: np.ndarray = None  # (H, W) distance along the view ray from the model origin's plane (inf: nothing)
 
     def to_rgba(self, player: int = 1, shadow_alpha: float = 0.4,
                 outline_rgb=(0.08, 0.07, 0.06)) -> np.ndarray:
@@ -225,6 +224,5 @@ def render(root, heading: float, pose: Pose = None, camera: Camera = None,
         edge[:, :-1] |= body[:, 1:]
         kind[edge & ~body] = OUTLINE
 
-    # the rays start 500 units before the plane through the model origin (Camera.rays)
     return Frame(kind, rgb.reshape(H, W, 3), light.reshape(H, W),
-                 (int(round(camera.origin[0])), int(round(camera.origin[1]))), (depth - 500.0).reshape(H, W))
+                 (int(round(camera.origin[0])), int(round(camera.origin[1]))))
