@@ -235,7 +235,7 @@ NAME_PREFIXES: dict[str, list[str]] = {
     "petard": ["PETARD", "PETRD", "SABOT"],
 }
 # Units drawn by another unit's sprites in the original game.
-SHARED = {"elite_cannon_galleon": "cannon_galleon", "elite_eagle_warrior": "eagle_warrior"}
+SHARED = {"elite_cannon_galleon": "cannon_galleon", "elite_eagle_warrior": "eagle_warrior", "fish_shore": "fish_perch"}
 
 SUFFIX_ACTIONS = {"AN": "attack", "DN": "die", "FN": "idle", "SN": "decay", "WN": "walk", "RN": "run",
                   "CN": "carry"}

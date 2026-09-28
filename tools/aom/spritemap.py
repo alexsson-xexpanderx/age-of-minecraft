@@ -366,8 +366,9 @@ TREE_STUMP = {"forest": "oak", "oak": "oak", "pine": "spruce", "palm": "palm", "
 def resolve_offsets(P: Plan, graphics: dict) -> None:
     """Fill in placement details that come from composite graphics' delta offsets.
 
-    Town Center: the main piece is drawn at the unit's own position; its offset inside the
-    construction composite is only recorded for the report (it should be zero).
+    Town Center: the game draws the main piece at an offset from the building's centre (one tile
+    north, (0, -48) px, in The Conquerors); our whole Town Center is drawn in that piece, so its
+    centre is moved back by the same offset.
     Gates: the distance to the end towers sets the length of the gate between them.
     """
     by_name = {g.name.upper(): g for g in graphics.values()}
@@ -379,6 +380,7 @@ def resolve_offsets(P: Plan, graphics: dict) -> None:
                 child = graphics.get(d.graphic_id)
                 if child is not None and child.slp == s.slp and (d.offset_x or d.offset_y):
                     spec["anchor_offset"] = (d.offset_x, d.offset_y)
+                    spec["shift"] = (-d.offset_x, -d.offset_y)
         gp = by_name.get(spec.get("gate_parent", ""))
         if gp is not None:
             dists = []

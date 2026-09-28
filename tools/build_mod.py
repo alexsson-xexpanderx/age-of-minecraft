@@ -124,6 +124,13 @@ class Game:
         backup = self.graphics_path.with_name(self.graphics_path.name + BACKUP)
         self.graphics = Drs(backup if backup.exists() else self.graphics_path)  # always start from the original
         self.patch = self._drs("gamedata_x1_p1.drs")
+        # every archive that can hold sprites, the patch files first (they win when an id is in several)
+        self.archives: list[tuple[str, Drs]] = []
+        for name in ("gamedata_x1_p1.drs", "gamedata_x1.drs", "gamedata.drs"):
+            drs = self.patch if name == "gamedata_x1_p1.drs" else self._drs(name)
+            if drs is not None:
+                self.archives.append((name, drs))
+        self.archives.append((self.graphics_path.name, self.graphics))
         interfac = self._drs("interfac.drs")
         self.interfac = interfac
         if interfac is None or interfac.get(50500, "bina") is None:
@@ -151,10 +158,14 @@ class Game:
         return Drs(backup if backup.exists() else p)
 
     def original(self, slp_id: int) -> Optional[bytes]:
-        for drs in (self.patch, self.graphics):
-            if drs is not None and slp_id in drs.ids():
+        for _, drs in self.archives:
+            if slp_id in drs.ids():
                 return drs.get(slp_id)
         return None
+
+    def holders(self, slp_id: int) -> list[tuple[str, Drs]]:
+        """Every archive that has this sprite (all of them get our version, so load order cannot matter)."""
+        return [(name, drs) for name, drs in self.archives if slp_id in drs.ids()]
 
     def layout(self, slp_id: int, num_frames: int) -> tuple[int, int, bool, int, str]:
         """(frames per angle, angle count, mirrored, extra frames, source) matching the original sprite.
@@ -478,27 +489,25 @@ def make_exe(root: Path, log) -> bool:
 
 
 def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Path:
-    in_patch = {s for s in rendered if game.patch is not None and s in game.patch.ids()}
+    changes: dict[str, tuple[Drs, set[int]]] = {}
+    for s in rendered:
+        for name, drs in game.holders(s):
+            changes.setdefault(name, (drs, set()))[1].add(s)
     if mode == "upmod":
         games = pick(game.root, "Games") or (game.root / "Games")
         mod_data = games / MOD / "Data"
         mod_data.mkdir(parents=True, exist_ok=True)
-        targets = [(game.graphics, mod_data / "graphics.drs", set(rendered) - in_patch)]
-        if in_patch:
-            targets.append((game.patch, mod_data / "gamedata_x1_p1.drs", in_patch))
-        for base, path, ids in targets:
+        for name, (drs, ids) in changes.items():
             for s in ids:
-                base.put(s, rendered[s])
-            base.write(path)
-            log(f"wrote {path}")
+                drs.put(s, rendered[s])
+            drs.write(mod_data / name)
+            log(f"wrote {mod_data / name} ({len(ids)} sprites)")
         (games / f"{MOD}.xml").write_bytes(mod_xml())
         log(f"wrote {games / (MOD + '.xml')}")
         return games / MOD
     # direct: patch the game's own files, keeping the originals once
-    for base, ids in ((game.graphics, set(rendered) - in_patch), (game.patch, in_patch)):
-        if not ids:
-            continue
-        live = Path(base.path)
+    for name, (drs, ids) in changes.items():
+        live = Path(drs.path)
         if live.name.endswith(BACKUP):
             live = live.with_name(live.name[:-len(BACKUP)])
         backup = live.with_name(live.name + BACKUP)
@@ -506,11 +515,11 @@ def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Pat
             shutil.copy2(live, backup)
             log(f"backed up {live.name} -> {backup.name}")
         for s in ids:
-            base.put(s, rendered[s])
+            drs.put(s, rendered[s])
         tmp = live.with_name(live.name + ".tmp")
-        base.write(tmp)
+        drs.write(tmp)
         tmp.replace(live)
-        log(f"patched {live}")
+        log(f"patched {live} ({len(ids)} sprites)")
     return game.data
 
 
@@ -592,9 +601,10 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
     covered |= {unit for unit, host in SHARED.items() if host in covered}
     lines += ["", "UNITS WITHOUT SPRITES YET: " + ", ".join(sorted(set(ROSTER) - covered))]
     if game.graphics_table:
-        lines += ["", "GRAPHICS TABLE (id, name, slp, frames, angles, mirror, deltas)"]
+        lines += ["", "GRAPHICS TABLE (id, name, slp, frames, angles, mirror, deltas with their x/y offsets)"]
         for gid, g in sorted(game.graphics_table.items()):
-            deltas = ",".join(str(d.graphic_id) for d in g.deltas)
+            deltas = ",".join(str(d.graphic_id) + (f"@{d.offset_x}/{d.offset_y}" if d.offset_x or d.offset_y else "")
+                              for d in g.deltas)
             lines.append(f"  {gid:5d} {g.name:22s} {g.slp:6d} {g.frame_count:4d} {g.angle_count:3d} {g.mirroring:2d}"
                          f"  {deltas}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

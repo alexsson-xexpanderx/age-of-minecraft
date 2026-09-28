@@ -6,9 +6,9 @@ cost, training time, training building, button). Patching in place keeps the
 rest of the file byte-for-byte identical. The layout follows genieutils /
 openage (unit types 10 to 80, Age of Kings and later).
 
-The civilisations are located by their unit pointer tables (a run of 0/1
-int32 values), and every civ's units are parsed completely: they must end
-exactly where the next civilisation begins, which verifies the layout.
+The civilisations are located by their headers (count, name, resources,
+unit pointer table), and every civ's units are parsed completely: they must
+end exactly where the next civilisation begins, which verifies the layout.
 """
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ import zlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-import numpy as np
 
 
 class DatLayoutError(ValueError):
@@ -196,23 +195,20 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     return UnitRecord(civ, uid, utype, name, start, f, v)
 
 
-def find_civ_tables(data: bytes, min_units: int = 400) -> list[int]:
-    """Offsets of the civilisations' unit pointer tables (long runs of int32 0/1 values)."""
-    hits = []
-    for off in range(4):
-        n = (len(data) - off) // 4
-        a = np.frombuffer(data[off:off + 4 * n], "<u4")
-        ok = (a <= 1).astype(np.int8)
-        edges = np.diff(np.concatenate([[0], ok, [0]]))
-        for s, e in zip(np.nonzero(edges == 1)[0], np.nonzero(edges == -1)[0]):
-            start = off + 4 * int(s)
-            if e - s < min_units or start < 2:
-                continue
-            count = struct.unpack_from("<H", data, start - 2)[0]
-            if count and count <= e - s and a[s:s + count].sum() > count // 3:
-                hits.append((start, count))
-    hits.sort()
-    return hits
+def _civ_header(data: bytes, h: int) -> Optional[tuple[int, int, int]]:
+    """(resource count, unit count, pointer table offset) if a civilisation header looks to start at h."""
+    if h + 30 > len(data) or data[h] > 5:
+        return None
+    name = data[h + 1:h + 21].split(b"\0", 1)[0]
+    if not name or not all(32 <= c < 127 for c in name):
+        return None
+    rc = struct.unpack_from("<H", data, h + 21)[0]
+    if not 1 <= rc <= 2000 or h + 30 + 4 * rc > len(data):
+        return None
+    count = struct.unpack_from("<H", data, h + 28 + 4 * rc)[0]
+    if not 100 <= count <= 20000:
+        return None
+    return rc, count, h + 30 + 4 * rc
 
 
 @dataclass
@@ -221,35 +217,53 @@ class CivUnits:
     units: list[list[Optional[UnitRecord]]]
 
 
-def read_units(data: bytes) -> CivUnits:
-    tables = find_civ_tables(data)
-    if len(tables) < 2:
-        raise DatLayoutError("could not find the civilisations' unit tables")
-    # the graphics pointer table is the only long 0/1 run far larger than the civ unit counts
-    counts = [c for _, c in tables]
-    common = max(set(counts), key=counts.count)
-    tables = [t for t in tables if t[1] == common]
-    civs: list[list[Optional[UnitRecord]]] = []
-    for k, (start, count) in enumerate(tables):
-        ptrs = struct.unpack_from(f"<{count}i", data, start)
-        r = _R(data, start + 4 * count)
+def _parse_civs(data: bytes, first: int, n_civs: int) -> CivUnits:
+    tables, civs = [], []
+    h = first
+    for k in range(n_civs):
+        head = _civ_header(data, h)
+        if head is None:
+            raise DatLayoutError(f"civilisation {k} does not start where civilisation {k - 1} ended ({h})")
+        _, count, table = head
+        ptrs = struct.unpack_from(f"<{count}i", data, table)
+        r = _R(data, table + 4 * count)
         units: list[Optional[UnitRecord]] = []
         for uid, ptr in enumerate(ptrs):
-            if not ptr:
+            if not ptr:  # 0 means "no unit"; otherwise any value (a memory address, or 1 after an editor)
                 units.append(None)
                 continue
             u = _unit(r, k)
             if u.id != uid:
                 raise DatLayoutError(f"civ {k}: unit {uid} reads as id {u.id} at {u.offset}")
             units.append(u)
-        if k + 1 < len(tables):  # the next civ header must follow: type, name[20], resources...
-            nxt = tables[k + 1][0]
-            rc = struct.unpack_from("<H", data, r.p + 21)[0]
-            expect = r.p + 1 + 20 + 2 + 2 + 2 + 4 * rc + 1 + 2
-            if expect != nxt:
-                raise DatLayoutError(f"civ {k}: units end at {r.p}, the next civ table is at {nxt}")
+        tables.append((table, count))
         civs.append(units)
+        h = r.p
     return CivUnits(tables, civs)
+
+
+def read_units(data: bytes) -> CivUnits:
+    """Every civilisation's units.
+
+    The civilisations block is found by its header: a civ count, then per civ a type, a 20-byte name,
+    its starting resources and its unit pointer table. The first candidate whose civilisations all parse
+    and follow each other exactly is taken.
+    """
+    import re
+    tried = 0
+    for m in re.finditer(rb"(?=[\x00-\x05][\x20-\x7e]{1,19}\x00)", data):
+        h = m.start()
+        if h < 2:
+            continue
+        n_civs = struct.unpack_from("<H", data, h - 2)[0]
+        if not 2 <= n_civs <= 64 or _civ_header(data, h) is None:
+            continue
+        tried += 1
+        try:
+            return _parse_civs(data, h, n_civs)
+        except (DatLayoutError, struct.error):
+            continue
+    raise DatLayoutError(f"could not find the civilisations' unit tables ({tried} candidates checked)")
 
 
 def decompress(raw: bytes) -> bytes:

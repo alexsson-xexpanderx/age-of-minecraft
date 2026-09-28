@@ -70,12 +70,15 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1) -> bytes:
 
 def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0) -> bytes:
     """Civilisations with unit tables: filler units, the Wonder (276) and Furious the Monkey Boy (860)."""
-    out = bytearray()
+    out = bytearray(struct.pack("<H", civs))
+    rng = np.random.default_rng(5)
     for c in range(civs):
-        out += struct.pack("<b20sHhh", 1, f"civ{c}".encode(), 4, 1, 1) + struct.pack("<4f", 1, 2, 3, 4)
-        out += struct.pack("<bH", 0, slots)
+        out += struct.pack("<b20sHhh", 1, [b"Gaia", b"British", b"French"][c % 3], 4, 1, 1)
+        out += struct.pack("<4f", 1, 2, 3, 4) + struct.pack("<bH", 0, slots)
         present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860)]
-        out += struct.pack(f"<{slots}i", *[1 if u in present else 0 for u in range(slots)])
+        # like the original game's file, a pointer is a memory address (0 = no unit)
+        out += struct.pack(f"<{slots}i", *[int(rng.integers(0x400000, 0x7fffffff)) if u in present else 0
+                                           for u in range(slots)])
         for u in present:
             if u == 276:
                 out += _unit_bytes(u, 80, "WNDR")
@@ -163,11 +166,16 @@ def fake_game(root: Path) -> Path:
               {"name": "GOLDM_NN", "slp": 2561, "frames": 1, "angles": 7, "mirror": 0, "deltas": [base + 7, -1]},
               {"name": "BLAC2N1E", "slp": 2219, "frames": 23, "angles": 1, "mirror": 0},
               {"name": "ABGAL_ANE", "slp": 2219, "frames": 1, "angles": 16, "mirror": 0}]
+    monkey = len(table)
     table.append({"name": "mkyby_FN", "slp": 5299, "frames": 15, "angles": 8})
     graphics.put(5299, build_mod.blank(15 * 5))
     graphics.put(40000, b"not a sprite we touch")
     graphics.write(data / "graphics.drs")
-    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=len(table) - 1)))
+    extra = Drs()  # some sprites only exist in gamedata_x1.drs
+    extra.put(5157, build_mod.blank(17 * 5))
+    extra.write(data / "gamedata_x1.drs")
+    table.append({"name": "BOARJ_AN", "slp": 5157, "frames": 17, "angles": 8})
+    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey)))
     return root
 
 
@@ -262,6 +270,9 @@ def test_full_build(tmp: Path):
     assert np.array_equal(icons_after[0].pixels, icons_before[0].pixels)
     assert not np.array_equal(icons_after[159].pixels, icons_before[159].pixels)
     assert "trainable at the Wonder" in report
+    x1 = Drs(mod / "Data" / "gamedata_x1.drs")  # the javelina lives in gamedata_x1.drs: replaced there
+    assert slp.info(x1.get(5157)).num_frames == 85
+    assert x1.get(5157) != Drs(game / "Data" / "gamedata_x1.drs").get(5157)
     assert "6 x 8 angles mirrored  [dat, plus 2 unused frames]" in report
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
