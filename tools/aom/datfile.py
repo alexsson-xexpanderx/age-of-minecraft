@@ -35,6 +35,9 @@ class Graphic:
     sequence_type: int
     mirroring: int
     deltas: list[Delta] = field(default_factory=list)
+    sound: int = -1
+    sound_at: int = -1  # offset of the sound id in the decompressed file
+    angle_sounds_at: int = -1  # offset of the per-angle sounds (3 x (delay, sound id) per angle), if any
 
     @property
     def stored_angles(self) -> int:
@@ -67,9 +70,18 @@ def decompress(raw: bytes) -> bytes:
     return zlib.decompress(raw, -15)
 
 
-def read_graphics(raw_or_path) -> dict[int, Graphic]:
-    raw = Path(raw_or_path).read_bytes() if not isinstance(raw_or_path, (bytes, bytearray)) else raw_or_path
-    r = Reader(decompress(raw))
+SOUND_FILE = struct.Struct("<13sihhh")  # file name, resource id in the DRS archives, probability, civ, icon set
+
+
+@dataclass
+class SoundTable:
+    count_at: int  # offset of the sound count
+    end: int  # offset just past the last sound (where the graphics begin)
+    count: int
+
+
+def _to_sounds(data: bytes) -> Reader:
+    r = Reader(data)
     version = r.take("8s")[0]
     if not version.startswith(b"VER 5."):
         raise ValueError(f"unexpected dat version {version!r}")
@@ -78,10 +90,33 @@ def read_graphics(raw_or_path) -> dict[int, Graphic]:
     r.skip(restrictions * terrains * (4 + 16))  # damage multipliers + pass graphics
     colours = r.one("H")
     r.skip(colours * 36)
-    sounds = r.one("H")
-    for _ in range(sounds):
+    return r
+
+
+def sound_table(data: bytes) -> SoundTable:
+    """Where the sounds are in the decompressed file. A sound: id, play delay, file count, cache time, files."""
+    r = _to_sounds(data)
+    at = r.p
+    count = r.one("H")
+    for _ in range(count):
         _sid, _delay, files, _cache = r.take("hhHi")
-        r.skip(files * (13 + 4 + 2 + 2 + 2))
+        r.skip(files * SOUND_FILE.size)
+    return SoundTable(at, r.p, count)
+
+
+def sound_entry(sid: int, files: list[tuple[str, int, int]]) -> bytes:
+    """One sound: files as (name, resource id, probability), for every civilisation."""
+    out = struct.pack("<hhHi", sid, 0, len(files), 300000)
+    for name, rid, prob in files:
+        out += SOUND_FILE.pack(name.encode("latin-1")[:12], rid, prob, -1, -1)
+    return out
+
+
+def read_graphics(raw_or_path) -> dict[int, Graphic]:
+    raw = Path(raw_or_path).read_bytes() if not isinstance(raw_or_path, (bytes, bytearray)) else raw_or_path
+    data = decompress(raw)
+    r = Reader(data)
+    r.p = sound_table(data).end
     count = r.one("H")
     ptrs = r.take(f"{count}I")
     graphics: dict[int, Graphic] = {}
@@ -91,7 +126,8 @@ def read_graphics(raw_or_path) -> dict[int, Graphic]:
         name, filename, slp_id = r.take("21s13si")
         _loaded, _old, layer, _force, _adapt, _sel = r.take("bbbbbB")
         r.skip(8)  # coordinates
-        delta_count, _sound = r.take("Hh")
+        sound_at = r.p + 2
+        delta_count, sound = r.take("Hh")
         attack_sounds, frames, angles = r.take("BHH")
         _speed, rate, _replay = r.take("fff")
         seq, own_id, mirror, _editor = r.take("bhbb")
@@ -99,10 +135,11 @@ def read_graphics(raw_or_path) -> dict[int, Graphic]:
         for _ in range(delta_count):
             dg, _pad, _ptr, ox, oy, angle, _pad2 = r.take("hhihhhh")
             deltas.append(Delta(dg, ox, oy, angle))
+        angle_sounds_at = r.p if attack_sounds else -1
         if attack_sounds:
             r.skip(max(1, angles) * 3 * 4)
         g = Graphic(own_id if own_id >= 0 else gid, _cstr(name), _cstr(filename), slp_id, layer, frames, angles,
-                    rate, seq, mirror, deltas)
+                    rate, seq, mirror, deltas, sound, sound_at, angle_sounds_at)
         _check(g)
         graphics[gid] = g
     return graphics

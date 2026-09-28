@@ -52,6 +52,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/nature.png` | trees, resources and map decorations |
 | `previews/player_colors.png` | a unit in all 8 player colours |
 | `previews/roster_easter.png` | the easter eggs: Pac-Man and a ghost in the cheat units' slots |
+| `previews/sounds/pacman_*.wav` | Pac-Man's sounds: clicking on him, orders, training, bites and his death |
 
 ## Layout
 
@@ -81,8 +82,9 @@ tools/aom/drs.py         DRS archive reader/writer
 tools/aom/palette.py     game palette and colour matching
 tools/aom/datfile.py     graphics table reader for empires2_x1_p1.dat
 tools/aom/datunits.py    reads and patches the civilisations' unit tables in the .dat
-tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon and his name
+tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon, name and sounds
 tools/aom/langdll.py     reads and changes strings in the game's language DLLs
+tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
 tools/aom/easter.py      Pac-Man and the ghost
 tools/aom/slpmap.py      which original sprite id each unit render replaces
 tools/aom/spritemap.py   finds buildings, walls, trees and decorations by name in the .dat

@@ -9,6 +9,11 @@ unit's icon changes), and his name in the language files becomes "Pac-Man".
 The Monkey Boy is a "predator animal" (unit class 10), and Transport Ships
 do not take animals. Pac-Man becomes infantry (class 6, like the Militia),
 and gets the Militia's "board a Transport Ship" task if he lacks it.
+
+He also gets his own sounds (sounds.py): new entries at the end of the
+sound table for clicking on him, ordering him around, training him, his
+bites and his death. The Monkey Boy's own sounds are the wolf's, so they
+are left alone.
 """
 from __future__ import annotations
 
@@ -18,6 +23,7 @@ from typing import Optional
 
 import numpy as np
 
+from . import datfile
 from . import datunits as DU
 from . import langdll
 from . import slp
@@ -41,6 +47,7 @@ class DatPatch:
     civs: int  # civilisations patched
     notes: list[str]
     pacman_strings: dict[str, int] = None  # the Monkey Boy's text ids: name, creation, help (if Pac-Man was patched)
+    sounds_added: bool = False  # the sound table has Pac-Man's sounds: their WAV files must be written too
 
 
 def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
@@ -49,9 +56,10 @@ def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
     return patch, notes[0]
 
 
-def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None
-              ) -> tuple[Optional[DatPatch], list[str]]:
-    """All .dat changes: Pac-Man at the Wonder (with icon `icon`, if given), and the Javelina's own sprites.
+def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None,
+              sounds: Optional[dict[str, list[int]]] = None) -> tuple[Optional[DatPatch], list[str]]:
+    """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), and the Javelina's own
+    sprites. `sounds` maps a sound name (see SOUND_USES) to the resource ids of its WAV files.
 
     Returns (patch, notes)."""
     try:
@@ -69,8 +77,15 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         msg = _javelina(data, civs, graphics)
         changed |= msg.startswith("Javelina: its own")
         notes.append(msg)
-    if pac_done:  # last: it can grow the file, which moves the civilisations' records
+    table = None
+    if pac_done and sounds:
+        table, msg = _sounds(data, civs, graphics, sounds)
+        notes.append(msg)
+    # last, from the back of the file to the front: these grow the file, which moves everything after them
+    if pac_done:
         notes.append(_boarding(data, civs))
+    if table is not None:
+        _add_sounds(data, table, sounds)
     if not changed:
         return None, notes
     check = DU.read_units(bytes(data))  # read everything back: same layout, new values
@@ -84,7 +99,16 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             DU.read_unit_headers(bytes(data), check)
         except DU.DatLayoutError:
             return None, notes + ["not changed: the patched task lists did not read back as expected"]
-    return DatPatch(DU.compress(bytes(data)), len(civs.units), notes, strings if pac_done else None), notes
+    packed = DU.compress(bytes(data))
+    if table is not None:
+        try:
+            datfile.read_graphics(packed)
+            ok = datfile.sound_table(bytes(data)).count == table.count + len(sounds)
+        except (ValueError, struct.error):
+            ok = False
+        if not ok:
+            return None, notes + ["not changed: the patched sound table did not read back as expected"]
+    return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, table is not None), notes
 
 
 def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple[str, Optional[dict[str, int]]]:
@@ -131,6 +155,63 @@ def _boarding(data: bytearray, civs) -> str:
         return "Pac-Man on ships: infantry now; no boarding task to copy from the Militia"
     DU.add_task(data, heads, PACMAN_UNIT, (board[0], len(tasks)) + board[2:])
     return "Pac-Man on ships: infantry now, and the Militia's boarding task added, so Transport Ships take him"
+
+
+# which unit sound each of Pac-Man's sounds replaces; "chomp" and "death" go on his attack and death animations
+SOUND_USES = {"select": "selection_sound", "move": "move_sound", "attack": "attack_sound", "train": "train_sound",
+              "chomp": None, "death": None}
+
+
+def _sounds(data: bytearray, civs, graphics: dict, sounds: dict[str, list[int]]):
+    """Point Pac-Man at his new sounds (in place); the sounds themselves are added by _add_sounds."""
+    try:
+        table = datfile.sound_table(bytes(data))
+    except (ValueError, struct.error) as exc:
+        return None, f"Pac-Man's sounds: not changed, the sound table could not be read ({exc})"
+    ids = {name: table.count + k for k, name in enumerate(sounds)}
+    first = None
+    for units in civs.units:
+        pac = units[PACMAN_UNIT] if len(units) > PACMAN_UNIT else None
+        if pac is None or pac.type < 70:
+            continue
+        DU.patch(data, pac, **{field: ids[name] for name, field in SOUND_USES.items() if field and name in ids})
+        first = first or pac
+    if first is None:
+        return None, "Pac-Man's sounds: not changed, no civilisation has him"
+    placed = []
+    for name, gid in (("chomp", first.values["attack_graphic"]), ("death", first.values["dying"][0])):
+        g = graphics.get(gid)
+        if name in ids and g is not None and g.name.lower().startswith("mkyby"):
+            _graphic_sound(data, g, ids[name])
+            placed.append(f"{name} on {g.name}")
+    return table, (f"Pac-Man's sounds: {', '.join(ids)} (sounds {min(ids.values())}-{max(ids.values())})"
+                   + (f"; {', '.join(placed)}" if placed else ""))
+
+
+def _graphic_sound(data: bytearray, g, sid: int) -> None:
+    """Our sound wherever the animation played one: its own sound, or its per-angle sounds (kept in sync with
+    the frames). An animation that played none gets ours as its own sound."""
+    played = False
+    if g.angle_sounds_at >= 0:
+        for a in range(max(1, g.angle_count)):
+            for k in range(3):  # (delay, sound id) x 3 per angle
+                at = g.angle_sounds_at + 12 * a + 4 * k + 2
+                if struct.unpack_from("<h", data, at)[0] >= 0:
+                    struct.pack_into("<h", data, at, sid)
+                    played = True
+    if g.sound >= 0 or not played:
+        struct.pack_into("<h", data, g.sound_at, sid)
+
+
+def _add_sounds(data: bytearray, table, sounds: dict[str, list[int]]) -> None:
+    entries = b""
+    for k, (name, rids) in enumerate(sounds.items()):
+        probs = [100 // len(rids)] * len(rids)
+        probs[0] += 100 - sum(probs)
+        entries += datfile.sound_entry(table.count + k, [(f"pac{name[:4]}{v}.wav", rid, prob)
+                                                         for v, (rid, prob) in enumerate(zip(rids, probs))])
+    data[table.end:table.end] = entries
+    struct.pack_into("<H", data, table.count_at, table.count + len(sounds))
 
 
 # The Javelina (unit 822) borrows the Wild Boar's sprites in The Conquerors; its own graphics

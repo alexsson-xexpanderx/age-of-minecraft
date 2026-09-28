@@ -20,6 +20,7 @@ import argparse
 import multiprocessing as mp
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -594,7 +595,16 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         log(f"Pac-Man icon: no unit icon sheet ({gameplay.UNIT_ICONS}) in {', '.join(n for n, _ in archives)}")
     if not any(new for _, _, new in new_sheets):
         icon = None  # he keeps the Monkey Boy's icon
-    patch, notes = gameplay.patch_dat(game.dat_path.read_bytes(), game.graphics_table, pacman, javelina, icon)
+    raw = game.dat_path.read_bytes()
+    waves, sound_ids, sound_drs = {}, None, None
+    if pacman:  # his sounds go where the game finds new files: the patch archive if there is one
+        from aom import sounds
+        sound_name, sound_drs = next(((n, d) for n, d in game.archives if n.lower() == "gamedata_x1_p1.drs"),
+                                     (game.graphics_path.name, game.graphics))
+        waves = sounds.pacman_sounds()
+        free = free_resource_ids(game, raw, sum(len(v) for v in waves.values()))
+        sound_ids = {name: [next(free) for _ in variants] for name, variants in waves.items()}
+    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids)
     for note in notes:
         log(note)
     if patch is None:
@@ -602,15 +612,61 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
     if not patch.pacman_strings:
         return
+    touched: dict[str, Drs] = {}
     for name, drs, new_sheet in new_sheets if icon is not None else []:
-        if new_sheet is None:
-            continue
-        drs.put(gameplay.UNIT_ICONS, new_sheet)
+        if new_sheet is not None:
+            drs.put(gameplay.UNIT_ICONS, new_sheet)
+            touched[name] = drs
+    if patch.sounds_added:
+        from aom import sounds
+        for name, variants in waves.items():
+            for rid, x in zip(sound_ids[name], variants):
+                sound_drs.put(rid, sounds.wav(x), "wav")
+        touched[sound_name] = sound_drs
+        log(f"Pac-Man's sounds: {sum(len(v) for v in waves.values())} WAV files in {sound_name} "
+            f"(ids {min(min(v) for v in sound_ids.values())}-{max(max(v) for v in sound_ids.values())})")
+    for name, drs in touched.items():  # each archive written once
         tmp = game.data / (name + ".aom-new")
         drs.write(tmp)
         write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
     rename_pacman(game, mode, patch.pacman_strings, log)
+
+
+def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):
+    """Resource ids no archive in the Data folder uses and no sound in the .dat refers to."""
+    from aom import datfile
+    used: set[int] = set()
+    for p in game.data.iterdir():
+        if p.suffix.lower() == ".drs":
+            backup = p.with_name(p.name + BACKUP)  # what a rebuild starts from
+            try:
+                drs = Drs(backup if backup.exists() else p)
+            except (OSError, struct.error):
+                continue
+            for kind in drs.index:
+                used |= drs.ids(kind)
+    for _, drs in game.archives:
+        for kind in set(drs.index) | set(drs.added):
+            used |= drs.ids(kind)
+    try:
+        data = datfile.decompress(raw_dat)
+        table = datfile.sound_table(data)
+        at = table.count_at + 2
+        for _ in range(table.count):
+            _, _, files, _ = struct.unpack_from("<hhHi", data, at)
+            at += 10
+            for _ in range(files):
+                used.add(datfile.SOUND_FILE.unpack_from(data, at)[1])
+                at += datfile.SOUND_FILE.size
+    except (ValueError, struct.error):
+        pass
+    rid = start
+    for _ in range(n):
+        while rid in used:
+            rid += 1
+        used.add(rid)
+        yield rid
 
 
 def rename_pacman(game: Game, mode: str, strings: dict[str, int], log) -> None:

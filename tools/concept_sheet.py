@@ -14,6 +14,7 @@ Writes into previews/ by default:
     wonders.png         the eighteen wonders and the scenario monuments
     fortifications.png  walls, gates, towers and castles
     walls.png           wall lines in every direction, with corners, as the game places them
+    sounds/*.wav        Pac-Man's sounds (clicking on him, orders, training, bites, death)
     nature.png          trees, resources and map decorations
 and docs/UNITS.md, the full unit list.
 """
@@ -489,6 +490,14 @@ def unit_table(units: dict[str, Unit], out: Path) -> None:
     out.write_text("\n".join(lines))
 
 
+def pacman_sounds(out: Path) -> None:
+    from aom import sounds
+    out.mkdir(parents=True, exist_ok=True)
+    for name, variants in sounds.pacman_sounds().items():
+        for k, x in enumerate(variants):
+            (out / f"pacman_{name}{k + 1 if len(variants) > 1 else ''}.wav").write_bytes(sounds.wav(x))
+
+
 def main() -> None:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "previews"
     out.mkdir(parents=True, exist_ok=True)
@@ -505,6 +514,7 @@ def main() -> None:
     wonders_sheet(out / "wonders.png")
     fortifications_sheet(out / "fortifications.png")
     walls_scene(out / "walls.png")
+    pacman_sounds(out / "sounds")
     nature_sheet(out / "nature.png")
     unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")

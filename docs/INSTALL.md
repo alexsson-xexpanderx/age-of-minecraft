@@ -112,7 +112,13 @@ first button trains **Pac-Man** (200 food, 100 gold, 30 seconds, 250 hit
 points), with his own Pac-Man icon, and the game calls him **Pac-Man**. This
 works for every civilisation. He is infantry, not a wild animal like the cheat
 unit: he boards Transport Ships, garrisons like a foot soldier, and gets the
-Blacksmith's infantry upgrades and your civilisation's infantry bonuses. It is the only change the mod makes to the
+Blacksmith's infantry upgrades and your civilisation's infantry bonuses.
+
+He has his own arcade sounds: click on him and he goes "waka-waka" (or
+boings, or giggles), orders get a "wakawakawaka" or a big CHOMP and
+"nom nom", the Wonder plays a little jingle when he is ready, every bite
+chomps, and he dies with a sad "wah wah wah waaah" and two pops. Listen to
+them in `previews/sounds/`. It is the only change the mod makes to the
 game's rules; `--no-wonder-pacman` leaves the rules alone.
 
 His name lives in the game's language files (`language_x1_p1.dll`,

@@ -149,6 +149,15 @@ the game's language files: his name string and the old name inside his
 button and help texts are rewritten in place (shorter text in the same
 string block), so the rest of each DLL stays byte-for-byte the same.
 
+His sounds (`sounds.py`) are synthesised, nothing sampled: the "waka"
+chomp is a triangle-wave pitch sweep down and back up, with a boing, a
+bloop, a giggle, "nom nom", a jingle and a sad trombone slide around it.
+They are new entries at the end of the `.dat`'s sound table (the Monkey
+Boy's own sounds are the wolf's), their WAV files go into
+`gamedata_x1_p1.drs` on free resource ids, and his unit's selection, move,
+attack and train sounds point at them. His bite and death sounds replace
+the sounds of his attack and dying animations, on the same frames.
+
 ### Projectiles
 
 Arrows are Minecraft arrows (flint tip, white fletching), pitched as they

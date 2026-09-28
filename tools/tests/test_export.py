@@ -114,7 +114,8 @@ def fake_dat(graphics: list[dict], civs: bytes = b"") -> bytes:
     for _ in range(restrictions):
         b += struct.pack(f"<{terrains}f", *([1.0] * terrains)) + bytes(16 * terrains)
     b += struct.pack("<H", 2) + bytes(36 * 2)
-    b += struct.pack("<H", 1) + struct.pack("<hhHi", 5, 0, 2, 300000) + bytes(23 * 2)
+    b += struct.pack("<H", 1) + struct.pack("<hhHi", 0, 0, 2, 300000)  # one sound, with two files
+    b += struct.pack("<13sihhh", b"a.wav", 5001, 50, -1, -1) + struct.pack("<13sihhh", b"b.wav", 15501, 50, -1, -1)
     b += struct.pack("<H", len(graphics)) + struct.pack(f"<{len(graphics)}I", *([1] * len(graphics)))
     for gid, g in enumerate(graphics):
         b += struct.pack("<21s13si", g["name"].encode(), b"file", g["slp"])
@@ -196,6 +197,9 @@ def fake_game(root: Path) -> Path:
     extra = Drs()  # some sprites only exist in gamedata_x1.drs
     extra.put(5157, build_mod.blank(17 * 5))
     extra.write(data / "gamedata_x1.drs")
+    patch = Drs()  # UserPatch's own archive, already holding a sound
+    patch.put(15500, b"RIFF a sound", "wav")
+    patch.write(data / "gamedata_x1_p1.drs")
     boar = len(table)
     table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
     for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
@@ -310,6 +314,17 @@ def test_full_build(tmp: Path):
     assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()
     assert "'Furious the Monkey Boy' is now 'Pac-Man'" in report
+    # his sounds: six new sounds in the .dat, their WAV files in the patch archive (on free ids)
+    from aom.datfile import sound_table
+    dat = datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
+    assert sound_table(dat).count == 7
+    pac = units.units[1][860]
+    assert (pac.values["selection_sound"], pac.values["move_sound"], pac.values["attack_sound"],
+            pac.values["train_sound"]) == (1, 2, 3, 4)
+    p1 = Drs(mod / "Data" / "gamedata_x1_p1.drs")
+    assert p1.ids("wav") == {15500} | set(range(15502, 15511))  # 15501 is a sound the .dat already uses
+    assert all(p1.get(i, "wav")[:4] == b"RIFF" and p1.get(i, "wav")[8:12] == b"WAVE" for i in range(15502, 15511))
+    assert "Pac-Man's sounds: select, move, attack, train, chomp, death" in report
     # the Javelina gets its own sprites: the missing files are created, the unit points at them
     table = read_graphics((game / "Data" / "empires2_x1_p1.dat").read_bytes())
     gid = {g.name: k for k, g in table.items()}
@@ -360,11 +375,34 @@ def test_direct_mode_and_restore(tmp: Path):
     assert (game / "language.dll").read_bytes() == lang_before["language.dll"]  # nothing of his in it
     icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     assert len(icons) == 171  # one icon added, not one per build
+    assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15511))
     assert build_mod.main(["--game", str(game), "--restore"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() == before
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() == dat_before
     assert {n: (game / n).read_bytes() for n in langdll.FILES} == lang_before
     assert not list(game.glob("*" + build_mod.BACKUP))
+
+
+def test_pacman_sounds():
+    from aom import gameplay, sounds
+    from aom.datfile import Graphic
+    waves = sounds.pacman_sounds()
+    assert set(waves) == set(gameplay.SOUND_USES)
+    for variants in waves.values():
+        for x in variants:
+            w = sounds.wav(x)
+            assert w[:4] == b"RIFF" and struct.unpack_from("<I", w, 4)[0] == len(w) - 8
+            assert struct.unpack_from("<HHI", w, 20) == (1, 1, 22050) and 0.1 < len(x) / 22050 < 3
+            assert 0.5 < np.abs(x).max() <= 0.8
+    # an attack animation whose sound plays on a frame of each angle: ours replaces it, the timing stays
+    data = bytearray(struct.pack("<h", -1) + struct.pack("<6h", 3, 77, -1, -1, -1, -1) * 2)
+    g = Graphic(1, "mkyby_AN", "", 1, 0, 10, 2, 0.1, 0, 0, [], -1, 0, 2)
+    gameplay._graphic_sound(data, g, 600)
+    assert struct.unpack_from("<h", data, 0)[0] == -1
+    assert struct.unpack_from("<12h", data, 2) == (3, 600, -1, -1, -1, -1) * 2
+    silent = bytearray(struct.pack("<h", -1))  # an animation with no sound gets ours as its own
+    gameplay._graphic_sound(silent, Graphic(2, "mkyby_DN", "", 2, 0, 10, 2, 0.1, 0, 0, [], -1, 0, -1), 601)
+    assert struct.unpack("<h", silent)[0] == 601
 
 
 def test_language_files():

@@ -59,7 +59,8 @@ class UnitRecord:
 FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h", "train_location": "h",
            "button": "b", "cost": "hhhhhhhhh", "creatable_type": "b", "hotkey": "i", "name_id": "H",
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
-           "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h"}
+           "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h",
+           "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -85,7 +86,9 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.one("f")  # line of sight
     r.one("b")  # garrison capacity
     r.take("fff")  # collision size
-    r.take("hh")  # train sound, damage sound
+    f["train_sound"] = r.p
+    v["train_sound"] = r.one("h")
+    r.one("h")  # damage sound
     f["dead_unit"] = r.p
     v["dead_unit"] = r.one("h")
     r.take("bb")  # sort number, can be built on
@@ -121,7 +124,10 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.skip(3 * 7)  # resource storages: (int16 type, float amount, int8 flag) x 3
     n_damage = r.one("B")
     r.skip(n_damage * 5)
-    r.take("hh")  # selection sound, dying sound
+    f["selection_sound"] = r.p
+    v["selection_sound"] = r.one("h")
+    f["dying_sound"] = r.p
+    v["dying_sound"] = r.one("h")
     r.take("bb")  # old attack reaction, convert terrain
     f["name"] = r.p
     raw_name = r.d[r.p:r.p + name_len]
@@ -144,7 +150,10 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         r.take("ff")  # search radius, work rate
         r.take("hh")  # drop sites
         r.one("b")  # task swap group
-        r.take("hh")  # attack sound, move sound
+        f["attack_sound"] = r.p
+        v["attack_sound"] = r.one("h")
+        f["move_sound"] = r.p
+        v["move_sound"] = r.one("h")
         r.one("b")  # run pattern
     if utype >= 50:  # combat
         r.one("h")  # base armour
