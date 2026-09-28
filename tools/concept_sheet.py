@@ -163,6 +163,8 @@ ANIMATIONS = {  # group -> [(unit, action, direction index)]
     "animals": [("sheep", "walk", 1), ("wolf", "attack", 1), ("wild_boar", "attack", 2), ("deer", "walk", 1),
                 ("turkey", "walk", 1), ("jaguar", "attack", 1), ("hawk", "walk", 1), ("macaw", "walk", 2),
                 ("marlin", "idle", 1), ("fish_tuna", "idle", 1), ("petard", "attack", 1)],
+    "easter": [("pacman", "walk", 1), ("pacman", "attack", 2), ("pacman", "die", 1), ("ghost", "walk", 0),
+               ("ghost", "walk", 1)],
 }
 
 

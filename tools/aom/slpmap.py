@@ -180,8 +180,34 @@ TARGETS: list[Target] = [
     Target(420, "fish_perch", "idle"), Target(1910, "fish_dorado", "idle"), Target(1911, "fish_salmon", "idle"),
     Target(1912, "fish_perch", "idle"), Target(1913, "fish_snapper", "idle"), Target(3549, "fish_tuna", "idle"),
     Target(1905, "marlin", "idle"), Target(1906, "marlin", "idle"),
-    # the Meso-American priest carrying a relic
+    # the Meso-American priest, also carrying a relic
+    Target(5284, "monk", "attack", "Meso priest"), Target(5285, "monk", "die", "Meso priest"),
+    Target(5286, "monk", "idle", "Meso priest"), Target(5287, "monk", "decay", "Meso priest"),
+    Target(5288, "monk", "attack", "Meso priest, second copy"), Target(5289, "monk", "walk", "Meso priest"),
     Target(5290, "monk", "idle", "with relic"), Target(5291, "monk", "walk", "with relic"),
+    # Meso-American trade carts, empty and loaded
+    Target(5305, "trade_cart", "die", "Meso, empty"), Target(5306, "trade_cart", "idle", "Meso, empty"),
+    Target(5307, "trade_cart", "decay", "Meso, empty"), Target(5308, "trade_cart", "walk", "Meso, empty"),
+    Target(5309, "trade_cart", "die", "Meso, loaded"), Target(5310, "trade_cart", "idle", "Meso, loaded"),
+    Target(5311, "trade_cart", "decay", "Meso, loaded"), Target(5312, "trade_cart", "walk", "Meso, loaded"),
+    # elite unique units with their own sprites
+    *_std("conquistador", 4775), *_std("plumed_archer", 4788), *_std("war_wagon", 5191), *_std("huskarl", 4688),
+    # campaign heroes, as the closest unit of the roster
+    *_std("champion", 1735), *_std("paladin", 3783), *_std("paladin", 3770), *_std("cavalier", 3846),
+    *_std("knight", 3885), *_std("cavalier", 3924), *_std("paladin", 3963), *_std("mangudai", 4410),
+    *_std("mangudai", 4548), *_std("pikeman", 4561), *_std("monk", 4842), *_std("knight", 5227),
+    *_std("cavalier", 5245), *_std("monk", 5258), *_std("champion", 1722),
+    *_set("jaguar_warrior", 4273, 4274, 4275, 4276, 4277), *_set("cavalier", 4281, 4282, 4283, 4284, 4285),
+    *_set("king", 5269, 5270, 5271, 5272, 5273), *_set("two_handed", 5274, 5275, 5276, 5277, 5278),
+    Target(5221, "horse", "die", "second horse"), Target(5222, "horse", "idle", "second horse"),
+    Target(5223, "horse", "decay", "second horse"), Target(5224, "horse", "walk", "second horse"),
+    Target(5279, "turtle_ship", "attack", "Admiral Yi's ship"), Target(5281, "turtle_ship", "idle", "Admiral Yi's ship"),
+    Target(5282, "turtle_ship", "walk", "Admiral Yi's ship"),
+    # easter eggs in the cheat units' slots
+    Target(5297, "pacman", "attack", "Furious the Monkey Boy"), Target(5298, "pacman", "die", "Furious the Monkey Boy"),
+    Target(5299, "pacman", "idle", "Furious the Monkey Boy"), Target(5300, "pacman", "decay", "Furious the Monkey Boy"),
+    Target(5301, "pacman", "walk", "Furious the Monkey Boy"),
+    Target(4681, "ghost", "walk", "the VDML cheat guy (one sprite for everything)"),
     # javelina (BOARJ in the .dat)
     Target(5157, "javelina", "attack"), Target(5158, "javelina", "die"), Target(5159, "javelina", "idle"),
     Target(5160, "javelina", "run"), Target(5161, "javelina", "decay"), Target(5162, "javelina", "walk"),

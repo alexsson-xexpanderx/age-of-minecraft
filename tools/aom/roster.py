@@ -4,12 +4,13 @@ from __future__ import annotations
 from typing import Callable
 
 from .animals import ANIMALS
+from .easter import EASTER
 from .mounted import MOUNTED
 from .ships import SHIPS
 from .siege import SIEGE
 from .units import FOOT, Unit
 
-ROSTER: dict[str, Callable[[], Unit]] = {**FOOT, **MOUNTED, **SIEGE, **SHIPS, **ANIMALS}
+ROSTER: dict[str, Callable[[], Unit]] = {**FOOT, **MOUNTED, **SIEGE, **SHIPS, **ANIMALS, **EASTER}
 
 # Preview sheets: (file stem, title, filter)
 SHEETS = [
@@ -20,6 +21,7 @@ SHEETS = [
     ("ships", "Ships", lambda u: u.group == "ship" and not u.civ),
     ("uniques", "Unique units", lambda u: u.civ is not None),
     ("animals", "Animals", lambda u: u.group == "animal"),
+    ("easter", "Easter eggs (cheat units)", lambda u: u.group == "easter"),
 ]
 
 

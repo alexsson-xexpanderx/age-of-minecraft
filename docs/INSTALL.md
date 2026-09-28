@@ -99,6 +99,20 @@ next to `build_mod.bat`. You have two options:
 * Still original: cliffs, bridges, terrain, fire and explosions, ships sinking,
   and the game's interface. Unit names are unchanged.
 
+## Easter eggs
+
+Two hidden cheat units are replaced. In a single-player game, press **Enter**,
+type the cheat and press **Enter** again; the unit appears next to your Town
+Center:
+
+| Cheat | You get |
+|---|---|
+| `furious the monkey boy` | **Pac-Man**, who chomps as he runs and attacks, and dies the arcade way |
+| `i love the monkey head` | a **ghost** in your team colour (red for player 2, like Blinky) |
+
+In a multiplayer game, cheats only work if "Allow cheats" is ticked in the
+game setup.
+
 **Please send back** `Games\AgeOfMinecraft\aom_report.txt` and a few
 screenshots. The report lists your game's full graphics table, so anything
 that looks off can be mapped exactly in the next round.

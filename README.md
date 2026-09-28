@@ -49,6 +49,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/wonders.png` | the eighteen wonders and the scenario monuments |
 | `previews/nature.png` | trees, resources and map decorations |
 | `previews/player_colors.png` | a unit in all 8 player colours |
+| `previews/roster_easter.png` | the easter eggs: Pac-Man and a ghost in the cheat units' slots |
 
 ## Layout
 

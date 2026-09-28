@@ -136,6 +136,12 @@ def pose(unit, action: str, t: float) -> Pose:
     if unit.carry:
         p.hidden |= {"item_r", "item_l"} if action == "carry" else {"carry"}
 
+    if action == "die" and rig == "pacman":  # the arcade death: the mouth opens all the way, then a pop
+        opening = 60 + 300 * _ease(min(1.0, t / 0.8))
+        _add(p, "jaw_top", rx=opening / 2)
+        _add(p, "jaw_bottom", rx=-opening / 2)
+        p.hidden |= {"body"} if t >= 0.85 else {"pop"}
+        return p
     if action == "die":
         fall = _ease(t / 0.6)
         if rig == "ship":
@@ -282,6 +288,22 @@ def pose(unit, action: str, t: float) -> Pose:
             _add(p, "torso", rx=40 * math.cos(math.pi * u))
         else:
             _move(p, "root", dz=-2)
+    elif rig == "pacman":  # chomp, chomp
+        p.hidden |= {"pop"}
+        if action == "idle":
+            opening, bob = 8 + 30 * (0.5 - 0.5 * math.cos(2 * math.pi * t)), 0.8 * s
+        elif action == "attack":
+            opening, bob = 5 + 75 * (0.5 - 0.5 * math.cos(4 * math.pi * t)), 0.0
+            _move(p, "root", dy=3 * _pulse(t, 0.0, 0.5) + 3 * _pulse(t, 0.5, 1.0))
+        else:
+            opening, bob = 5 + 55 * (0.5 - 0.5 * math.cos(4 * math.pi * t)), 1.2 * abs(s)
+        _add(p, "jaw_top", rx=opening / 2)
+        _add(p, "jaw_bottom", rx=-opening / 2)
+        _move(p, "body", dz=bob)
+    elif rig == "ghost":  # floating, the skirt rippling
+        _move(p, "body", dz=0.8 * s)
+        for k in range(8):
+            _move(p, f"foot{k % 2}_{k}", dz=(1 if k % 2 else -1) * 1.2 * math.sin(4 * math.pi * t) + 0.8 * s)
     elif rig == "ship":
         _add(p, "root", ry=3 * s)
         _move(p, "root", dz=0.6 * s)
