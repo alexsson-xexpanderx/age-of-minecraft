@@ -326,6 +326,8 @@ def main(argv=None) -> int:
     ap.add_argument("--no-exe", action="store_true", help="do not run UserPatch's SetupAoC.exe to create the mod exe")
     ap.add_argument("--no-wonder-pacman", action="store_true",
                     help="leave the game rules alone (Pac-Man then only comes with the cheat)")
+    ap.add_argument("--no-dat", action="store_true",
+                    help="do not change empires2_x1_p1.dat at all (no Pac-Man at the Wonder, no Javelina sprites)")
     args = ap.parse_args(argv)
 
     report: list[str] = []
@@ -346,9 +348,24 @@ def main(argv=None) -> int:
     targets = list(TARGETS) + game.name_targets({t.slp for t in TARGETS})
     targets = [t for t in targets if only is None or t.unit in only]
 
+    # sprites the .dat names but the game never shipped, which the mod adds (the Javelina's own)
+    from aom import gameplay
+    created: dict[int, int] = {}  # slp -> frame count
+    jav = gameplay.javelina_graphics(game.graphics_table) if not args.no_dat else None
+    if jav and (only is None or "javelina" in only):
+        for name, g in jav.items():
+            if game.original(g.slp) is None:
+                created[g.slp] = g.stored_angles * max(1, g.frame_count)
     jobs, skipped, planned = [], [], []
     for t in targets:
         data = game.original(t.slp)
+        if data is None and t.slp in created:
+            g = jav[next(n for n, gg in jav.items() if gg.slp == t.slp)]
+            jobs.append(("unit", t.slp, t.unit, t.action, max(1, g.frame_count), max(1, g.angle_count),
+                         bool(g.mirroring), 0))
+            planned.append((t, created[t.slp], max(1, g.frame_count), max(1, g.angle_count), bool(g.mirroring),
+                            "new sprite"))
+            continue
         if data is None:
             skipped.append((t, "not in your game files"))
             continue
@@ -418,7 +435,7 @@ def main(argv=None) -> int:
         rendered[s] = blank(slp.info(game.original(s)).num_frames)
 
     for slp_id, data in rendered.items():  # never ship a sprite whose frame count differs from the original
-        want = slp.info(game.original(slp_id)).num_frames
+        want = created[slp_id] if slp_id in created else slp.info(game.original(slp_id)).num_frames
         got = slp.info(data).num_frames
         if want != got:
             raise SystemExit(f"internal error: SLP {slp_id} has {got} frames, the game expects {want}")
@@ -429,8 +446,10 @@ def main(argv=None) -> int:
         raise SystemExit(f"Windows would not let us write {exc.filename}.\n"
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
-    if not args.no_wonder_pacman and (only is None or "pacman" in only):
-        apply_gameplay(game, args.mode, log)
+    pacman = not args.no_wonder_pacman and (only is None or "pacman" in only)
+    javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
+    if not args.no_dat and (pacman or javelina):
+        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina)
     exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
     write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics)
     log(f"done in {time.time() - started:.0f}s")
@@ -490,8 +509,8 @@ def make_exe(root: Path, log) -> bool:
 
 def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Path:
     changes: dict[str, tuple[Drs, set[int]]] = {}
-    for s in rendered:
-        for name, drs in game.holders(s):
+    for s in rendered:  # into every archive that has the sprite; new sprites go into graphics.drs
+        for name, drs in game.holders(s) or [(game.graphics_path.name, game.graphics)]:
             changes.setdefault(name, (drs, set()))[1].add(s)
     if mode == "upmod":
         games = pick(game.root, "Games") or (game.root / "Games")
@@ -514,6 +533,7 @@ def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Pat
         if not backup.exists():
             shutil.copy2(live, backup)
             log(f"backed up {live.name} -> {backup.name}")
+        drs.path = backup  # read untouched entries from the original copy from now on
         for s in ids:
             drs.put(s, rendered[s])
         tmp = live.with_name(live.name + ".tmp")
@@ -543,28 +563,36 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log) -> None:
     log(f"patched {live}")
 
 
-def apply_gameplay(game: Game, mode: str, log) -> None:
-    """Pac-Man at the Wonder: the .dat rule change and his unit icon."""
+def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True) -> None:
+    """The .dat changes (Pac-Man at the Wonder, the Javelina's own sprites) and Pac-Man's icon."""
     from aom import gameplay
     if game.dat_path is None:
-        log("Pac-Man at the Wonder: no .dat found, skipped")
+        log(".dat changes: no empires2_x1_p1.dat found, skipped")
         return
-    patch, msg = gameplay.wonder_pacman(game.dat_path.read_bytes(), game.graphics_table)
-    log(f"Pac-Man at the Wonder: {msg}")
+    patch, notes = gameplay.patch_dat(game.dat_path.read_bytes(), game.graphics_table, pacman, javelina)
+    for note in notes:
+        log(note)
     if patch is None:
         return
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
-    sheet = game.interfac.get(gameplay.UNIT_ICONS) if game.interfac is not None else None
-    if sheet is None:
-        log("Pac-Man icon: the unit icon sheet is not in interfac.drs, icon unchanged")
+    if not pacman:
         return
-    new_sheet, msg = gameplay.icon_sheet(sheet, Quantiser(game.palette))
-    log(f"Pac-Man icon: {msg}")
-    if new_sheet is not None:
-        game.interfac.put(gameplay.UNIT_ICONS, new_sheet)
-        tmp = game.data / "interfac.drs.aom-new"
-        game.interfac.write(tmp)
-        write_game_file(game, mode, "interfac.drs", tmp.read_bytes(), log)
+    archives = list(game.archives) + ([("interfac.drs", game.interfac)] if game.interfac is not None else [])
+    sheets = gameplay.icon_sheets(archives)
+    if not sheets:
+        log(f"Pac-Man icon: no unit icon sheet ({gameplay.UNIT_ICONS}) in {', '.join(n for n, _ in archives)}")
+        return
+    quant = Quantiser(game.palette)
+    for name, drs, sheet in sheets:  # every copy, so the load order cannot matter
+        new_sheet, msg = gameplay.icon_sheet(sheet, quant)
+        info = slp.info(sheet)
+        log(f"Pac-Man icon in {name} (sheet {gameplay.UNIT_ICONS}, {info.num_frames} icons): {msg}")
+        if new_sheet is None:
+            continue
+        drs.put(gameplay.UNIT_ICONS, new_sheet)
+        tmp = game.data / (name + ".aom-new")
+        drs.write(tmp)
+        write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
 
 

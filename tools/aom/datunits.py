@@ -46,6 +46,7 @@ class UnitRecord:
     type: int
     name: str
     offset: int  # start of the record in the decompressed data
+    end: int = 0  # end of the record
     fields: dict[str, int] = field(default_factory=dict)  # name -> byte offset of the field
     values: dict[str, object] = field(default_factory=dict)
 
@@ -53,7 +54,8 @@ class UnitRecord:
 # field name -> struct format, for the fields we may patch
 FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h", "train_location": "h",
            "button": "b", "cost": "hhhhhhhhh", "creatable_type": "b", "hotkey": "i", "name_id": "H",
-           "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h"}
+           "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
+           "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -70,7 +72,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     v["class"] = r.one("h")
     f["standing"] = r.p
     v["standing"] = r.take("hh")
-    r.take("hh")  # dying graphics
+    f["dying"] = r.p
+    v["dying"] = r.take("hh")
     r.one("b")  # undead mode
     f["hit_points"] = r.p
     v["hit_points"] = r.one("h")
@@ -78,7 +81,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.one("b")  # garrison capacity
     r.take("fff")  # collision size
     r.take("hh")  # train sound, damage sound
-    r.one("h")  # dead unit
+    f["dead_unit"] = r.p
+    v["dead_unit"] = r.one("h")
     r.take("bb")  # sort number, can be built on
     f["icon"] = r.p
     v["icon"] = r.one("h")
@@ -114,13 +118,15 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.skip(n_damage * 5)
     r.take("hh")  # selection sound, dying sound
     r.take("bb")  # old attack reaction, convert terrain
+    f["name"] = r.p
     raw_name = r.d[r.p:r.p + name_len]
     r.skip(name_len)
     r.take("hh")  # copy id, base id
     if utype >= 20:  # flags and up: speed
         r.one("f")
     if utype >= 30:  # dead units / fish: movement
-        r.take("hh")  # walking graphics
+        f["walking"] = r.p
+        v["walking"] = r.take("hh")
         r.one("f")  # rotation speed
         r.one("b")  # old size class
         r.one("h")  # tracking unit
@@ -150,7 +156,9 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         r.one("b")  # blast attack level
         r.one("f")  # min range
         r.one("f")  # accuracy dispersion
-        r.take("hhh")  # attack graphic, displayed melee armour, displayed attack
+        f["attack_graphic"] = r.p
+        v["attack_graphic"] = r.one("h")
+        r.take("hh")  # displayed melee armour, displayed attack
         r.take("ff")  # displayed range, displayed reload time
     if utype == 60:  # projectiles
         r.take("bbbbb")
@@ -192,7 +200,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     name = raw_name.split(b"\0", 1)[0].decode("latin-1")
     if utype not in (10, 15, 20, 25, 30, 40, 50, 60, 70, 80) or not all(32 <= ord(c) < 127 for c in name):
         raise DatLayoutError(f"unexpected unit record at {start}: type {utype}, name {raw_name!r}")
-    return UnitRecord(civ, uid, utype, name, start, f, v)
+    return UnitRecord(civ, uid, utype, name, start, r.p, f, v)
 
 
 def _civ_header(data: bytes, h: int) -> Optional[tuple[int, int, int]]:

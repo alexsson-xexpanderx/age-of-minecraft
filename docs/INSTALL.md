@@ -75,6 +75,7 @@ next to `build_mod.bat`. You have two options:
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs` (no mod exe needed); a backup is kept as `graphics.drs.aom-backup` |
 | `restore_original.bat` | undo `build_mod_direct.bat` (graphics, the rules file and the icons) |
 | `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder) |
+| `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man at the Wonder, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
 
@@ -94,6 +95,10 @@ next to `build_mod.bat`. You have two options:
   only the Minecraft sprite shows.
 * The Elite Eagle Warrior uses the Eagle Warrior's sprites, as in the
   original game.
+* The Javelina borrows the Wild Boar's sprites in the original game (its own
+  were never shipped). The mod renders its own pig sprites and points the
+  Javelina at them in `empires2_x1_p1.dat`, with a pig carcass that holds the
+  same food as the boar's.
 * A few original sprite files hold a frame or two more than the game uses.
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.

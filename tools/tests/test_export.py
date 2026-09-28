@@ -42,12 +42,12 @@ def fake_palette() -> bytes:
     return f"JASC-PAL\r\n0100\r\n256\r\n{body}\r\n".encode()
 
 
-def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1) -> bytes:
+def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1) -> bytes:
     """One unit record in the Conquerors layout (mirrors aom.datunits)."""
     nb = name.encode()
     b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 0))
     b += struct.pack("<hhhhbhfb", standing, -1, -1, -1, 0, 30, 4.0, 0)
-    b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, -1, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
+    b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
     b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
     b += struct.pack("<iiibbbbbbbBbhbBfff", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
     b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
@@ -68,14 +68,15 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1) -> bytes:
     return bytes(b)
 
 
-def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0) -> bytes:
-    """Civilisations with unit tables: filler units, the Wonder (276) and Furious the Monkey Boy (860)."""
+def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0) -> bytes:
+    """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860), and the
+    Javelina (822) borrowing the Wild Boar's sprites, with its carcass (823) and the boar's (356)."""
     out = bytearray(struct.pack("<H", civs))
     rng = np.random.default_rng(5)
     for c in range(civs):
         out += struct.pack("<b20sHhh", 1, [b"Gaia", b"British", b"French"][c % 3], 4, 1, 1)
         out += struct.pack("<4f", 1, 2, 3, 4) + struct.pack("<bH", 0, slots)
-        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860)]
+        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823)]
         # like the original game's file, a pointer is a memory address (0 = no unit)
         out += struct.pack(f"<{slots}i", *[int(rng.integers(0x400000, 0x7fffffff)) if u in present else 0
                                            for u in range(slots)])
@@ -84,6 +85,10 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0) -> bytes
                 out += _unit_bytes(u, 80, "WNDR")
             elif u == 860:
                 out += _unit_bytes(u, 70, "mkyby", monkey_graphic)
+            elif u == 822:
+                out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
+            elif u in (356, 823):
+                out += _unit_bytes(u, 30, "BOARX_D" if u == 356 else "BOARJ_D", boar_graphic)
             else:
                 out += _unit_bytes(u, 10, f"U{u}")
     return bytes(out)
@@ -174,8 +179,12 @@ def fake_game(root: Path) -> Path:
     extra = Drs()  # some sprites only exist in gamedata_x1.drs
     extra.put(5157, build_mod.blank(17 * 5))
     extra.write(data / "gamedata_x1.drs")
-    table.append({"name": "BOARJ_AN", "slp": 5157, "frames": 17, "angles": 8})
-    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey)))
+    boar = len(table)
+    table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
+    for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
+                                 ("BOARJ_RN", 5160, 10), ("BOARJ_SN", 5161, 5), ("BOARJ_WN", 5162, 10)):
+        table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8})  # only 5157 has a file
+    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar)))
     return root
 
 
@@ -270,6 +279,17 @@ def test_full_build(tmp: Path):
     assert np.array_equal(icons_after[0].pixels, icons_before[0].pixels)
     assert not np.array_equal(icons_after[159].pixels, icons_before[159].pixels)
     assert "trainable at the Wonder" in report
+    # the Javelina gets its own sprites: the missing files are created, the unit points at them
+    table = read_graphics((game / "Data" / "empires2_x1_p1.dat").read_bytes())
+    gid = {g.name: k for k, g in table.items()}
+    for civ in units.units:
+        jav, carcass = civ[822], civ[823]
+        assert jav.values["standing"] == (gid["BOARJ_FN"], -1) and jav.values["walking"] == (gid["BOARJ_WN"],
+                                                                                              gid["BOARJ_RN"])
+        assert jav.values["dead_unit"] == 823 and carcass.values["standing"] == (gid["BOARJ_SN"], -1)
+        assert carcass.id == 823 and carcass.name == "BOARJ_D" and civ[356].values["standing"][0] == gid["BOARX_FN"]
+    for slp_id, frames in ((5158, 11 * 5), (5159, 10 * 5), (5161, 5 * 5), (5162, 10 * 5)):
+        assert slp.info(out.get(slp_id)).num_frames == frames
     x1 = Drs(mod / "Data" / "gamedata_x1.drs")  # the javelina lives in gamedata_x1.drs: replaced there
     assert slp.info(x1.get(5157)).num_frames == 85
     assert x1.get(5157) != Drs(game / "Data" / "gamedata_x1.drs").get(5157)
