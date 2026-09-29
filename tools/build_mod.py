@@ -70,10 +70,8 @@ def blank_group(why: str) -> str:
             return group
     return "buildings"
 
-MOD = "age_of_minecraft"  # the mod's folder (Games\\age_of_minecraft) and exe (age2_x1\\age_of_minecraft.exe)
-# UserPatch's name for the mod: Games\\AoM.xml, SetupAoC.exe -g:AoM, age2_x1.exe GAME=AoM. Short like WololoKingdoms'
-# "WK": SetupAoC.exe writes it into the exe it makes, and did not make one for "age_of_minecraft".
-UP_NAME = "AoM"
+MOD = "age_of_minecraft"  # the UserPatch data mod: Games\\age_of_minecraft.xml, its folder, age2_x1\\age_of_minecraft.exe
+LEFTOVERS = ("Games/AoM.xml", "age2_x1/AoM.exe")  # what one earlier build called the mod
 NAME = "Age of Minecraft"
 BACKUP = ".aom-backup"
 # the game's own name, where a language file has it as a string of its own: the mod's copy calls it NAME
@@ -98,7 +96,7 @@ CIVS = [
 
 def mod_xml() -> bytes:
     lines = ['<?xml version="1.0" encoding="utf-8"?>',
-             f'<configuration game="{UP_NAME}">',
+             f'<configuration game="{MOD}">',
              f"  <name>{NAME}</name>",
              f"  <path>{MOD}</path>",
              '  <civilizations langId="10270" descId="20150" aiNameOffset="6840" uiBaseId="51100" uiStride="20" '
@@ -547,6 +545,7 @@ def main(argv=None) -> int:
         apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina)
     exe_ok = False
     if args.mode == "upmod":
+        mod_archive(game, log)
         mod_language(game, log)
         exe_ok = not args.no_exe and make_exe(game.root, log)
         make_shortcuts(game, exe_ok, log)
@@ -565,7 +564,7 @@ def main(argv=None) -> int:
             log(f"  Or start {game.root / 'age2_x1' / (MOD + '.exe')}. Your normal game is not changed.")
         else:
             log(f"  {NAME}'s own exe needs UserPatch's SetupAoC.exe in your game folder; until it is there the")
-            log(f"  shortcut starts it with age2_x1.exe GAME={UP_NAME}. Your normal game is not changed.")
+            log(f"  shortcut starts it with age2_x1.exe GAME={MOD}. Your normal game is not changed.")
     return 0
 
 
@@ -580,42 +579,63 @@ def find_setup(root: Path) -> Optional[Path]:
 
 
 def make_exe(root: Path, log) -> bool:
-    """The mod's own exe: SetupAoC.exe -g:<UP_NAME> makes age2_x1\\<UP_NAME>.exe (as WololoKingdoms makes WK.exe),
-    which becomes age2_x1\\<MOD>.exe with our icon. The game's own age2_x1.exe must not change: if the installer
-    changes it anyway, it is put back as it was."""
+    """The mod's own exe, made once: SetupAoC.exe -g:<mod> makes age2_x1\\<mod>.exe, then it gets our icon. The
+    installer hands over to a copy of itself running as administrator and returns at once, so the exe appears only
+    when Install is clicked in its window: wait for it. The game's own age2_x1.exe must not change; if the
+    installer changes it anyway, it is put back as it was."""
     age2 = pick(root, "age2_x1") or root / "age2_x1"
-    made, exe = age2 / f"{UP_NAME}.exe", age2 / f"{MOD}.exe"
+    exe = age2 / f"{MOD}.exe"
+    if exe.exists():
+        log(f"mod exe: {exe} is there (made by an earlier build)")
+        add_icon(exe, log)
+        return True
     setup = find_setup(root)
     if setup is None:
         log(f"mod exe: SetupAoC.exe (the UserPatch installer) is not in {root}, so the mod exe can't be made.")
         return False
     if os.name != "nt":
-        log(f"mod exe: on Windows, run  {setup.name} -g:{UP_NAME}  in {setup.parent}")
+        log(f"mod exe: on Windows, run  {setup.name} -g:{MOD}  in {setup.parent}")
         return False
     game_exe = pick(age2, "age2_x1.exe")
     before = game_exe.read_bytes() if game_exe is not None else None
-    log(f"mod exe: running {setup} -g:{UP_NAME}")
-    log("         (if a UserPatch window opens, click its Install / Run button and wait for it to finish)")
+    log(f"mod exe: running {setup} -g:{MOD}")
+    log("         A UserPatch window opens: click its Install button and wait for it to finish.")
     try:
-        done = subprocess.run([str(setup), f"-g:{UP_NAME}"], cwd=setup.parent, timeout=600, check=False,
+        done = subprocess.run([str(setup), f"-g:{MOD}"], cwd=setup.parent, timeout=600, check=False,
                               capture_output=True, text=True, errors="replace")
-        log(f"mod exe: SetupAoC.exe finished with code {done.returncode}")
-        for line in (done.stdout + done.stderr).strip().splitlines()[-20:]:
-            log("         " + line)
+        log(f"mod exe: SetupAoC.exe returned code {done.returncode}")
     except (OSError, subprocess.SubprocessError) as exc:
         log(f"mod exe: could not run SetupAoC.exe ({exc})")
+    waited = 0
+    while not exe.exists() and waited < 600 and _installer_running():
+        if waited % 20 == 0:
+            print("  waiting for the UserPatch window: click Install there (or close it to go on without the exe)")
+        time.sleep(2)
+        waited += 2
+    last = -1
+    while exe.exists() and exe.stat().st_size != last:  # until it is written completely
+        last = exe.stat().st_size
+        time.sleep(1)
     if before is not None and game_exe.exists() and game_exe.read_bytes() != before:
         game_exe.write_bytes(before)
         log("mod exe: SetupAoC.exe changed your age2_x1.exe; it is put back as it was")
-    if made.exists():
-        made.replace(exe)
-        log(f"mod exe: made {exe}")
     if exe.exists():
+        log(f"mod exe: made {exe}")
         add_icon(exe, log)
         return True
     found = sorted(p.name for p in age2.iterdir() if p.suffix.lower() == ".exe") if age2.is_dir() else []
-    log(f"mod exe: {made.name} was not created. Exes in age2_x1: {', '.join(found) or 'none'}")
+    log(f"mod exe: {exe.name} was not made. Exes in age2_x1: {', '.join(found) or 'none'}")
     return False
+
+
+def _installer_running() -> bool:
+    """True while a SetupAoC.exe is running (Windows' tasklist; True if it can't tell)."""
+    try:
+        done = subprocess.run(["tasklist", "/FI", "IMAGENAME eq SetupAoC.exe", "/NH"], capture_output=True,
+                              text=True, errors="replace", timeout=30)
+        return "setupaoc.exe" in done.stdout.lower()
+    except (OSError, subprocess.SubprocessError):
+        return True
 
 
 def add_icon(exe: Path, log) -> None:
@@ -644,7 +664,7 @@ def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
     icon.write_bytes(appicon.ico())
     age2 = pick(game.root, "age2_x1") or game.root / "age2_x1"
     target = age2 / f"{MOD}.exe" if exe_ok else (pick(age2, "age2_x1.exe") or age2 / "age2_x1.exe")
-    arguments = "" if exe_ok else f"GAME={UP_NAME}"
+    arguments = "" if exe_ok else f"GAME={MOD}"
     if os.name != "nt":
         log(f"shortcut: on Windows, '{NAME}' on the desktop and in the game folder starts {target.name} {arguments}")
         return
@@ -665,6 +685,32 @@ def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
         log(f"shortcut: '{NAME}' on your desktop and in {game.root} (starts {target.name} {arguments}".rstrip() + ")")
     except (OSError, subprocess.SubprocessError) as exc:
         log(f"shortcut: could not make it ({exc}); start {target} {arguments} instead")
+
+
+def mod_archive(game: Game, log) -> None:
+    """The mod's own gamedata_x1_p1.drs: the game's (UserPatch's), with every changed sprite, farm texture, panel,
+    menu picture, icon and sound in it. A UserPatch mod's Data folder is read for its patch archive, rules and
+    language file (WololoKingdoms puts all its pictures there too), and the game looks in the patch archive first,
+    so these win over graphics.drs, terrain.drs and interfac.drs. Any copies of those that earlier builds put into
+    the mod's folder are removed."""
+    patch = game.patch if game.patch is not None else Drs()
+    for _, drs in game._searched():
+        if drs is not patch:
+            for kind, entries in drs.added.items():
+                for fid, data in entries.items():
+                    patch.put(fid, data, kind)
+    folder = (pick(game.root, "Games") or game.root / "Games") / MOD / "Data"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "gamedata_x1_p1.drs"
+    tmp = path.with_name(path.name + ".tmp")
+    patch.write(tmp)
+    tmp.replace(path)
+    log(f"wrote {path} ({sum(len(e) for e in patch.added.values())} changed files)")
+    for name in ("graphics.drs", "interfac.drs", "terrain.drs", "gamedata_x1.drs", "gamedata.drs"):
+        old = pick(folder, name)
+        if old is not None:
+            old.unlink()
+            log(f"removed {old} (the game doesn't read it from a mod; everything is in gamedata_x1_p1.drs)")
 
 
 def mod_language(game: Game, log) -> None:
@@ -728,21 +774,19 @@ def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Pat
     for s in rendered:  # into every archive that has the sprite; new sprites go into graphics.drs
         for name, drs in game.holders(s) or [(game.graphics_path.name, game.graphics)]:
             changes.setdefault(name, (drs, set()))[1].add(s)
-    if mode == "upmod":
-        games = pick(game.root, "Games") or (game.root / "Games")
-        mod_data = games / MOD / "Data"
-        mod_data.mkdir(parents=True, exist_ok=True)
+    if mode == "upmod":  # all of it goes into the mod's own patch archive, written by mod_archive
         for name, (drs, ids) in changes.items():
             for s in ids:
                 drs.put(s, rendered[s])
-            drs.write(mod_data / name)
-            log(f"wrote {mod_data / name} ({len(ids)} sprites)")
-        (games / f"{UP_NAME}.xml").write_bytes(mod_xml())
-        log(f"wrote {games / (UP_NAME + '.xml')}")
-        old = games / f"{MOD}.xml"  # what an earlier build called the mod
-        if old.exists():
-            old.unlink()
-            log(f"removed {old} (the mod is {UP_NAME} to UserPatch now)")
+        games = pick(game.root, "Games") or (game.root / "Games")
+        (games / MOD / "Data").mkdir(parents=True, exist_ok=True)
+        (games / f"{MOD}.xml").write_bytes(mod_xml())
+        log(f"wrote {games / (MOD + '.xml')}")
+        for leftover in LEFTOVERS:
+            old = game.root / leftover
+            if old.exists():
+                old.unlink()
+                log(f"removed {old} (an earlier build's name for the mod)")
         return games / MOD
     # direct: patch the game's own files, keeping the originals once
     for name, (drs, ids) in changes.items():
@@ -767,6 +811,8 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log, folder: 
     """Write a changed game file: into the mod's Data folder, or over the game's own file in `folder` (the
     Data folder by default), backed up once."""
     if mode == "upmod":
+        if name.lower().endswith(".drs"):  # its changes go into the mod's own patch archive (mod_archive)
+            return
         games = pick(game.root, "Games") or (game.root / "Games")
         path = games / MOD / "Data" / name
         path.parent.mkdir(parents=True, exist_ok=True)

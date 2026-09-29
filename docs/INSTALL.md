@@ -39,10 +39,9 @@ The build takes about two to ten minutes, depending on your PC. It makes
 files are not changed. It writes:
 
 ```
-Games\AoM.xml                                 the UserPatch mod definition ("Age of Minecraft")
-Games\age_of_minecraft\Data\graphics.drs      your graphics with the Minecraft sprites swapped in
-Games\age_of_minecraft\Data\terrain.drs       your ground textures with Minecraft farms
-Games\age_of_minecraft\Data\interfac.drs      your screen panels in the Minecraft style
+Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
+Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu, Pac-Man's icon and sounds
+Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man at the Wonder, the Javelina's own look
 Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's name, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
 Games\age_of_minecraft\menu_originals\         your game's main menu pictures (for a Minecraft menu)
@@ -65,10 +64,14 @@ and stays exactly as it was.
 files. Double-click **`restore_original.bat`** once to give your normal game
 its original files back; Age of Minecraft doesn't need them.
 
+**The UserPatch window.** The first build opens it to make
+`age_of_minecraft.exe`: click its **Install** button and wait; the build waits
+for it too. Later builds keep that exe and don't open the window again.
+
 **No `age_of_minecraft.exe`?** The exe is made by UserPatch's installer,
 `SetupAoC.exe`, which must be in your game folder (it comes with UserPatch 1.5
 from <https://userpatch.aiscripters.net/>). Without it the shortcut still
-works: it starts your normal exe with `GAME=AoM`, which tells
+works: it starts your normal exe with `GAME=age_of_minecraft`, which tells
 UserPatch to load Age of Minecraft instead. The end of the black window (under
 **RESULT**) says which one you got; everything shown there is also saved to
 **`aom_build_log.txt`**, next to `build_mod.bat`.

@@ -366,15 +366,20 @@ def test_rendered_sprite_matches_layout():
 
 def test_full_build(tmp: Path):
     game = fake_game(tmp / "aoe2")
+    for leftover in ("Games/AoM.xml", "age2_x1/AoM.exe", "Games/age_of_minecraft/Data/graphics.drs"):
+        (game / leftover).parent.mkdir(parents=True, exist_ok=True)  # what earlier builds left behind
+        (game / leftover).write_bytes(b"old")
     assert build_mod.main(["--game", str(game), "--jobs", "2"]) == 0
     mod = game / "Games" / "age_of_minecraft"
-    xml = (game / "Games" / "AoM.xml").read_bytes()  # UserPatch's short name for the mod, its folder is longer
+    xml = (game / "Games" / "age_of_minecraft.xml").read_bytes()
     assert xml.startswith(b"\xef\xbb\xbf") and b"<path>age_of_minecraft</path>" in xml and b'id="18" name="korean"' in xml
-    assert b'<configuration game="AoM">' in xml and not (game / "Games" / "age_of_minecraft.xml").exists()
+    assert b'<configuration game="age_of_minecraft">' in xml
     assert b"<name>Age of Minecraft</name>" in xml
-    out = Drs(mod / "Data" / "graphics.drs")
+    out = Drs(mod / "Data" / "gamedata_x1_p1.drs")  # every change is in the mod's own patch archive
+    assert [p.name for p in sorted((mod / "Data").glob("*.drs"))] == ["gamedata_x1_p1.drs"]
+    assert not (game / "Games" / "AoM.xml").exists() and not (game / "age2_x1" / "AoM.exe").exists()
     orig = Drs(game / "Data" / "graphics.drs")
-    assert out.get(40000) == orig.get(40000)  # untouched files are copied as they were
+    assert out.get(40000) is None and out.get(15500, "wav") == b"RIFF a sound"  # UserPatch's own files stay
     for s in (987, 993, 2, 8, 173, 183, 176):
         assert slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
         assert out.get(s) != orig.get(s)
@@ -382,7 +387,7 @@ def test_full_build(tmp: Path):
         frames = slp.decode(out.get(s))
         assert len(frames) == 25 and all((f.pixels == slp.TRANSPARENT).all() for f in frames)
     assert out.get(9000) != orig.get(9000) and out.get(9003) != orig.get(9003)  # halberdier found by name
-    assert out.get(9100) == orig.get(9100)  # shared explosion is left alone
+    assert out.get(9100) is None  # shared explosion is left alone
     report = (mod / "aom_report.txt").read_text()
     assert "REPLACED" in report and "BTRAM_AN" in report and "found by name HALBD_AN" in report
     # buildings and scenery
@@ -391,7 +396,7 @@ def test_full_build(tmp: Path):
         assert slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
     for s in (122, 126, 2090, 2296, 4479):  # their shadow and flag layers are hidden
         assert all((f.pixels == slp.TRANSPARENT).all() for f in slp.decode(out.get(s)))
-    assert out.get(2219) == orig.get(2219)  # shared with a ship: left alone
+    assert out.get(2219) is None  # shared with a ship: left alone
     wall = slp.decode(out.get(2098))
     assert len({f.pixels.tobytes() for f in wall}) == 5  # five different wall pieces
     w = [f.pixels.shape[1] for f in wall]  # in the game's order: "/", "\", the post, "--", "|"
@@ -414,7 +419,7 @@ def test_full_build(tmp: Path):
     assert len(heads.tasks[74]) == 2 and heads.tasks[861] is None
     assert "boarding task added" in report
     icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
-    icons_after = slp.decode(Drs(mod / "Data" / "interfac.drs").get(50730))
+    icons_after = slp.decode(out.get(50730))
     assert len(icons_after) == len(icons_before) + 1
     assert all(np.array_equal(a.pixels, b.pixels) for a, b in zip(icons_after, icons_before))
     assert icons_after[170].pixels.shape == (36, 36) and len(np.unique(icons_after[170].pixels)) >= 4
@@ -457,13 +462,12 @@ def test_full_build(tmp: Path):
         assert carcass.id == 823 and carcass.name == "BOARJ_D" and civ[356].values["standing"][0] == gid["BOARX_FN"]
     for slp_id, frames in ((5158, 11 * 5), (5159, 10 * 5), (5161, 5 * 5), (5162, 10 * 5)):
         assert slp.info(out.get(slp_id)).num_frames == frames
-    x1 = Drs(mod / "Data" / "gamedata_x1.drs")  # the javelina lives in gamedata_x1.drs: replaced there
-    assert slp.info(x1.get(5157)).num_frames == 85
-    assert x1.get(5157) != Drs(game / "Data" / "gamedata_x1.drs").get(5157)
+    assert slp.info(out.get(5157)).num_frames == 85  # the javelina, from gamedata_x1.drs: replaced too
+    assert out.get(5157) != Drs(game / "Data" / "gamedata_x1.drs").get(5157)
     assert "6 x 8 angles mirrored  [dat, plus 2 unused frames]" in report
     # farms are terrain: their textures in terrain.drs become Minecraft farmland, in the same tile shapes
-    ground, ground_before = Drs(mod / "Data" / "terrain.drs"), Drs(game / "Data" / "terrain.drs")
-    assert ground.get(15000) == ground_before.get(15000)  # grass stays
+    ground, ground_before = out, Drs(game / "Data" / "terrain.drs")
+    assert ground.get(15000) is None  # grass stays
     for slp_id in (15004, 15005, 15021, 15040, 15023):
         new, old = slp.decode(ground.get(slp_id)), slp.decode(ground_before.get(slp_id))
         assert len(new) == len(old)
@@ -475,7 +479,7 @@ def test_full_build(tmp: Path):
     assert np.array_equal(ripe[24:, 48:][overlap], ripe[:25, :49][overlap])  # so the tiles join up
     assert "FARMS" in report and "terrain 30 'Farm 2'" in report and "TERRAIN TABLE" in report
     # the panels: planks, inventory grey and slots, with Minecraft resource icons; the game view stays open
-    ui, ui_before = Drs(mod / "Data" / "interfac.drs"), Drs(game / "Data" / "interfac.drs")
+    ui, ui_before = out, Drs(game / "Data" / "interfac.drs")
     quant = Quantiser(parse_jasc(fake_palette()))
     new, old = slp.decode(ui.get(51141))[0].pixels, slp.decode(ui_before.get(51141))[0].pixels
     assert new.shape == old.shape and np.array_equal(new < 0, old < 0)
@@ -486,7 +490,7 @@ def test_full_build(tmp: Path):
     assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
     new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels
     assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[6:23, 11:37], old[6:23, 11:37])
-    assert ui.get(51101) == ui_before.get(51101)  # no icons found: it keeps its look
+    assert ui.get(51101) is None  # no icons found: it keeps its look
     assert "INTERFACE PANELS" in report and "Minecraft style" in report and "were not found" in report
     menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu
     assert len(menu_after) == 53 and not np.array_equal(menu_after[0].pixels, menu_before[0].pixels)

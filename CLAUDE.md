@@ -79,9 +79,11 @@ putting `tools/` on `sys.path`.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,
      `mod_language` gives the mod its own `language_x1_p1.dll` (`langdll.with_strings`: a new resource section
      added by `pe.py`) with his texts and "Age of Minecraft".
-   The standalone mod then gets its exe (`SetupAoC.exe -g:AoM` makes `AoM.exe`, renamed to `age_of_minecraft.exe`;
-   UserPatch knows the mod as `UP_NAME` = `AoM`, short like WololoKingdoms' `WK`; icon swapped in place by
-   `appicon.into_exe`), "Age of Minecraft" shortcuts (PowerShell, Windows only) and the original menu pictures as
+   In the standalone mod, `mod_archive` then writes every archive's changes into the mod's own
+   `gamedata_x1_p1.drs`: a UserPatch mod's Data folder is only read for that, its `.dat` and `language_x1_p1.dll`
+   (the game looks in the patch archive first; WololoKingdoms does the same). It then gets its exe once
+   (`SetupAoC.exe -g:age_of_minecraft` returns at once and finishes after Install is clicked, so `make_exe` waits;
+   icon swapped in place by `appicon.into_exe`), "Age of Minecraft" shortcuts (PowerShell, Windows only) and the original menu pictures as
    PNGs (`menu_originals/`). Last, the build writes `aom_report.txt`.
 
 ## Invariants that are easy to break

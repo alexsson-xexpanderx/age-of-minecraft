@@ -307,16 +307,20 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    table (terrains 7, 8, 29, 30 and 31), and each of their tiles is redrawn
    in exactly the pixels of the original tile.
 5. **Install** as a UserPatch 1.5 data mod, a game of its own called Age of
-   Minecraft: `Games\AoM.xml` (UserPatch's short name for it, like
-   WololoKingdoms' `WK`),
-   `Games\age_of_minecraft\Data\graphics.drs`, `terrain.drs`, `interfac.drs`
-   and its own `language_x1_p1.dll` (the game's, with Pac-Man's name and
-   "Age of Minecraft" added in a new section at its end), and
-   `age2_x1\age_of_minecraft.exe` (`SetupAoC.exe -g:AoM` makes `AoM.exe`, renamed),
-   with the villager king icon put into its icon pictures in place. An "Age of
+   Minecraft: `Games\age_of_minecraft.xml`, and in
+   `Games\age_of_minecraft\Data\` its own `empires2_x1_p1.dat`,
+   `language_x1_p1.dll` (the game's, with Pac-Man's name and "Age of
+   Minecraft" added in a new section at its end) and `gamedata_x1_p1.drs`.
+   A UserPatch mod's Data folder is read for those three only, so every
+   changed sprite, farm texture, panel, menu picture, icon and sound goes into
+   its `gamedata_x1_p1.drs` (the game's, plus ours), which the game looks in
+   first, as WololoKingdoms does. `SetupAoC.exe -g:age_of_minecraft` makes
+   `age2_x1\age_of_minecraft.exe` once (it returns at once and finishes when
+   Install is clicked in its window, so the build waits for the exe), and the
+   villager king icon goes into its icon pictures in place. An "Age of
    Minecraft" shortcut with the icon starts it (or, without that exe,
-   `age2_x1.exe GAME=AoM`). The game's own `age2_x1.exe` is checked before
-   and after `SetupAoC.exe` runs, and put back if it changed.
+   `age2_x1.exe GAME=age_of_minecraft`). The game's own `age2_x1.exe` is
+   checked before and after `SetupAoC.exe` runs, and put back if it changed.
    A `--mode direct` fallback patches `Data\graphics.drs`,
    `Data\terrain.drs` and `Data\interfac.drs` with backups.
 
