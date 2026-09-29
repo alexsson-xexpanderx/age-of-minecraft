@@ -159,6 +159,25 @@ def _rectangles(m: np.ndarray, min_area: int = 40) -> np.ndarray:
     return out
 
 
+def _widen(boxes: np.ndarray, icons: Optional[list[tuple[int, int]]], more: int = 10, gap: int = 2) -> np.ndarray:
+    """Each box as wide as it can be: `gap` pixels from the icon before it and from the next icon or box, at most
+    `more` pixels wider on each side. Room for the game's numbers."""
+    lab, n = _label(boxes)
+    spans = []
+    for k in range(1, n + 1):
+        ys, xs = np.nonzero(lab == k)
+        spans.append((xs.min(), xs.max() + 1, ys.min(), ys.max() + 1))
+    icons = icons or []
+    starts = sorted([x for x, _ in icons] + [x0 for x0, _, _, _ in spans])
+    ends = sorted([x + ICON_W for x, _ in icons] + [x1 for _, x1, _, _ in spans])
+    out = boxes.copy()
+    for x0, x1, y0, y1 in spans:
+        right = min([x1 + more] + [x - gap for x in starts if x >= x1])
+        left = max([x0 - more] + [x + gap for x in ends if x <= x0])
+        out[y0:y1, max(0, left):max(x1, right)] = True
+    return out
+
+
 def _top_bar(opaque: np.ndarray) -> np.ndarray:
     """The resource bar: the rows at the top that are drawn all the way across."""
     full = opaque.mean(1) > 0.9
@@ -212,7 +231,11 @@ def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int,
     bar = _top_bar(opaque)
     paper = _paper(lum, opaque) & ~bar  # the parchment below the resource bar (its tears are filled)
     # the resource bar's boxes, each on its own (the game writes the amounts in them, in white)
-    counts = _rectangles(_grow(_shrink(opaque & bar & (lum > 0.5), 2), 2)) & bar & opaque
+    light = opaque & bar & (lum > 0.5)
+    for x, y in icons or []:  # the icons themselves (gold is bright) are not boxes
+        light[max(0, y - 2):y + ICON_H + 2, max(0, x - 2):x + ICON_W + 2] = False
+    counts = _rectangles(_grow(_shrink(light, 2), 2)) & bar & opaque
+    counts = _widen(counts, icons) & bar & opaque
     slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper & ~counts
     frame = opaque & ~paper & ~slots & ~counts
     out = np.zeros_like(rgb)

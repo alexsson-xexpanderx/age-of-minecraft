@@ -554,7 +554,7 @@ def interface_sheet(out: Path) -> None:
         pic = Image.fromarray(img)
         d = ImageDraw.Draw(pic)
         for (x, y), amount in zip(interface.ICON_BOXES, ("40000", "40000", "20000", "10000", "4/5")):
-            d.text((x + 32, y - 2), amount, fill=(255, 255, 255), font=font(15), stroke_width=1, stroke_fill=(0, 0, 0))
+            d.text((x + 33, y), amount, fill=(255, 255, 255), font=font(12), stroke_width=1, stroke_fill=(0, 0, 0))
         img[...] = np.asarray(pic)
     canvas = Image.new("RGB", (before_img.shape[1], head + 2 * (before_img.shape[0] + gap)), PAPER)
     d = ImageDraw.Draw(canvas)
