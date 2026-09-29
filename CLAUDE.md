@@ -65,7 +65,8 @@ putting `tools/` on `sys.path`.
    - The other screens (`screens.RESTYLED`: setup screens, dialogues, history, achievements, loading screen 50163) are
      found through the screen files (`screens.read`, `Game.screens`) and redrawn by `screens.hall`: parchment
      (`screens.sheets`) becomes a window in a middle grey (`screens.WINDOWS`: white, cream, black and player colours
-     all readable), frames deepslate, wood dark oak; the achievements and timeline are the dark window. `screens.quantise` picks
+     all readable); everything around it one material, deepslate or dark oak (`WOODEN`), never mixed (the player
+     asked for that); the achievements and timeline are the dark window. `screens.quantise` picks
      colours good in every palette a picture is shown in; `LAYOUTS` gives the sheets of a few pictures by hand.
      Pictures without parchment are one solid colour (the game writes scores in player colours on them). The
      achievements' flags (`screens.FLAGS`, no screen file names them: `SHOWN_WITH` gives the achievements' palette)

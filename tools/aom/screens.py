@@ -7,16 +7,14 @@ with one setting per line: its background pictures for 800x600, 1024x768 and 128
 (plus every other large picture in interfac.drs); the build saves them as PNG files (screen_originals/) and lists
 the screen files in the report.
 
-Almost every screen is a light parchment the game writes on, in black or in light text with a black shadow. So
-the "deepslate hall" keeps the parchment as light as it was: each sheet becomes a window in the grey of
-Minecraft's inventory, with straight edges (its tears filled, what sticks out cut off) and Minecraft's bevel;
-the dark frames around it become deepslate tiles and the wood (crates, the plaques titles are written on) dark oak
-planks, as dark as the original. Pictures without parchment (the achievements, the blue and green dialogue
-backgrounds) are one solid colour, the grey of Minecraft's inventory slots: the game writes the achievements in
-each player's colour, and on a texture or a dark or light background some of those can't be read. A wooden board
-is solid dark oak. The loading screen is Minecraft's dark dirt with the block logo in grey stone. The
-achievements' flags become Minecraft banners in their own colours, with a black stripe where the game writes each
-player's name (in white, or in a colour the game chooses, which can be the flag's own).
+Almost every screen is a parchment the game writes on, in white, in cream with a black shadow, in black or in the
+players' colours. The "deepslate hall" makes each sheet a Minecraft window (straight edges: its tears filled, what
+sticks out cut off; Minecraft's bevel) in a middle grey on which all of those can be read (`WINDOWS`), and
+everything around it one material: deepslate tiles, or dark oak planks for the pictures in WOODEN. The
+achievements are a dark window, their flags Minecraft banners with a black stripe for the names, their tabs
+Minecraft tabs and their team marks numbered shields. Pictures without parchment (the dark dialogue backgrounds)
+are one solid dark grey, a wooden board solid dark oak. The loading screen is Minecraft's dark dirt with the block
+logo in grey stone.
 
 Each picture is drawn in every palette the game shows it in (`quantise`), and only the pictures in RESTYLED, at
 those sizes, are changed.
@@ -59,10 +57,13 @@ SHOWN_WITH = {FLAGS: 50061, TABS: 50061, TEAMS: 50061}  # no screen file names t
 LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
     50104: {"insets": [(503, 50, 790, 495)]},  # the game settings' own sheet
     50161: {"sheets": [(0, 10, 251, 588), (262, 10, 792, 588)], "insets": [(8, 18, 238, 390)]},  # the history book
-    50149: {"sheets": [(26, 0, 800, 540)], "window": "dark", "wood": [(0, 540, 800, 600)]},  # the achievements:
-    # white titles and every player's colour on a dark sheet; the tabs sit on the wooden table under it
+    50149: {"sheets": [(26, 0, 800, 540)], "window": "dark"},  # the achievements: white titles and every
+    # player's colour on a dark sheet; the tabs sit on the (wooden) table under it
     50763: {"window": "dark"},  # the timeline's background
 }
+# one material around the windows of a picture: deepslate, or dark oak for these (the campaigns' dialogues, and the
+# achievements, whose dark tabs would be lost on deepslate)
+WOODEN = {53161, 53162, 53163, 53164, 53171, 53172, 53173, 53174, 50149}
 LUMA = I.LUMA
 PAPER, DARK = 0.38, 0.45  # parchment is lighter than PAPER; a picture darker than DARK on average is all deepslate
 STONE, WOOD = 0.3, 0.24  # how light the deepslate and the planks are
@@ -290,12 +291,9 @@ def hall(rgb: np.ndarray, opaque: np.ndarray, sid: int = 0) -> np.ndarray:
         board = wood.sum() > 0.5 * rest.sum()  # a wooden board
         out[rest & ~shadow] = tex * WOOD / (tex @ LUMA) if board else colour(SOLID)[:3]
         return out
-    wood = _boxes(_opening(wood, 3), 0.01 * opaque.size) & rest & ~shadow
-    for x0, y0, x1, y1 in LAYOUTS.get(sid, {}).get("wood", []):
-        wood[y0:y1, x0:x1] = rest[y0:y1, x0:x1]
-    stone = rest & ~shadow & ~wood
-    out[stone] = _tiled("deepslate_tiles", opaque.shape, STONE)[stone]
-    out[wood] = _tiled("dark_oak_planks", opaque.shape, WOOD)[wood]
+    border = rest & ~shadow  # all of it one material: a mix of stone and wood doesn't look right
+    material = ("dark_oak_planks", WOOD) if sid in WOODEN else ("deepslate_tiles", STONE)
+    out[border] = _tiled(material[0], opaque.shape, material[1])[border]
     lay = LAYOUTS.get(sid, {})
     whole = paper.all() or (opaque.all() and paper.mean() > 0.97)
     fill, light, shade = WINDOWS[lay.get("window", "mid")]

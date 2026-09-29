@@ -206,10 +206,10 @@ lists them in the report and saves them as `screen_originals\`.
 Almost all of them are parchment, and the game writes on it in white, in
 cream with a black shadow, in black, or in the players' colours. The **deepslate
 hall** makes each sheet a Minecraft window in a middle grey, where all of those
-can be read, with straight edges and Minecraft's light and dark bevel, and
-everything around it deepslate tiles. The wood (the crate the setup screen's
-buttons sit on, the plaques titles are written on in white) becomes dark oak
-planks. The history book gets two grey pages, with its list of topics sunk in.
+can be read, with straight edges and Minecraft's light and dark bevel.
+Everything around the windows of one picture is one material, never a mix:
+deepslate tiles, or dark oak planks for the campaigns' dialogues and the
+achievements (their dark tabs would be lost on deepslate). The history book gets two grey pages, with its list of topics sunk in.
 The loading screen is Minecraft's dark dirt with the block logo in grey stone
 (its palette has greys, not gold or green).
 
