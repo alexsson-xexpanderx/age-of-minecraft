@@ -165,6 +165,34 @@ The icons sit at fixed places in the 1280x1024 pictures. In the 800x600 and 1024
 by matching the same civilisation's 1280x1024 icons; a picture whose icons aren't found keeps its original
 look, so no resource loses its icon.
 
+### The main menu
+
+![menu](../previews/menu.png)
+
+The main menu is one 800x600 picture (`interfac.drs` 50189) with, for every
+button, pictures drawn over it at its place: the object cut out, with a yellow
+glow (the mouse is on it), with a white glow (pressed), and plain. The game
+writes the button names and the Single Player menu over the picture. Age of
+Minecraft's menu is a snowy block village at night with a blacksmith on the
+right, and each button a Minecraft thing in the original's exact place:
+
+| Button | Minecraft |
+|---|---|
+| Learn to Play | a banner with a villager and a book |
+| Single Player | a shield with a gold cross |
+| History | an open book |
+| Multiplayer | two diamond swords crossed over a shield |
+| Map Editor | a map in an item frame |
+| Options | an anvil |
+| Zone | a compass in an item frame |
+| Exit | an arrow-shaped dark oak sign |
+| the title | "AGE OF MINECRAFT" in blocks (gold, and grass on cobblestone) |
+
+A dark sign sits wherever the game writes, so its texts stay readable. The
+button pictures are cut from the new picture at the same places, with the
+original's glow colour around the new object. The build only replaces a menu
+whose pictures have the sizes it was designed for.
+
 ### Nature and decorations
 
 | AoE2 | Minecraft |
@@ -279,14 +307,16 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    table (terrains 7, 8, 29, 30 and 31), and each of their tiles is redrawn
    in exactly the pixels of the original tile.
 5. **Install** as a UserPatch 1.5 data mod, a game of its own called Age of
-   Minecraft: `Games\age_of_minecraft.xml`,
+   Minecraft: `Games\AoM.xml` (UserPatch's short name for it, like
+   WololoKingdoms' `WK`),
    `Games\age_of_minecraft\Data\graphics.drs`, `terrain.drs`, `interfac.drs`
    and its own `language_x1_p1.dll` (the game's, with Pac-Man's name and
    "Age of Minecraft" added in a new section at its end), and
-   `age2_x1\age_of_minecraft.exe` made by `SetupAoC.exe -g:age_of_minecraft`,
+   `age2_x1\age_of_minecraft.exe` (`SetupAoC.exe -g:AoM` makes `AoM.exe`, renamed),
    with the villager king icon put into its icon pictures in place. An "Age of
    Minecraft" shortcut with the icon starts it (or, without that exe,
-   `age2_x1.exe GAME=age_of_minecraft`).
+   `age2_x1.exe GAME=AoM`). The game's own `age2_x1.exe` is checked before
+   and after `SetupAoC.exe` runs, and put back if it changed.
    A `--mode direct` fallback patches `Data\graphics.drs`,
    `Data\terrain.drs` and `Data\interfac.drs` with backups.
 

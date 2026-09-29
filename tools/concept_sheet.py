@@ -18,6 +18,7 @@ Writes into previews/ by default:
     nature.png          trees, resources and map decorations
     farms.png           farms, which are terrain: being built, grown and exhausted
     interface.png       the resource bar and bottom panel in the Minecraft style (on a stand-in panel)
+    menu.png            the main menu, with the texts and Single Player buttons the game draws over it
 and docs/UNITS.md, the full unit list.
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aom.animation import DIRECTIONS, pose  # noqa: E402
-from aom import farmland, interface, props  # noqa: E402
+from aom import farmland, interface, menu, props  # noqa: E402
 from aom.voxel import BUILDING_HEADING  # noqa: E402
 from aom.colors import PLAYER_COLORS  # noqa: E402
 from aom.geometry import Pose  # noqa: E402
@@ -560,6 +561,30 @@ def interface_sheet(out: Path) -> None:
     canvas.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, optimize=True)
 
 
+def menu_sheet(out: Path) -> None:
+    """The Minecraft main menu at its size, with what the game writes over it: the button names on the signs, and
+    the Single Player menu on the right (its buttons are the game's own)."""
+    img, _ = menu.scene()
+    canvas = Image.fromarray((img * 255 + 0.5).astype(np.uint8))
+    d = ImageDraw.Draw(canvas)
+    for name, text in (("learn", "Learn to Play"), ("single", "Single Player"), ("history", "History"),
+                       ("multi", "Multiplayer"), ("map", "Map Editor"), ("options", "Options"), ("zone", "Zone")):
+        x0, y0, x1, y1 = menu.SIGNS[name]
+        d.text(((x0 + x1 - d.textlength(text, font=font(13))) / 2, (y0 + y1) / 2 - 8), text, fill=(236, 226, 190),
+               font=font(13))
+    d.text((66, 568), "Exit", fill=(236, 226, 190), font=font(14))
+    d.text((560, 12), "Single Player", fill=(236, 230, 210), font=font(18))
+    for k, label in enumerate(("The Conquerors Campaigns", "Standard Game", "Age of Kings Campaigns",
+                               "Custom Campaign", "Watching Player", "Saved and Recorded Games")):
+        y = 90 + k * 66
+        d.rectangle((472, y, 767, y + 38), fill=(22, 20, 18), outline=(200, 170, 90), width=2)
+        d.text(((1239 - d.textlength(label, font=font(17))) / 2, y + 9), label,
+               fill=(240, 200, 90) if k == 0 else (230, 225, 210), font=font(17))
+    d.text((396, 505), "Play with or against computer players, or play one of nine\nhistorical campaigns.",
+           fill=(236, 226, 190), font=font(12))
+    canvas.save(out, optimize=True)
+
+
 # --------------------------------------------------------------------------- unit list
 
 def unit_table(units: dict[str, Unit], out: Path) -> None:
@@ -605,6 +630,7 @@ def main() -> None:
     nature_sheet(out / "nature.png")
     farms_sheet(out / "farms.png", units)
     interface_sheet(out / "interface.png")
+    menu_sheet(out / "menu.png")
     unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")
 

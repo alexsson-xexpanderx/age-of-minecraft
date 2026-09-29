@@ -59,6 +59,9 @@ putting `tools/` on `sys.path`.
      ids. Their textures in `terrain.drs` are redrawn one diamond tile per frame.
    - The screen panels are full-screen pictures in `interfac.drs` (51101–51160, one per civ and screen size).
      `interface.py` repaints them by brightness class and puts item icons over the resource icons.
+   - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
+     pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
+     with exactly the known picture sizes (`menu.known`) is replaced.
    - `terrain.drs` and `interfac.drs` are searched by `Game.original`/`holders` (`Game._searched`) but kept out of
      `Game.archives`, so Pac-Man's icon and sound code sees exactly the archives it always did.
 3. `Game.layout()` takes each sprite's frames per angle, angle count and mirroring from the `.dat`, falling back
@@ -76,7 +79,8 @@ putting `tools/` on `sys.path`.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,
      `mod_language` gives the mod its own `language_x1_p1.dll` (`langdll.with_strings`: a new resource section
      added by `pe.py`) with his texts and "Age of Minecraft".
-   The standalone mod then gets its exe (`SetupAoC.exe -g:age_of_minecraft`, icon swapped in place by
+   The standalone mod then gets its exe (`SetupAoC.exe -g:AoM` makes `AoM.exe`, renamed to `age_of_minecraft.exe`;
+   UserPatch knows the mod as `UP_NAME` = `AoM`, short like WololoKingdoms' `WK`; icon swapped in place by
    `appicon.into_exe`), "Age of Minecraft" shortcuts (PowerShell, Windows only) and the original menu pictures as
    PNGs (`menu_originals/`). Last, the build writes `aom_report.txt`.
 

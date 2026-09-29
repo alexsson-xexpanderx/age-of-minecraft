@@ -39,7 +39,7 @@ The build takes about two to ten minutes, depending on your PC. It makes
 files are not changed. It writes:
 
 ```
-Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
+Games\AoM.xml                                 the UserPatch mod definition ("Age of Minecraft")
 Games\age_of_minecraft\Data\graphics.drs      your graphics with the Minecraft sprites swapped in
 Games\age_of_minecraft\Data\terrain.drs       your ground textures with Minecraft farms
 Games\age_of_minecraft\Data\interfac.drs      your screen panels in the Minecraft style
@@ -68,7 +68,7 @@ its original files back; Age of Minecraft doesn't need them.
 **No `age_of_minecraft.exe`?** The exe is made by UserPatch's installer,
 `SetupAoC.exe`, which must be in your game folder (it comes with UserPatch 1.5
 from <https://userpatch.aiscripters.net/>). Without it the shortcut still
-works: it starts your normal exe with `GAME=age_of_minecraft`, which tells
+works: it starts your normal exe with `GAME=AoM`, which tells
 UserPatch to load Age of Minecraft instead. The end of the black window (under
 **RESULT**) says which one you got; everything shown there is also saved to
 **`aom_build_log.txt`**, next to `build_mod.bat`.
@@ -104,6 +104,9 @@ each one backed up first, and **`restore_original.bat`** puts them back.
   wheat sprouts and grows. A finished farm is ripe golden wheat, and an
   exhausted farm is dry farmland. The edges blend into the
   grass as the original farms do.
+* The main menu is a snowy Minecraft village at night: the buttons are a
+  shield, an open book, crossed diamond swords, a map, an anvil and more, in
+  the same places as before, under an "AGE OF MINECRAFT" block title.
 * The panels at the top and bottom of the screen are Minecraft style. The
   parchment is the grey of Minecraft's inventory, the dark area behind the
   minimap is an inventory slot, and the carved frames are planks. The
@@ -128,7 +131,7 @@ each one backed up first, and **`restore_original.bat`** puts them back.
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.
 * Still original: cliffs, bridges, the rest of the terrain, fire and explosions, ships sinking,
-  and the menus and buttons. Unit names are unchanged, except Pac-Man's.
+  and the other menus. Unit names are unchanged, except Pac-Man's.
 
 ## Easter eggs
 

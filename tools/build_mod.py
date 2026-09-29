@@ -34,7 +34,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from aom import farmland, interface, slp  # noqa: E402
+from aom import farmland, interface, menu, slp  # noqa: E402
 from aom.datfile import Graphic, Terrain, read_graphics, read_terrains  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import blank, render_frames  # noqa: E402
@@ -70,7 +70,10 @@ def blank_group(why: str) -> str:
             return group
     return "buildings"
 
-MOD = "age_of_minecraft"  # the UserPatch data mod: Games\\age_of_minecraft, started by age2_x1\\age_of_minecraft.exe
+MOD = "age_of_minecraft"  # the mod's folder (Games\\age_of_minecraft) and exe (age2_x1\\age_of_minecraft.exe)
+# UserPatch's name for the mod: Games\\AoM.xml, SetupAoC.exe -g:AoM, age2_x1.exe GAME=AoM. Short like WololoKingdoms'
+# "WK": SetupAoC.exe writes it into the exe it makes, and did not make one for "age_of_minecraft".
+UP_NAME = "AoM"
 NAME = "Age of Minecraft"
 BACKUP = ".aom-backup"
 # the game's own name, where a language file has it as a string of its own: the mod's copy calls it NAME
@@ -95,7 +98,7 @@ CIVS = [
 
 def mod_xml() -> bytes:
     lines = ['<?xml version="1.0" encoding="utf-8"?>',
-             f'<configuration game="{MOD}">',
+             f'<configuration game="{UP_NAME}">',
              f"  <name>{NAME}</name>",
              f"  <path>{MOD}</path>",
              '  <civilizations langId="10270" descId="20150" aiNameOffset="6840" uiBaseId="51100" uiStride="20" '
@@ -331,12 +334,17 @@ def _cost(job) -> int:
         return job[4] * (job[5] // 2 + 1)
     if job[0] == "static":
         return job[3] * 4
-    if job[0] == "interface":
+    if job[0] in ("interface", "menu"):
         return 30
     return 20  # a farm texture: one render, cut into tiles
 
 
 def _render(job) -> tuple[int, bytes, int]:
+    if job[0] == "menu":
+        _, slp_id, original, palette = job
+        frames = menu.pictures(slp.decode(original), palette, Quantiser(palette))
+        data = slp.encode(frames, props=slp.frame_props(original))
+        return slp_id, data, len(frames)
     if job[0] == "interface":
         _, slp_id, original, big = job
         try:
@@ -483,6 +491,13 @@ def main(argv=None) -> int:
         for slp_id, size, data, big in interface.panels(game.original):
             jobs.append(("interface", slp_id, data, big))
             panels.append((slp_id, size))
+        data, raw = game.original(menu.MENU), game.interfac.get(menu.PALETTE, "bina")
+        if data is not None and raw is not None:
+            if menu.known([(w, h) for w, h, _, _ in slp.info(data).sizes]):
+                jobs.append(("menu", menu.MENU, data, parse_jasc(raw)))
+                panels.append((menu.MENU, (800, 600)))
+            else:
+                log(f"main menu: picture {menu.MENU} is not the one this build knows; it keeps its look")
 
     target_slps = {j[1] for j in jobs}
     blanks = {} if only else {s: why for s, why in BLANK}
@@ -550,7 +565,7 @@ def main(argv=None) -> int:
             log(f"  Or start {game.root / 'age2_x1' / (MOD + '.exe')}. Your normal game is not changed.")
         else:
             log(f"  {NAME}'s own exe needs UserPatch's SetupAoC.exe in your game folder; until it is there the")
-            log(f"  shortcut starts it with age2_x1.exe GAME={MOD}. Your normal game is not changed.")
+            log(f"  shortcut starts it with age2_x1.exe GAME={UP_NAME}. Your normal game is not changed.")
     return 0
 
 
@@ -565,31 +580,41 @@ def find_setup(root: Path) -> Optional[Path]:
 
 
 def make_exe(root: Path, log) -> bool:
-    """UserPatch starts a data mod through its own exe: SetupAoC.exe -g:<mod> creates age2_x1\\<mod>.exe."""
-    exe = root / "age2_x1" / f"{MOD}.exe"
+    """The mod's own exe: SetupAoC.exe -g:<UP_NAME> makes age2_x1\\<UP_NAME>.exe (as WololoKingdoms makes WK.exe),
+    which becomes age2_x1\\<MOD>.exe with our icon. The game's own age2_x1.exe must not change: if the installer
+    changes it anyway, it is put back as it was."""
+    age2 = pick(root, "age2_x1") or root / "age2_x1"
+    made, exe = age2 / f"{UP_NAME}.exe", age2 / f"{MOD}.exe"
     setup = find_setup(root)
     if setup is None:
         log(f"mod exe: SetupAoC.exe (the UserPatch installer) is not in {root}, so the mod exe can't be made.")
         return False
     if os.name != "nt":
-        log(f"mod exe: on Windows, run  {setup.name} -g:{MOD}  in {setup.parent}")
+        log(f"mod exe: on Windows, run  {setup.name} -g:{UP_NAME}  in {setup.parent}")
         return False
-    log(f"mod exe: running {setup} -g:{MOD}")
+    game_exe = pick(age2, "age2_x1.exe")
+    before = game_exe.read_bytes() if game_exe is not None else None
+    log(f"mod exe: running {setup} -g:{UP_NAME}")
     log("         (if a UserPatch window opens, click its Install / Run button and wait for it to finish)")
     try:
-        done = subprocess.run([str(setup), f"-g:{MOD}"], cwd=setup.parent, timeout=600, check=False,
+        done = subprocess.run([str(setup), f"-g:{UP_NAME}"], cwd=setup.parent, timeout=600, check=False,
                               capture_output=True, text=True, errors="replace")
         log(f"mod exe: SetupAoC.exe finished with code {done.returncode}")
         for line in (done.stdout + done.stderr).strip().splitlines()[-20:]:
             log("         " + line)
     except (OSError, subprocess.SubprocessError) as exc:
         log(f"mod exe: could not run SetupAoC.exe ({exc})")
+    if before is not None and game_exe.exists() and game_exe.read_bytes() != before:
+        game_exe.write_bytes(before)
+        log("mod exe: SetupAoC.exe changed your age2_x1.exe; it is put back as it was")
+    if made.exists():
+        made.replace(exe)
+        log(f"mod exe: made {exe}")
     if exe.exists():
         add_icon(exe, log)
         return True
-    folder = pick(root, "age2_x1")
-    found = sorted(p.name for p in folder.iterdir() if p.suffix.lower() == ".exe") if folder else []
-    log(f"mod exe: {exe} was not created. Exes in age2_x1: {', '.join(found) or 'none'}")
+    found = sorted(p.name for p in age2.iterdir() if p.suffix.lower() == ".exe") if age2.is_dir() else []
+    log(f"mod exe: {made.name} was not created. Exes in age2_x1: {', '.join(found) or 'none'}")
     return False
 
 
@@ -619,7 +644,7 @@ def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
     icon.write_bytes(appicon.ico())
     age2 = pick(game.root, "age2_x1") or game.root / "age2_x1"
     target = age2 / f"{MOD}.exe" if exe_ok else (pick(age2, "age2_x1.exe") or age2 / "age2_x1.exe")
-    arguments = "" if exe_ok else f"GAME={MOD}"
+    arguments = "" if exe_ok else f"GAME={UP_NAME}"
     if os.name != "nt":
         log(f"shortcut: on Windows, '{NAME}' on the desktop and in the game folder starts {target.name} {arguments}")
         return
@@ -712,8 +737,12 @@ def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Pat
                 drs.put(s, rendered[s])
             drs.write(mod_data / name)
             log(f"wrote {mod_data / name} ({len(ids)} sprites)")
-        (games / f"{MOD}.xml").write_bytes(mod_xml())
-        log(f"wrote {games / (MOD + '.xml')}")
+        (games / f"{UP_NAME}.xml").write_bytes(mod_xml())
+        log(f"wrote {games / (UP_NAME + '.xml')}")
+        old = games / f"{MOD}.xml"  # what an earlier build called the mod
+        if old.exists():
+            old.unlink()
+            log(f"removed {old} (the mod is {UP_NAME} to UserPatch now)")
         return games / MOD
     # direct: patch the game's own files, keeping the originals once
     for name, (drs, ids) in changes.items():

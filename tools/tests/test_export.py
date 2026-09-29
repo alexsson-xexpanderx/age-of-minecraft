@@ -184,6 +184,24 @@ def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
     return slp.encode([slp.SlpFrame(px, (0, 0))])
 
 
+def fake_menu() -> bytes:
+    """The Conquerors main menu's shape: an 800x600 picture and every button's pictures at their sizes."""
+    from aom import menu
+    size = {0: (800, 600)}
+    for frames, _, _ in menu.BUTTONS.values():
+        for k in frames:
+            size[k] = menu.SIZES.get(k) or size[k - 1]
+    rng = np.random.default_rng(5)
+    frames = []
+    for k in range(53):
+        w, h = size.get(k, (1, 1))
+        px = rng.integers(0, 256, (h, w)).astype(np.int16)
+        if k in (10, 14, 18, 22, 26, 30, 34, 46):  # the cut-out ones: much of them clear
+            px[:, : w // 3] = slp.TRANSPARENT
+        frames.append(slp.SlpFrame(px, (k, 2 * k)))
+    return slp.encode(frames)
+
+
 def fake_game(root: Path) -> Path:
     data = root / "Data"
     data.mkdir(parents=True)
@@ -199,7 +217,7 @@ def fake_game(root: Path) -> Path:
     interfac.put(51101, fake_panel(800, 600, []))  # its icons can't be found
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
-    interfac.put(50189, slp.encode([diamond(9)]))  # the main menu, and its palette
+    interfac.put(50189, fake_menu())  # the main menu, and its palette
     interfac.put(50589, fake_palette(), "bina")
     interfac.write(data / "interfac.drs")
     # the language files: Furious the Monkey Boy's name (5860), button (6860) and help (26860) texts
@@ -350,8 +368,9 @@ def test_full_build(tmp: Path):
     game = fake_game(tmp / "aoe2")
     assert build_mod.main(["--game", str(game), "--jobs", "2"]) == 0
     mod = game / "Games" / "age_of_minecraft"
-    xml = (game / "Games" / "age_of_minecraft.xml").read_bytes()
+    xml = (game / "Games" / "AoM.xml").read_bytes()  # UserPatch's short name for the mod, its folder is longer
     assert xml.startswith(b"\xef\xbb\xbf") and b"<path>age_of_minecraft</path>" in xml and b'id="18" name="korean"' in xml
+    assert b'<configuration game="AoM">' in xml and not (game / "Games" / "age_of_minecraft.xml").exists()
     assert b"<name>Age of Minecraft</name>" in xml
     out = Drs(mod / "Data" / "graphics.drs")
     orig = Drs(game / "Data" / "graphics.drs")
@@ -415,7 +434,7 @@ def test_full_build(tmp: Path):
     ico = (mod / "age_of_minecraft.ico").read_bytes()
     assert ico[:4] == b"\0\0\1\0" and struct.unpack_from("<H", ico, 4)[0] == 7
     assert (mod / "menu_originals" / "50189_00.png").read_bytes()[:4] == b"\x89PNG"
-    assert "menu pictures: 50189: 1 pictures (97x49)" in report
+    assert "menu pictures: 50189: 53 pictures" in report
     # his sounds: six new sounds in the .dat, their WAV files in the patch archive (on free ids)
     from aom.datfile import sound_table
     dat = datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
@@ -469,6 +488,10 @@ def test_full_build(tmp: Path):
     assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[6:23, 11:37], old[6:23, 11:37])
     assert ui.get(51101) == ui_before.get(51101)  # no icons found: it keeps its look
     assert "INTERFACE PANELS" in report and "Minecraft style" in report and "were not found" in report
+    menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu
+    assert len(menu_after) == 53 and not np.array_equal(menu_after[0].pixels, menu_before[0].pixels)
+    assert all(a.pixels.shape == b.pixels.shape and a.hotspot == b.hotspot for a, b in zip(menu_after, menu_before))
+    assert (menu_after[10].pixels < 0).mean() > 0.1 and (menu_after[11].pixels >= 0).all()
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
 
