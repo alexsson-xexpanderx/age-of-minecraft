@@ -113,6 +113,21 @@ def parse(data: bytes) -> dict[str, list[str]]:
     return out if any(k in out for k in KEYS) else {}
 
 
+def with_field(data: bytes, key: str, words: list[str]) -> bytes:
+    """A screen file with one setting's words changed; every other byte (line endings too) kept."""
+    lines = data.split(b"\n")
+    for i, line in enumerate(lines):
+        parts = line.split()
+        if parts and parts[0].decode("latin-1").lower() == key:
+            end = b"\r" if line.endswith(b"\r") else b""
+            head = line[:len(line.rstrip(b"\r")) - len(line.rstrip(b"\r").lstrip())]
+            gap = line.lstrip()[len(parts[0]):]
+            gap = gap[:len(gap) - len(gap.lstrip())] or b" "
+            lines[i] = head + parts[0] + gap + " ".join(words).encode("latin-1") + end
+            return b"\n".join(lines)
+    raise KeyError(key)
+
+
 def read(ids: list[int], get: Callable[[int], Optional[bytes]]) -> list[Screen]:
     """Every screen file among these data file ids."""
     out = []

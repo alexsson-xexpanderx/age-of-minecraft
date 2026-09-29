@@ -42,15 +42,24 @@ SIZES = {0: (800, 600), 10: (109, 184), 11: (120, 189), 14: (88, 124), 15: (97, 
          22: (121, 179), 23: (125, 187), 26: (63, 60), 27: (70, 67), 30: (94, 89), 31: (102, 97), 34: (87, 91),
          35: (95, 100), 46: (154, 60), 47: (153, 65), 49: (211, 111), 50: (427, 170)}
 # where the game writes: a dark sign under each button name, the Single Player title and its description
-SIGNS = {"learn": (5, 7, 117, 32), "single": (312, 8, 397, 40), "history": (110, 166, 198, 186),
-         "multi": (267, 219, 352, 238), "map": (199, 276, 256, 291), "options": (106, 349, 186, 368),
+SIGNS = {"learn": (5, 7, 117, 32), "single": (308, 8, 428, 40), "history": (110, 166, 198, 186),
+         "multi": (259, 218, 360, 239), "map": (199, 276, 256, 291), "options": (106, 349, 186, 368),
          "zone": (274, 369, 333, 383)}
 TITLE_SIGN = (453, 3, 775, 53)
+# buttons shown darker instead of with a glow around them (the player asked): the mouse on it, pressed
+DARKER = {"single": (0.6, 0.45)}
 DESCRIPTION = (380, 490, 790, 597)
 # the Single Player menu's six buttons (measured on photos of the game): the game draws only their edges and names,
-# so the picture gets a solid plate behind each, a little bigger, and nothing shows through them
+# so the picture gets a solid plate behind each (as wide as the button, a little taller), and nothing shows through
 SUBMENU = [(462, y, 759, y + 39) for y in (90, 155, 221, 286, 351, 417)]
 PLATE = "#1e1e1e"
+
+
+def border(palette: np.ndarray) -> int:
+    """The palette index the game should draw the buttons' border in: the plates' colour, so it doesn't show (the
+    player asked for no white border). Not the Windows colours at 0-9 and 246-255."""
+    free = np.arange(10, 246)
+    return int(free[np.abs(np.asarray(palette, float)[free, :3] - parse(PLATE)[:3] * 255).sum(1).argmin()])
 
 
 # --------------------------------------------------------------------------- drawing helpers
@@ -339,7 +348,7 @@ def scene() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     for x in range(482, 690, 44):  # a rack of diamond swords on the wall
         _blit(img, masks, None, sword(), x, 300, 2)
     for x0, y0, x1, y1 in SUBMENU:  # solid behind the Single Player menu's buttons
-        _rect(img, (x0 - 5, y0 - 5, x1 + 5, y1 + 5), PLATE)
+        _rect(img, (x0, y0 - 5, x1, y1 + 5), PLATE)
     _sign(img, masks, "title", TITLE_SIGN)
 
     # the ground: snow, and a cobblestone path
@@ -476,9 +485,12 @@ def pictures(original: list[slp.SlpFrame], palette: np.ndarray, quant: Quantiser
             picture = img[y:y + h, x:x + w].copy()
             shape = mask[y:y + h, x:x + w]
             inside = silhouette if silhouette is not None and silhouette.shape == (h, w) else None
-            colour = None if cut or alone else glow_colour(f, original[0], (x, y), palette, inside)
+            plain = cut or alone or name in DARKER
+            colour = None if plain else glow_colour(f, original[0], (x, y), palette, inside)
             if colour is not None:
                 picture[_outline(shape)] = colour
+            if name in DARKER and not cut and k in frames[1:3]:
+                picture[shape] *= DARKER[name][frames.index(k) - 1]
             px = quant.indices(np.clip(picture * 255 + 0.5, 0, 255).astype(np.int64).reshape(-1, 3)).reshape(h, w)
             px = px.astype(np.int16)
             px[(~shape) if cut else (f.pixels < 0)] = slp.TRANSPARENT

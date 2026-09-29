@@ -177,7 +177,10 @@ writes the button names and the Single Player menu over the picture. Age of
 Minecraft's menu is a snowy block village at night with a blacksmith on the
 right, and each button a Minecraft thing in the original's exact place. The
 game draws only the edges and names of the Single Player menu's buttons, so the
-picture has a solid dark plate behind each of them: nothing shows through.
+picture has a solid dark plate behind each of them: nothing shows through. Their
+light border is drawn in the plates' colour, so it doesn't show either. When
+Single Player is chosen, its shield and sign turn darker instead of glowing
+yellow.
 
 | Button | Minecraft |
 |---|---|

@@ -518,6 +518,7 @@ def main(argv=None) -> int:
             if menu.known([(w, h) for w, h, _, _ in slp.info(data).sizes]):
                 jobs.append(("menu", menu.MENU, data, parse_jasc(raw)))
                 panels.append((menu.MENU, (800, 600)))
+                menu_border(game, screen_files, parse_jasc(raw), log)
             else:
                 log(f"main menu: picture {menu.MENU} is not the one this build knows; it keeps its look")
         # the other screens: the setup screens, the dialogues, the history, the loading screen
@@ -680,6 +681,19 @@ def loading_plan(game: Game, screen_files, log) -> Optional[tuple[bytes, int, np
         log(f"loading screen: picture {screens.LOADING} is not the one this build knows; it keeps its look")
         return None
     return data, ids[0], parse_jasc(raw)
+
+
+def menu_border(game: Game, screen_files, palette: np.ndarray, log) -> None:
+    """The main menu's screen file with its bevel colours (the border the game draws around the Single Player
+    menu's buttons) set to the plates' colour, in every archive that has it."""
+    for sc in screen_files:
+        if menu.MENU not in sc.backgrounds or len(sc.fields.get("bevel_colors", [])) != 6:
+            continue
+        new = screens.with_field(game.data_file(sc.id), "bevel_colors", [str(menu.border(palette))] * 6)
+        for _, drs in game._searched():
+            if sc.id in drs.ids("bina"):
+                drs.put(sc.id, new, "bina")
+        log(f"main menu: no light border on its buttons (screen file {sc.id})")
 
 
 def draw_loading(game: Game, data: bytes, pal_id: int, palette: np.ndarray, log) -> bytes:
