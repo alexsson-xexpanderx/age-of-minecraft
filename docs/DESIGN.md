@@ -195,13 +195,28 @@ whose pictures have the sizes it was designed for.
 
 ### The other screens and the window
 
-Every other screen (game setup, options, scenario editor, history, victory,
-the dialogues) is described by a small screen file in `interfac.drs`: its
-pictures for the three screen sizes, its palette, and the colours the game
-draws its buttons and text in. The loading screen is a picture of its own.
-The build finds them all, lists them in the report and saves them as
-`screen_originals\`, so their Minecraft versions can be drawn to fit where
-the game puts its buttons and text. Those come next.
+![screens](../previews/screens.png)
+
+Every other screen (game setup, history, achievements, the dialogues in the
+game, the loading screen) is described by a small screen file in
+`interfac.drs`: its pictures for the three screen sizes, its palette, and the
+colours the game draws its buttons and text in. The build finds them all,
+lists them in the report and saves them as `screen_originals\`.
+
+Almost all of them are light parchment, and the game writes on it in black,
+or in light letters with a black shadow. So the parchment stays as light as it
+was: the **deepslate hall** makes each sheet a window in the grey of
+Minecraft's inventory, with straight edges and Minecraft's white and dark
+bevel, and everything around it deepslate tiles. The wood (the crate the
+setup screen's buttons sit on, the plaques titles are written on in white)
+becomes dark oak planks, dark as before. The dark blue and green dialogue
+backgrounds become deepslate. The history book gets two grey pages, with its
+list of topics sunk in. The loading screen is Minecraft's dark dirt with the
+block logo in grey stone (its palette has greys, not gold or green).
+
+Each picture is drawn in the palette of every screen that shows it, keeps its
+size and its see-through parts, and only the pictures the build knows, at
+their sizes, are changed. The campaign maps and the credits keep their look.
 
 The mod's own exe says **Age of Minecraft** in its window and on the taskbar:
 the text "Age of Empires II Expansion" is replaced where it stands on its own,

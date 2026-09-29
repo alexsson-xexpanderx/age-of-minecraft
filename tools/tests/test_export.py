@@ -202,6 +202,19 @@ def fake_menu() -> bytes:
     return slp.encode(frames)
 
 
+def fake_screen(w: int, h: int) -> bytes:
+    """A screen picture like the game's: a light parchment in a dark frame, with a wooden crate at the bottom."""
+    pal = parse_jasc(fake_palette())
+    lum = pal @ [0.299, 0.587, 0.114] / 255
+    allowed = [i for i in range(256) if not (16 <= i < 144 and i % 16 < 8)]
+    light, dark = max(allowed, key=lambda i: lum[i]), min(allowed, key=lambda i: lum[i])
+    wood = min(allowed, key=lambda i: np.abs(pal[i] - (110, 70, 20)).sum())
+    px = np.full((h, w), light, np.int16)
+    px[:12], px[-12:], px[:, :12], px[:, -12:] = dark, dark, dark, dark
+    px[h - 110:h - 12, w // 2:w - 12] = wood
+    return slp.encode([slp.SlpFrame(px, (0, 0))])
+
+
 def fake_game(root: Path) -> Path:
     data = root / "Data"
     data.mkdir(parents=True)
@@ -219,14 +232,20 @@ def fake_game(root: Path) -> Path:
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.put(50189, fake_menu())  # the main menu, and its palette
     interfac.put(50589, fake_palette(), "bina")
-    # a screen file (the game setup) with its pictures and palette, the loading screen no screen file names, an icon
+    # screen files: the game setup (its big picture shown by two screens, in two palettes); a picture no screen file
+    # names, the loading screen and an icon
     interfac.put(50053, b"background1_files      setup1.slp none 50100 -1\r\n"
                         b"background2_files      setup2.slp none 50101 -1\r\n"
                         b"background3_files      none none -1 -1\r\n"
                         b"palette_file           setup.pal 50532\r\n"
                         b"text_color1            255 255 255\r\n", "bina")
-    interfac.put(50532, fake_palette(), "bina")
-    for sid, (w, h) in ((50100, (800, 600)), (50101, (1024, 768)), (50163, (800, 600)), (50700, (36, 36))):
+    interfac.put(50054, b"background2_files scr2B none 50101 -1\r\npalette_file scr3 50533\r\n", "bina")
+    interfac.put(50063, b"background1_files scrstart none 50163 -1\r\npalette_file scrstart 50563\r\n", "bina")
+    for pal in (50532, 50533, 50563):
+        interfac.put(pal, fake_palette(), "bina")
+    interfac.put(50100, fake_screen(800, 600))
+    interfac.put(50101, fake_screen(1024, 768))
+    for sid, (w, h) in ((50163, (800, 600)), (50149, (640, 480)), (50700, (36, 36))):
         interfac.put(sid, slp.encode([slp.SlpFrame(np.full((h, w), 90, np.int16), (0, 0))]))
     interfac.write(data / "interfac.drs")
     # the language files: Furious the Monkey Boy's name (5860), button (6860) and help (26860) texts
@@ -460,10 +479,21 @@ def test_full_build(tmp: Path):
     assert "menu pictures: 50189: 53 pictures" in report
     # the other screens' pictures, to draw Minecraft ones over: the setup screen's, and the loading screen
     saved = sorted(p.name for p in (mod / "screen_originals").iterdir())
-    assert saved == ["50100_00.png", "50101_00.png", "50163_00.png"]
-    assert out.get(50100) is None and out.get(50163) is None  # not changed yet
+    assert saved == ["50100_00.png", "50101_00.png", "50149_00.png", "50163_00.png"]
     assert "  50053  50100 (800x600), 50101 (1024x768); palette 50532" in report
-    assert "text_color1 255 255 255" in report and "  50163  800x600" in report
+    assert "text_color1 255 255 255" in report and "  50149  640x480" in report  # not the size the build knows
+    # the screens in the Minecraft style: the parchment is the inventory's grey, the loading screen dirt
+    from aom import screens
+    ui_before = Drs(game / "Data" / "interfac.drs")
+    for sid in (50100, 50101, 50163):
+        a, b = slp.decode(ui_before.get(sid)), slp.decode(out.get(sid))
+        assert len(a) == len(b) == 1 and a[0].pixels.shape == b[0].pixels.shape
+        assert not np.array_equal(a[0].pixels, b[0].pixels)
+    grey = screens.quantise(np.full((1, 1, 3), 198 / 255), [parse_jasc(fake_palette())])[0, 0]
+    assert slp.decode(out.get(50100))[0].pixels[300, 200] == grey
+    assert out.get(50149) is None and out.get(50700) is None  # a picture it doesn't know, and an icon
+    assert "screen picture 50149 is not the one this build knows" in report
+    assert "   50163  800x600   Minecraft style" in report
     # the mod's exe: our icon, and the window says Age of Minecraft; the game's name is gone from it
     from aom import pe
     exe = (game / "age2_x1" / "age_of_minecraft.exe").read_bytes()
@@ -595,6 +625,31 @@ def test_exe_icon():
     places = [(at, at + size) for (t, _, _), (at, size, _) in pe.places(exe).items() if t == pe.RT_ICON]
     assert all(any(a <= i < b for a, b in places) for i in range(len(exe)) if exe[i] != new[i])
     assert all(new[a:b] != exe[a:b] for a, b in places)
+
+
+def test_screens():
+    """A parchment dialogue becomes a straight Minecraft window: its tears filled, its ornament painted over, its
+    plaque and frame kept apart, in the inventory's grey; quantising looks for colours good in every palette."""
+    from aom import screens
+    h, w = 300, 400
+    rgb = np.zeros((h, w, 3))
+    rgb[:] = (0.25, 0.2, 0.15)  # the dark frame
+    rgb[12:h - 12, 12:w - 12] = (0.85, 0.72, 0.5)  # the parchment
+    for x in range(30, w - 30, 40):
+        rgb[12:20, x:x + 12] = (0.25, 0.2, 0.15)  # tears in its top edge
+    rgb[40:56, 40:56] = (0.3, 0.1, 0.08)  # an ornament on it
+    rgb[12:50, 140:260] = (0.5, 0.28, 0.05)  # the wooden plaque the title is written on
+    opaque = np.ones((h, w), bool)
+    paper = screens.sheets(rgb, opaque)
+    assert paper[20:h - 14, 14:140].all() and paper[50:h - 14, 140:260].all()  # the tears and the ornament: gone
+    assert not paper[:8].any() and not paper[14:46, 144:256].any()  # the frame and the plaque stay apart
+    out = screens.hall(rgb, opaque)
+    assert np.allclose(out[150, 200], 198 / 255, atol=0.01)  # the inventory's grey
+    assert (out[25, 200] @ screens.LUMA) < 0.4  # the plaque: dark planks, so the game's white title stays readable
+    a = np.array([[0, 0, 0], [200, 200, 200], [250, 250, 250]] + [[255, 0, 0]] * 253)
+    b = np.array([[0, 0, 0], [120, 120, 120], [210, 210, 210]] + [[255, 0, 0]] * 253)
+    assert screens.quantise(np.full((1, 1, 3), 0.8), [a])[0, 0] == 1
+    assert screens.quantise(np.full((1, 1, 3), 0.8), [a, b])[0, 0] == 2  # good in both
 
 
 def test_exe_title():

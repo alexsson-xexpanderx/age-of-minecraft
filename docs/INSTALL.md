@@ -40,7 +40,7 @@ files are not changed. It writes:
 
 ```
 Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
-Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu, Pac-Man's icon and sounds
+Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, Pac-Man's icon and sounds
 Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man at the Wonder, the Javelina's own look
 Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's name, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king

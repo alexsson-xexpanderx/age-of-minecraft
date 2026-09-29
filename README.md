@@ -55,6 +55,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/farms.png` | farms, which the game draws as ground: being built, grown and exhausted |
 | `previews/interface.png` | the resource bar and bottom panel in the Minecraft style, on a stand-in for the game's own panel |
 | `previews/menu.png` | the main menu: a block village at night, with the game's texts and buttons drawn over it |
+| `previews/screens.png` | the other screens as the deepslate hall, and the loading screen, on stand-in screens |
 | `previews/player_colors.png` | a unit in all 8 player colours |
 | `previews/roster_easter.png` | the easter eggs: Pac-Man and a ghost in the cheat units' slots |
 | `previews/sounds/pacman_*.wav` | Pac-Man's sounds: clicking on him, orders, training, bites and his death |
@@ -84,7 +85,7 @@ tools/aom/gaia.py        map decorations: yurts, ruins, graves, flags, torches, 
 tools/aom/farmland.py    farms, which are terrain: Minecraft farmland and wheat in terrain.drs
 tools/aom/interface.py   the screen panels repainted: planks, inventory grey, slots and item icons
 tools/aom/menu.py        the main menu: a block village at night, every button a Minecraft thing in its place
-tools/aom/screens.py     the game's other screens: their screen files and pictures in interfac.drs
+tools/aom/screens.py     the other screens: found by their screen files, redrawn as the deepslate hall
 tools/aom/props.py       renders buildings and scenery in the original sprite's frame layout
 tools/aom/slp.py         SLP 2.0N sprite encoder/decoder
 tools/aom/drs.py         DRS archive reader/writer

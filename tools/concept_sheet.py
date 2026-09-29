@@ -19,6 +19,7 @@ Writes into previews/ by default:
     farms.png           farms, which are terrain: being built, grown and exhausted
     interface.png       the resource bar and bottom panel in the Minecraft style (on a stand-in panel)
     menu.png            the main menu, with the texts and Single Player buttons the game draws over it
+    screens.png         the other screens as the deepslate hall, and the loading screen (on stand-in screens)
 and docs/UNITS.md, the full unit list.
 """
 from __future__ import annotations
@@ -585,6 +586,62 @@ def menu_sheet(out: Path) -> None:
     canvas.save(out, optimize=True)
 
 
+def stand_in_screen(w: int, h: int, dialogue: bool) -> tuple[np.ndarray, np.ndarray]:
+    """A screen picture shaped like the game's (its own are not in this repository): RGB 0..1 and where it is
+    drawn. A parchment with torn edges and an ornament, in a dark frame; a dialogue has a wooden plaque for its
+    title and a drop shadow, a setup screen a wooden crate for its buttons."""
+    rng = np.random.default_rng(3)
+    rgb = np.clip(np.array((0.24, 0.19, 0.13)) + rng.normal(0, 0.04, (h, w, 1)), 0, 1)
+    drawn = np.ones((h, w), bool)
+    x0, y0, x1, y1 = 14, 14, w - 14, h - 14
+    if dialogue:
+        shadow = np.zeros((h, w), bool)
+        shadow[h - 12:, 12:] = shadow[12:, w - 12:] = True
+        rgb[shadow] = 0.02  # the drop shadow: every other pixel
+        drawn[shadow] = (np.indices((h, w)).sum(0) % 2 == 0)[shadow]
+        x1, y1 = w - 22, h - 22
+    paper = np.clip(np.array((0.86, 0.72, 0.5)) + rng.normal(0, 0.03, (y1 - y0, x1 - x0, 1)), 0, 1)
+    rgb[y0:y1, x0:x1] = paper
+    for x in range(x0 + 20, x1 - 20, 55):  # tears in its edges
+        rgb[y0:y0 + int(rng.integers(4, 12)), x:x + int(rng.integers(8, 20))] = (0.24, 0.19, 0.13)
+        rgb[y1 - int(rng.integers(4, 12)):y1, x + 20:x + 34] = (0.24, 0.19, 0.13)
+    rgb[y0 + 26:y0 + 70, x0 + 20:x0 + 50] = (0.4, 0.15, 0.1)  # an ornament
+    if dialogue:
+        rgb[y0:y0 + 40, w // 2 - 110:w // 2 + 110] = (0.52, 0.28, 0.05)  # the plaque
+    else:
+        rgb[h - 130:h - 14, w // 2:w - 14] = (0.36, 0.23, 0.1)  # the crate
+    return rgb, drawn
+
+
+def screens_sheet(out: Path) -> None:
+    """The deepslate hall on stand-ins for the game's screens, before and after, and the loading screen."""
+    from aom import screens
+    pics = [stand_in_screen(800, 600, False), stand_in_screen(560, 400, True)]
+    head, gap, pad = 34, 22, 14
+
+    def view(img: np.ndarray, drawn: np.ndarray) -> Image.Image:
+        v = (img * 255 + 0.5).astype(np.uint8)
+        v[~drawn] = GRASS[0]
+        return Image.fromarray(v)
+
+    rows = [[view(rgb, drawn), view(screens.hall(rgb, drawn), drawn)] for rgb, drawn in pics]
+    rows.append([view(screens.loading((600, 800)), np.ones((600, 800), bool))])
+    width = max(sum(im.width for im in r) + pad * (len(r) - 1) for r in rows)
+    canvas = Image.new("RGB", (width, head + sum(gap + r[0].height for r in rows)), PAPER)
+    d = ImageDraw.Draw(canvas)
+    d.text((10, 8), "The other screens, as the deepslate hall (the build redraws your own)", fill=INK, font=font(20))
+    y = head
+    for label, r in zip(("a setup screen: a stand-in, and after", "a dialogue: a stand-in, and after",
+                         "the loading screen"), rows):
+        d.text((10, y + 3), label, fill=MUTED, font=font(13))
+        x = 0
+        for im in r:
+            canvas.paste(im, (x, y + gap))
+            x += im.width + pad
+        y += gap + r[0].height
+    canvas.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, optimize=True)
+
+
 # --------------------------------------------------------------------------- unit list
 
 def unit_table(units: dict[str, Unit], out: Path) -> None:
@@ -631,6 +688,7 @@ def main() -> None:
     farms_sheet(out / "farms.png", units)
     interface_sheet(out / "interface.png")
     menu_sheet(out / "menu.png")
+    screens_sheet(out / "screens.png")
     unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")
 

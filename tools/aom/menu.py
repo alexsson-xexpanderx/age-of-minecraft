@@ -194,13 +194,17 @@ def compass() -> np.ndarray:
                    {"k": "#2a2a2a", "g": "#8a8a8a", "d": "#3a3a4a", "r": "#d83030", "w": "#e8e8e8"})
 
 
+LOGO = (("AGE OF", "gold_block", None, 2), ("MINECRAFT", "cobblestone", "grass_block", 3))  # text, block, top, depth
+STONE_LOGO = (("AGE OF", "smooth_stone", None, 2), ("MINECRAFT", "cobblestone", "stone", 3))  # grey only
+
+
 @lru_cache(maxsize=None)
-def logo(width: int) -> np.ndarray:
+def logo(width: int, blocks: tuple = LOGO) -> np.ndarray:
     """ "AGE OF MINECRAFT" in blocks, like Minecraft's own title: RGBA 0..1, `width` pixels wide."""
     from .render import Camera, fit_camera, render
     from .textures import Painter  # noqa: F401  (block textures are painted on first use)
     lines = []
-    for text, face, top, depth in (("AGE OF", "gold_block", None, 2), ("MINECRAFT", "cobblestone", "grass_block", 3)):
+    for text, face, top, depth in blocks:
         s = V.Structure("logo")
         x = 0
         for ch in text:

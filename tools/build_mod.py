@@ -346,12 +346,16 @@ def _cost(job) -> int:
         return job[4] * (job[5] // 2 + 1)
     if job[0] == "static":
         return job[3] * 4
-    if job[0] in ("interface", "menu"):
+    if job[0] in ("interface", "menu", "screen"):
         return 30
     return 20  # a farm texture: one render, cut into tiles
 
 
 def _render(job) -> tuple[int, bytes, int]:
+    if job[0] == "screen":
+        _, slp_id, original, palettes = job
+        data = screens.encode(slp_id, original, palettes)
+        return slp_id, data, slp.info(data).num_frames
     if job[0] == "menu":
         _, slp_id, original, palette = job
         frames = menu.pictures(slp.decode(original), palette, Quantiser(palette))
@@ -498,6 +502,7 @@ def main(argv=None) -> int:
             farms.append((slp_id, stage, source, n))
 
     # the panels at the top and bottom of the screen, one picture per civilisation and screen size
+    screen_files, screen_pictures = game.screens()
     panels: list[tuple[int, tuple[int, int]]] = []
     if only is None or "interface" in only:
         for slp_id, size, data, big in interface.panels(game.original):
@@ -510,6 +515,20 @@ def main(argv=None) -> int:
                 panels.append((menu.MENU, (800, 600)))
             else:
                 log(f"main menu: picture {menu.MENU} is not the one this build knows; it keeps its look")
+        # the other screens: the setup screens, the dialogues, the history, the loading screen
+        shown_in = screens.palettes(screen_files)
+        for sid in sorted(screens.RESTYLED):
+            data = game.original(sid)
+            if data is None:
+                continue
+            if not screens.fits(sid, data):
+                log(f"screen picture {sid} is not the one this build knows; it keeps its look")
+                continue
+            raws = [game.data_file(p) for p in shown_in.get(sid, [screens.MAIN_PALETTE])]
+            palettes = [parse_jasc(raw) for raw in raws if raw]
+            if palettes:
+                jobs.append(("screen", sid, data, palettes))
+                panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
 
     target_slps = {j[1] for j in jobs}
     blanks = {} if only else {s: why for s, why in BLANK}
@@ -519,9 +538,8 @@ def main(argv=None) -> int:
     blanks = {s: why for s, why in blanks.items() if s not in target_slps and game.original(s) is not None}
 
     log(f"plan: {len(jobs) - len(statics) - len(farms) - len(panels)} unit sprites, {len(statics)} building/scenery "
-        f"sprites, {len(farms)} farm textures and {len(panels)} interface panels to render, {len(blanks)} layers to "
+        f"sprites, {len(farms)} farm textures and {len(panels)} interface pictures to render, {len(blanks)} layers to "
         f"blank, {len(skipped)} skipped")
-    screen_files, screen_pictures = game.screens()
     if args.dry_run:
         write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics, farms, panels,
                      screen_files=screen_files, screen_pictures=screen_pictures)
@@ -1049,7 +1067,7 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
     lines += ["", "FARMS (terrain texture slp, stage, found by, tiles)"]
     lines += [f"  {s:6d}  {stage:8s} {farmland.STAGES[stage]:32s} {source:28s} {n:3d} tiles"
               for s, stage, source, n in farms]
-    lines += ["", "INTERFACE PANELS (slp, screen size, result)"]
+    lines += ["", "INTERFACE PANELS AND SCREENS (slp, size, result)"]
     for s, (w, h) in panels:
         result = "planned" if failed is None else ("Minecraft style" if s not in failed else failed[s])
         lines.append(f"  {s:6d}  {w}x{h:<5d} {result}")

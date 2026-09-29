@@ -62,6 +62,11 @@ putting `tools/` on `sys.path`.
    - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
      pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
      with exactly the known picture sizes (`menu.known`) is replaced.
+   - The other screens (`screens.RESTYLED`: setup screens, dialogues, history, achievements, loading screen 50163) are
+     found through the screen files (`screens.read`, `Game.screens`) and redrawn by `screens.hall`: parchment
+     (`screens.sheets`) becomes Minecraft's inventory grey, frames deepslate, wood dark oak, keeping the original's
+     lightness so the game's black text and light text with black shadow stay readable. `screens.quantise` picks
+     colours good in every palette a picture is shown in; `LAYOUTS` gives the sheets of a few pictures by hand.
    - `terrain.drs` and `interfac.drs` are searched by `Game.original`/`holders` (`Game._searched`) but kept out of
      `Game.archives`, so Pac-Man's icon and sound code sees exactly the archives it always did.
 3. `Game.layout()` takes each sprite's frames per angle, angle count and mirroring from the `.dat`, falling back
