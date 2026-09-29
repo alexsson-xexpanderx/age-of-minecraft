@@ -324,27 +324,35 @@ def loading(shape: tuple[int, int]) -> np.ndarray:
     return out
 
 
+BANNER_GROW = (6, 6, 20)  # a banner is this much taller above and below, and wider, than the flag it replaces
+
+
 def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """A flag (RGB 0..1, and where it is drawn) as a Minecraft banner the size of the original: wool in the flag's
-    own colours (they are in its palette) on a dark oak pole, its end cut like a swallowtail, and across its middle,
-    where the game writes the player's name (on two lines if it is long), a black stripe (Minecraft's "fess"
-    pattern), so a name in white or in a player's colour can be read on it."""
-    h, w = opaque.shape
+    """A flag (RGB 0..1, and where it is drawn) as a Minecraft banner, BANNER_GROW bigger than the original (its
+    hotspot moves down with it, so it stays centred on the name): wool in the flag's own colours (they are in its
+    palette) on a dark oak pole, its end cut like a swallowtail, and across it, where the game writes the player's
+    name, a black stripe (Minecraft's "fess" pattern) with room for a long name on two lines, so a name in white
+    or in a player's colour can be read on it."""
+    h0, w0 = opaque.shape
     rows = np.nonzero(opaque.mean(1) > 0.6)[0]  # the original's cloth, not the shadow under it
-    top, bottom = (int(rows.min()), int(rows.max()) + 1) if len(rows) else (4, h - 6)
-    mid = (top + bottom) // 2
-    ys, xs = np.mgrid[0:h, 0:w]
-    cloth_px = rgb[opaque & (ys >= top) & (ys < bottom)]
+    top0, bottom0 = (int(rows.min()), int(rows.max()) + 1) if len(rows) else (4, h0 - 6)
+    ys0 = np.mgrid[0:h0, 0:w0][0]
+    cloth_px = rgb[opaque & (ys0 >= top0) & (ys0 < bottom0)]
     if len(cloth_px):  # its own colour: the pixels nearest its usual hue (not the green shadow's)
         hue = cloth_px - (cloth_px @ LUMA)[:, None]
         off = np.abs(hue - np.median(hue, axis=0)).sum(1)
         cloth_px = cloth_px[off <= np.percentile(off, 60)]
     ramp = cloth_px[np.argsort(cloth_px @ LUMA)] if len(cloth_px) else np.full((1, 3), 0.5)
+    up, down, wider = BANNER_GROW
+    h, w = h0 + up + down, w0 + wider
+    top, bottom = top0 + up - 5, bottom0 + up + 5  # the cloth, 10 pixels taller than the flag's
+    mid = (top + bottom) // 2
+    ys, xs = np.mgrid[0:h, 0:w]
     wool = V.all_blocks()["white_wool"].faces["front"][..., :3] @ LUMA
     shade = (wool - wool.min()) / max(1e-6, np.ptp(wool))  # the wool's weave, 0..1
     shade = np.tile(shade.repeat(I.PIXEL, 0).repeat(I.PIXEL, 1), (h // (16 * I.PIXEL) + 1, w // (16 * I.PIXEL) + 1))
     out = ramp[((0.35 + 0.35 * shade[:h, :w]) * (len(ramp) - 1)).astype(int)]  # its middle tones, not the folds
-    stripe = (ys >= top + 5) & (ys < bottom - 5)  # tall enough for a name on two lines
+    stripe = (ys >= top + 5) & (ys < bottom - 5)
     out[stripe] = _tiled("black_wool", (h, w), 0.09)[stripe]
     cloth = (ys >= top) & (ys < bottom) & (xs >= 6) & (xs < w - 1)
     cloth &= ~(w - 1 - xs < (bottom - top) // 2 - np.abs(ys - mid) * 0.9)  # the swallowtail cut
@@ -465,9 +473,10 @@ def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0
         rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
         new, drawn = (banner(rgb, opaque) if sid == FLAGS else tab(rgb, opaque) if sid == TABS
                       else team_mark(k, opaque))
-        out = np.full(px.shape, slp.TRANSPARENT, np.int16)
+        out = np.full(drawn.shape, slp.TRANSPARENT, np.int16)
         out[drawn] = quantise(new, palettes)[drawn]
-        return slp.SlpFrame(out, frame.hotspot)
+        hx, hy = frame.hotspot
+        return slp.SlpFrame(out, (hx, hy + (BANNER_GROW[0] if sid == FLAGS else 0)))
     rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
     new = loading(px.shape) if sid == LOADING else hall(rgb, opaque, sid)
     out = px.copy()

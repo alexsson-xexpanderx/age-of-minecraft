@@ -512,13 +512,17 @@ def test_full_build(tmp: Path):
     assert out.get(50149) is None and out.get(50700) is None  # a picture it doesn't know, and an icon
     assert "screen picture 50149 is not the one this build knows" in report
     assert "   50163  800x600   Minecraft style" in report
-    banners = slp.decode(out.get(50762))  # the flags: banners, each its own size, with a dark stripe for the name
-    assert [f.pixels.shape for f in banners] == [f.pixels.shape for f in flags_before]
+    banners = slp.decode(out.get(50762))  # the flags: banners a bit bigger, with a dark stripe for the name
+    up, down, wider = screens.BANNER_GROW
+    assert [f.pixels.shape for f in banners] == [(a + up + down, b + wider) for a, b in
+                                                 (f.pixels.shape for f in flags_before)]
+    assert [f.hotspot for f in banners] == [(x, y + up) for x, y in (f.hotspot for f in flags_before)]
     ach = parse_jasc(fake_palette())
     for f in banners:
         px = f.pixels
-        assert (px[21, 20:100] >= 0).all() and (ach[px[21, 20:100]] @ [0.299, 0.587, 0.114]).max() < 60
-        assert (px[40:, 10:] == slp.TRANSPARENT).all()  # no shadow under it
+        for row in (21 + up - 8, 21 + up, 21 + up + 8):  # room for two lines
+            assert (px[row, 20:120] >= 0).all() and (ach[px[row, 20:120]] @ [0.299, 0.587, 0.114]).max() < 60
+        assert (px[38 + up + 12:, 10:] == slp.TRANSPARENT).all()  # no shadow under it
     tabs = slp.decode(out.get(50765))  # Minecraft tabs: their top rows (under the buttons) left out
     assert len(tabs) == 12 and all((f.pixels[:14] == slp.TRANSPARENT).all() for f in tabs)
     assert all((tabs[k].pixels[17:20, 40] >= 0).all() for k in range(1, 12, 2))  # a chosen one opens upwards

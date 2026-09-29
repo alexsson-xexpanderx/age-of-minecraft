@@ -221,7 +221,8 @@ window's grey, opening into it, the others darker. Their top rows used to carry
 on the parchment under the Play Again and Main Menu buttons; those rows are left
 out, so the tabs no longer run into the buttons. The flags the players' names
 are written on become Minecraft banners in the flag's own colour, on a dark oak
-pole, with a black stripe across them (room for a name on two lines). The team
+pole, a little taller and wider than the flags, with a black stripe across
+them that holds a long name on two lines. The team
 marks are Minecraft shields with the team's number, and a dash for no team.
 
 Each picture is drawn in the palette of every screen that shows it, keeps its
