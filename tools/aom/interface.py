@@ -18,14 +18,18 @@ Each picture is repainted in the Minecraft style, every pixel keeping its place:
   game's white and black text stays readable on it;
 * where the panels meet the game view they get a black edge, like every Minecraft window;
 * the five resource icons in the top bar (wood, food, gold, stone, population) become an oak log, a leg of meat, a
-  gold ingot, cobblestone and a villager's face.
+  gold block, cobblestone and a villager's face, each filling its square, so they line up.
 
 Every panel picture, at every size, has its five icons every 77 pixels from x 8, each followed by a dark box
 that ends 69 pixels after the icon's left edge; only the rows differ (4-21 at 800x600 and 1024x768, 10-27 at
 1280x1024). The build finds those dark boxes (`places`) and lays the bar out on them; a picture whose boxes are
-not there is left as it was, so no resource ever loses its icon. The game starts a five-digit amount about 23
-pixels after the icon and ends it about 65 after (measured on photos of the game): the box, 20 to 68, has it in
-its middle.
+not there is left as it was, so no resource ever loses its icon. The game writes each amount right-aligned,
+ending 66 pixels after the icon's left edge (measured on photos of the game), so a longer amount reaches further
+left: the box, 17 to 71, has a five-digit amount in its middle and room for "4/1000".
+
+UserPatch draws its own food icon (`FOOD`, a steak on black, 22x17) over the bar's, at the icon's left edge and
+the box's top row, in every panel: it becomes the bar's leg of meat at the same place, on clear pixels
+(`food_icon`), or the steak would hide it.
 """
 from __future__ import annotations
 
@@ -43,8 +47,9 @@ from .textures import Painter, parse
 BASE, STRIDE = 51100, 20
 SCREENS = ((800, 600), (1024, 768), (1280, 1024))
 FIRST, STEP = 8, 77  # the resource bar: an icon every 77 pixels from x 8, at every screen size
-CELL = 16  # each resource's item is drawn in a 16x16 square, 2 pixels from the icon's left edge
-BOX = (20, 68)  # the box the game writes the amount in, from the icon's left edge
+CELL = 16  # each resource's item fills a 16x16 square from 1 pixel before the icon's left edge...
+BOX = (17, 71)  # ...then 2 pixels on, the box the game writes the amount in (from the icon's left edge)
+FOOD = 53010  # UserPatch's food icon, which it draws over the bar's
 RESOURCES = ("wood", "food", "gold", "stone", "population")
 GUI = {"panel": "#c6c6c6", "light": "#ffffff", "shade": "#555555", "edge": "#000000",
        "slot": "#8b8b8b", "slot_light": "#ffffff", "slot_shade": "#373737",
@@ -251,14 +256,17 @@ def restyle(rgb: np.ndarray, opaque: np.ndarray) -> np.ndarray:
     out[counts] = parse(GUI["count"])[:3]  # flat, no shading
     out[opaque & ~_shrink(opaque, PIXEL)] = parse(GUI["edge"])[:3]  # a black edge along the game view
     for x, what in zip(xs, RESOURCES):  # each in the same square: all in line, all as far from their box
+        dx, dy = _item_place(bottom - top)
+        region = out[top + dy:top + dy + CELL, x + dx:x + dx + CELL]
         icon = item(what)
-        ih, iw = icon.shape[:2]
-        x0 = x + BOX[0] - 2 - CELL + (CELL - iw) // 2
-        y0 = top + (bottom - top - CELL) // 2 + (CELL - ih) // 2
-        region = out[y0:y0 + ih, x0:x0 + iw]
-        solid = (icon[..., 3] > 0) & opaque[y0:y0 + ih, x0:x0 + iw]
+        solid = (icon[..., 3] > 0) & opaque[top + dy:top + dy + CELL, x + dx:x + dx + CELL]
         region[solid] = icon[..., :3][solid]
     return out
+
+
+def _item_place(rows: int) -> tuple[int, int]:
+    """Where an item's square goes, from the icon's left edge and the box's top row (the box is `rows` high)."""
+    return BOX[0] - 2 - CELL, (rows - CELL) // 2
 
 
 def repaint(codes: np.ndarray, palette: np.ndarray, quant: Quantiser) -> np.ndarray:
@@ -274,6 +282,26 @@ def encode(original: bytes, palette: np.ndarray, quant: Quantiser) -> bytes:
     """The repainted picture, same frames and sizes; raises ValueError if its resource bar is not the known one."""
     frames = slp.decode(original)
     out = [slp.SlpFrame(repaint(f.pixels, palette, quant), f.hotspot) for f in frames]
+    return slp.encode(out, props=slp.frame_props(original))
+
+
+def food_icon(original: bytes, quant: Quantiser) -> bytes:
+    """UserPatch's food icon, same frames and sizes: the bar's leg of meat, where the bar has it (the frame's top
+    left is the icon's left edge and the box's top row), the rest clear, so the bar shows around it."""
+    icon = item("food")
+    solid = icon[..., 3] > 0
+    codes = quant.indices(np.clip(icon[..., :3][solid] * 255 + 0.5, 0, 255).astype(np.int64))
+    out = []
+    for f in slp.decode(original):
+        h, w = f.pixels.shape
+        px = np.full((h, w), slp.TRANSPARENT, np.int16)
+        dx, dy = _item_place(h)
+        x0, y0 = max(dx, 0), max(dy, 0)  # (a smaller picture than UserPatch's shows what fits)
+        square = np.full((CELL, CELL), slp.TRANSPARENT, np.int16)
+        square[solid] = codes
+        part = square[y0 - dy:y0 - dy + h - y0, x0 - dx:x0 - dx + w - x0]
+        px[y0:y0 + part.shape[0], x0:x0 + part.shape[1]] = part
+        out.append(slp.SlpFrame(px, f.hotspot))
     return slp.encode(out, props=slp.frame_props(original))
 
 
@@ -297,18 +325,6 @@ ART = {
              {"k": "#2e0a08", "r": "#b8402c", "R": "#e07a5c", "d": "#7e2a1c", "w": "#f2eee0"}),
     "population": (None, {"k": "#24160c", "s": "#b8866c", "b": "#4a2c22", "w": "#f0f0f0", "g": "#2f8a3a",
                           "n": "#9a6c56", "m": "#7a5040"}),
-    "gold": (["................",
-              "................",
-              "................",
-              ".....kkkkkkk....",
-              "....kyyyyyyyk...",
-              "...kyWWWWWWyyk..",
-              "..kyyyyyyyyyyyk.",
-              "..kooooooooooyk.",
-              "..koooooooooook.",
-              "...kkkkkkkkkkk..",
-              "................"],
-             {"k": "#5a3e08", "y": "#f2d33a", "W": "#fff6a0", "o": "#c89a18"}),
 }
 
 
@@ -328,19 +344,22 @@ def _outlined(rows: list[str]) -> list[str]:
 
 @lru_cache(maxsize=None)
 def item(what: str) -> np.ndarray:
-    """A resource icon, RGBA 0..1: drawn items for food and gold, a villager's face for population, little blocks
-    for the rest."""
+    """A resource icon, RGBA 0..1, CELL x CELL, in the middle of its square: a drawn leg of meat for food, a
+    villager's face for population, little blocks for the rest (all as big, so they line up)."""
     if what in ART:
         rows, legend = ART[what]
         if rows is None:  # population: a villager's face, like the one on the menu's Learn to Play banner
             rows = _outlined(_doubled(VILLAGER))
-        tex = Painter(f"icon_{what}").grid(rows, {".": None, **legend}, noise=0.04)
-        return tex[..., :4]
-    s = V.Structure(what, origin=(0.5, 0.5))
-    s.set(0, 0, 0, "oak_log" if what == "wood" else "cobblestone")
-    root, scale = s.part(V.all_blocks()), 0.58  # a block, no bigger than the 16x16 square
-    cam = fit_camera(root, V.BUILDING_HEADING, scale=scale, pad=1)
-    frame = render(root, V.BUILDING_HEADING, camera=cam, shadow=False)
-    rgba = frame.to_rgba().astype(np.float64) / 255
+        rgba = Painter(f"icon_{what}").grid(rows, {".": None, **legend}, noise=0.04)[..., :4]
+    else:
+        s = V.Structure(what, origin=(0.5, 0.5))
+        s.set(0, 0, 0, {"wood": "oak_log", "gold": "gold_block"}.get(what, "cobblestone"))
+        root, scale = s.part(V.all_blocks()), 0.58  # a block, no bigger than the 16x16 square
+        cam = fit_camera(root, V.BUILDING_HEADING, scale=scale, pad=1)
+        rgba = render(root, V.BUILDING_HEADING, camera=cam, shadow=False).to_rgba().astype(np.float64) / 255
     ys, xs = np.nonzero(rgba[..., 3] > 0)
-    return rgba[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    rgba = rgba[ys.min():ys.max() + 1, xs.min():xs.max() + 1][:CELL, :CELL]
+    out = np.zeros((CELL, CELL, 4))
+    y0, x0 = (CELL - rgba.shape[0]) // 2, (CELL - rgba.shape[1]) // 2
+    out[y0:y0 + rgba.shape[0], x0:x0 + rgba.shape[1]] = rgba
+    return out

@@ -156,15 +156,18 @@ widescreen panels from the same pictures. The build repaints each one, every pix
 | AoE2 | Minecraft |
 |---|---|
 | Parchment (where the game writes the unit's details) | the grey of Minecraft's inventory, with a black edge, a white bevel at the top left and a dark one at the bottom right |
-| The resource bar (the game writes the amounts in white) | one layout in every picture: each item the same size, in line, and 2 pixels after it a flat, nearly black box with the amount in its middle |
+| The resource bar (the game writes the amounts in white) | one layout in every picture: each item the same size, in line, and 2 pixels after it a flat, nearly black box, wide enough for "4/1000", with a five-digit amount in its middle |
 | Dark areas (behind the minimap) | an inventory slot, sunk in |
 | Carved frames | planks, as dark or light as the original frame, so the game's text stays readable |
-| Resource icons: wood, food, gold, stone, population | an oak log, a leg of meat, a gold ingot, cobblestone, a villager's face |
+| Resource icons: wood, food, gold, stone, population | an oak log, a leg of meat, a gold block, cobblestone, a villager's face, all as big |
 | Where a panel meets the game view | a black edge, like every Minecraft window |
 
-The icons sit at fixed places in the 1280x1024 pictures. In the 800x600 and 1024x768 pictures they are found
-by matching the same civilisation's 1280x1024 icons; a picture whose icons aren't found keeps its original
-look, so no resource loses its icon.
+Every panel picture has the same bar: an icon every 77 pixels, each followed by a dark box. The game writes
+each amount right-aligned in it, so a longer amount reaches further left, and the new box is widest on its left.
+A picture whose boxes aren't there keeps its original look, so no resource loses its icon.
+
+UserPatch draws a food icon of its own over the bar's: a steak on a black square. The build redraws it as the
+bar's leg of meat, in the same place, with nothing around it, so the bar shows through.
 
 ### The main menu
 

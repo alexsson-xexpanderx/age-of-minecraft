@@ -60,8 +60,10 @@ putting `tools/` on `sys.path`.
    - The screen panels are full-screen pictures in `interfac.drs` (51101–51160, one per civ and screen size).
      `interface.py` repaints them by brightness class and puts item icons over the resource icons.
      The resource bar has one fixed layout in every picture (`interface.places`: an icon every 77 px from x 8, the
-     game's dark amount box ending 69 px after it); each item goes in a 16x16 square, and a flat near-black box
-     (`BOX`, 20-68 from the icon) holds the amount.
+     game's dark amount box ending 69 px after it); each item fills a 16x16 square, and a flat near-black box
+     (`BOX`, 17-71 from the icon) holds the amount, which the game writes right-aligned, ending at icon + 66.
+     UserPatch draws its own food icon (`interface.FOOD`, 53010, a steak on black) over the bar's; `food_icon`
+     makes it the bar's meat at the same place, the rest clear.
    - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
      pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
      with exactly the known picture sizes (`menu.known`) is replaced. Names sit on Minecraft buttons drawn where a

@@ -376,6 +376,10 @@ def _render(job) -> tuple[int, bytes, int]:
                                         f.pixels).astype(np.int16), f.hotspot) for f in slp.decode(original)]
         data = slp.encode(frames, props=slp.frame_props(original))
         return slp_id, data, len(frames)
+    if job[0] == "food":  # UserPatch's food icon, which it draws over the bar's: the bar's, on clear pixels
+        _, slp_id, original = job
+        data = interface.food_icon(original, _STATE["quant"])
+        return slp_id, data, slp.info(data).num_frames
     if job[0] == "interface":
         _, slp_id, original = job
         try:
@@ -524,6 +528,10 @@ def main(argv=None) -> int:
         for slp_id, size, data in interface.panels(game.original):
             jobs.append(("interface", slp_id, data))
             panels.append((slp_id, size))
+        data = game.original(interface.FOOD)
+        if data is not None:  # UserPatch's own food icon (a steak on black), drawn over the bar's
+            jobs.append(("food", interface.FOOD, data))
+            panels.append((interface.FOOD, tuple(slp.info(data).sizes[0][:2])))
         data, raw = game.original(menu.MENU), game.interfac.get(menu.PALETTE, "bina")
         old_menu = new_menu = None  # the main menu's palette, and its new one
         if data is not None and raw is not None:

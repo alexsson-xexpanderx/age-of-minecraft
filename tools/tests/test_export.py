@@ -225,6 +225,7 @@ def fake_game(root: Path) -> Path:
     interfac.put(51141, fake_panel(1280, 1024, [(x, 10) for x in icons]))  # a civilisation's panels at 1280x1024
     interfac.put(51121, fake_panel(1024, 768, [(x, 4) for x in icons]))  # at 1024x768 six rows higher
     interfac.put(51101, fake_panel(800, 600, []))  # a bar without the boxes: not one the build knows
+    interfac.put(53010, slp.encode([slp.SlpFrame(np.full((17, 22), 0, np.int16), (0, 0))]))  # UserPatch's steak
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.put(50189, fake_menu())  # the main menu, and its palette
@@ -616,10 +617,14 @@ def test_full_build(tmp: Path):
     assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
     box = quant.indices(np.array([[30, 30, 30]]))[0]
     for x in (8 + 77 * k for k in range(5)):  # each amount's box: flat, nearly black, no shading, all alike
-        assert (new[10:27, x + 20:x + 68] == box).all() and (new[10:27, x + 18:x + 20] != box).all()
+        assert (new[10:27, x + 17:x + 71] == box).all() and (new[10:27, x + 15:x + 17] != box).all()
+    steak = slp.decode(ui.get(53010))  # UserPatch's food icon, drawn over the bar's: the bar's, the rest clear
+    assert len(steak) == 1 and steak[0].pixels.shape == (17, 22) and steak[0].hotspot == (0, 0)
+    drawn = steak[0].pixels >= 0
+    assert 0 < drawn.sum() < drawn.size and np.array_equal(new[10:27, 85:107][drawn], steak[0].pixels[drawn])
     new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels
     assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[4:21, 8:26], old[4:21, 8:26])
-    assert (new[4:21, 28:76] == box).all()
+    assert (new[4:21, 25:79] == box).all()
     assert ui.get(51101) is None  # its bar is not the known one: it keeps its look
     assert "INTERFACE PANELS" in report and "Minecraft style" in report and "is not the one this build knows" in report
     menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu

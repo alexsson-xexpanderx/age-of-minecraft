@@ -553,8 +553,9 @@ def interface_sheet(out: Path) -> None:
     for img in (before_img, after_img):  # the amounts, as the game writes them: white with a black shadow
         pic = Image.fromarray(img)
         d = ImageDraw.Draw(pic)
-        for k, amount in enumerate(("40000", "40000", "20000", "10000", "4/5")):  # where the game writes them
-            x = interface.FIRST + interface.STEP * k + 23
+        for k, amount in enumerate(("39900", "40000", "20000", "10000", "4/1000")):  # where the game writes them:
+            end = interface.FIRST + interface.STEP * k + 66  # right-aligned, 66 pixels after the icon's left edge
+            x = end - d.textlength(amount, font=font(12))
             d.text((x, 12), amount, fill=(255, 255, 255), font=font(12), stroke_width=1, stroke_fill=(0, 0, 0))
         img[...] = np.asarray(pic)
     canvas = Image.new("RGB", (before_img.shape[1], head + 2 * (before_img.shape[0] + gap)), PAPER)
