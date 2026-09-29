@@ -11,8 +11,10 @@ Almost every screen is a light parchment the game writes on, in black or in ligh
 the "deepslate hall" keeps the parchment as light as it was: each sheet becomes a window in the grey of
 Minecraft's inventory, with straight edges (its tears filled, what sticks out cut off) and Minecraft's bevel;
 the dark frames around it become deepslate tiles and the wood (crates, the plaques titles are written on) dark oak
-planks, as dark as the original. Dark pictures (the blue and green dialogue backgrounds) become deepslate, and the
-loading screen Minecraft's dark dirt with the block logo in grey stone. Each picture is drawn in every palette the
+planks, as dark as the original. Pictures without parchment (the achievements, the blue and green dialogue
+backgrounds) are one solid colour, the grey of Minecraft's inventory slots: the game writes the achievements in
+each player's colour, and on a texture or a dark or light background some of those can't be read. A wooden board
+is solid dark oak. The loading screen is Minecraft's dark dirt with the block logo in grey stone. Each picture is drawn in every palette the
 game shows it in (`quantise`), and only the pictures in RESTYLED, at those sizes, are changed.
 """
 from __future__ import annotations
@@ -34,6 +36,7 @@ MAIN_PALETTE = 50500
 INTERFACE = range(50000, 60000)  # the ids of interfac.drs's files (the sprites' ids are lower)
 PANELS = range(51101, 51161)  # the in-game panels: interface.py
 MIN_SIZE = (250, 130)  # smaller pictures are buttons and icons, not screens
+ALSO_SAVED = (50761, 50762, 50765, 50769)  # smaller pictures of the achievements: icons, flags, tabs, team shields
 LOADING = 50163  # the Conquerors' loading screen (screen file 50063)
 RESTYLED = {  # picture -> its size: the screens this module redraws
     50100: (800, 600), 50101: (1024, 768), 50102: (1280, 1024), 50103: (800, 600), 50104: (800, 600),  # setup
@@ -52,6 +55,7 @@ LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
 LUMA = I.LUMA
 PAPER, DARK = 0.38, 0.45  # parchment is lighter than PAPER; a picture darker than DARK on average is all deepslate
 STONE, WOOD = 0.3, 0.24  # how light the deepslate and the planks are
+SOLID = I.GUI["slot"]  # a picture without parchment: every player colour can be read on it
 
 
 @dataclass
@@ -121,7 +125,7 @@ def pictures(screens: list[Screen], slp_ids: list[int], get: Callable[[int], Opt
             sizes = slp.info(data).sizes if data else []
         except (ValueError, IndexError):
             continue
-        if any(w >= MIN_SIZE[0] and h >= MIN_SIZE[1] for w, h, _, _ in sizes):
+        if sid in ALSO_SAVED or any(w >= MIN_SIZE[0] and h >= MIN_SIZE[1] for w, h, _, _ in sizes):
             out[sid] = MAIN_PALETTE
     return out
 
@@ -257,11 +261,14 @@ def hall(rgb: np.ndarray, opaque: np.ndarray, sid: int = 0) -> np.ndarray:
     shadow = rest & (lum < 0.07) & ~I._shrink(opaque, 3)  # the dots of a drop shadow outside: they stay
     warm = (rgb[..., 0] - rgb[..., 2] > 0.2).astype(np.float64)
     wood = rest & ~shadow & (_blur(warm, 3, rest) > 0.5)
-    wood = _boxes(_opening(wood, 3), 0.01 * opaque.size) & rest & ~shadow if paper.any() else wood
-    if not paper.any():  # a dark picture: all of it one thing, wood (a wooden board) or deepslate
-        wood = rest & ~shadow if wood.sum() > 0.5 * rest.sum() else np.zeros_like(wood)
-    stone = rest & ~shadow & ~wood
     out = rgb.copy()
+    if not paper.any():  # no parchment: the game writes straight on it, so one solid colour
+        tex = V.all_blocks()["dark_oak_planks"].faces["front"][..., :3].reshape(-1, 3).mean(0)
+        board = wood.sum() > 0.5 * rest.sum()  # a wooden board
+        out[rest & ~shadow] = tex * WOOD / (tex @ LUMA) if board else colour(SOLID)[:3]
+        return out
+    wood = _boxes(_opening(wood, 3), 0.01 * opaque.size) & rest & ~shadow
+    stone = rest & ~shadow & ~wood
     out[stone] = _tiled("deepslate_tiles", opaque.shape, STONE)[stone]
     out[wood] = _tiled("dark_oak_planks", opaque.shape, WOOD)[wood]
     lay = LAYOUTS.get(sid, {})

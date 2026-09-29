@@ -646,6 +646,8 @@ def test_screens():
     out = screens.hall(rgb, opaque)
     assert np.allclose(out[150, 200], 198 / 255, atol=0.01)  # the inventory's grey
     assert (out[25, 200] @ screens.LUMA) < 0.4  # the plaque: dark planks, so the game's white title stays readable
+    dark = screens.hall(np.random.default_rng(1).uniform(0.05, 0.6, (60, 80, 3)) * (0.3, 0.5, 0.8), np.ones((60, 80), bool))
+    assert np.allclose(dark, 139 / 255)  # no parchment: one solid grey, so text in every player colour shows
     a = np.array([[0, 0, 0], [200, 200, 200], [250, 250, 250]] + [[255, 0, 0]] * 253)
     b = np.array([[0, 0, 0], [120, 120, 120], [210, 210, 210]] + [[255, 0, 0]] * 253)
     assert screens.quantise(np.full((1, 1, 3), 0.8), [a])[0, 0] == 1

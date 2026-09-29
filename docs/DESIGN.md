@@ -209,8 +209,11 @@ was: the **deepslate hall** makes each sheet a window in the grey of
 Minecraft's inventory, with straight edges and Minecraft's white and dark
 bevel, and everything around it deepslate tiles. The wood (the crate the
 setup screen's buttons sit on, the plaques titles are written on in white)
-becomes dark oak planks, dark as before. The dark blue and green dialogue
-backgrounds become deepslate. The history book gets two grey pages, with its
+becomes dark oak planks, dark as before. Screens without parchment, like the
+achievements and the dark blue and green dialogue backgrounds, are one solid
+grey, the grey of Minecraft's inventory slots. The game writes the
+achievements in each player's colour, and on a texture, or on a very dark or
+very light background, some of those colours can't be read. The history book gets two grey pages, with its
 list of topics sunk in. The loading screen is Minecraft's dark dirt with the
 block logo in grey stone (its palette has greys, not gold or green).
 
