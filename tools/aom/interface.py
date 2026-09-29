@@ -117,6 +117,48 @@ def _paper(lum: np.ndarray, opaque: np.ndarray) -> np.ndarray:
     return _shrink(_grow(paper, 6), 6) & opaque  # the game's letters and logo on it
 
 
+def _label(m: np.ndarray) -> tuple[np.ndarray, int]:
+    """Connected parts of m (4-neighbours), numbered from 1, found run by run."""
+    parent: list[int] = []
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    runs, prev = [], []
+    for y in range(m.shape[0]):
+        d = np.diff(np.concatenate(([0], m[y].astype(np.int8), [0])))
+        cur = []
+        for s, e in zip(np.nonzero(d == 1)[0], np.nonzero(d == -1)[0]):
+            rid = len(parent)
+            parent.append(rid)
+            for ps, pe, pid in prev:
+                if ps < e and pe > s:
+                    parent[find(pid)] = find(rid)
+            cur.append((s, e, rid))
+            runs.append((y, s, e, rid))
+        prev = cur
+    lab = np.zeros(m.shape, np.int32)
+    ids: dict[int, int] = {}
+    for y, s, e, rid in runs:
+        lab[y, s:e] = ids.setdefault(find(rid), len(ids) + 1)
+    return lab, len(ids)
+
+
+def _rectangles(m: np.ndarray, min_area: int = 40) -> np.ndarray:
+    """Each part of m as its bounding rectangle (the small bits dropped)."""
+    lab, n = _label(m)
+    out = np.zeros_like(m)
+    sizes = np.bincount(lab.ravel(), minlength=n + 1)
+    for k in range(1, n + 1):
+        if sizes[k] >= min_area:
+            ys, xs = np.nonzero(lab == k)
+            out[ys.min():ys.max() + 1, xs.min():xs.max() + 1] = True
+    return out
+
+
 def _top_bar(opaque: np.ndarray) -> np.ndarray:
     """The resource bar: the rows at the top that are drawn all the way across."""
     full = opaque.mean(1) > 0.9
@@ -167,9 +209,10 @@ def _bevel(rgb: np.ndarray, m: np.ndarray, fill: str, tl: str, br: str, edge: Op
 def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int, int]]]) -> np.ndarray:
     """A panel picture (RGB 0..1) in the Minecraft style; `icons` are the top left corners of the resource icons."""
     lum = rgb @ LUMA
-    paper = _paper(lum, opaque)
-    counts = paper & _top_bar(opaque)  # the resource bar's boxes: the game writes their numbers in white
-    paper &= ~counts
+    bar = _top_bar(opaque)
+    paper = _paper(lum, opaque) & ~bar  # the parchment below the resource bar (its tears are filled)
+    # the resource bar's boxes, each on its own (the game writes the amounts in them, in white)
+    counts = _rectangles(_grow(_shrink(opaque & bar & (lum > 0.5), 2), 2)) & bar & opaque
     slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper & ~counts
     frame = opaque & ~paper & ~slots & ~counts
     out = np.zeros_like(rgb)

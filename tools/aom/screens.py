@@ -186,39 +186,9 @@ def _blur(a: np.ndarray, r: int, m: np.ndarray) -> np.ndarray:
     return box(a * m) / np.maximum(box(m.astype(np.float64)), 1e-9)
 
 
-def _label(m: np.ndarray) -> tuple[np.ndarray, int]:
-    """Connected parts of m (4-neighbours), numbered from 1, found run by run."""
-    parent: list[int] = []
-
-    def find(a: int) -> int:
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-
-    runs, prev = [], []
-    for y in range(m.shape[0]):
-        d = np.diff(np.concatenate(([0], m[y].astype(np.int8), [0])))
-        cur = []
-        for s, e in zip(np.nonzero(d == 1)[0], np.nonzero(d == -1)[0]):
-            rid = len(parent)
-            parent.append(rid)
-            for ps, pe, pid in prev:
-                if ps < e and pe > s:
-                    parent[find(pid)] = find(rid)
-            cur.append((s, e, rid))
-            runs.append((y, s, e, rid))
-        prev = cur
-    lab = np.zeros(m.shape, np.int32)
-    ids: dict[int, int] = {}
-    for y, s, e, rid in runs:
-        lab[y, s:e] = ids.setdefault(find(rid), len(ids) + 1)
-    return lab, len(ids)
-
-
 def _fill_holes(m: np.ndarray, max_area: float) -> np.ndarray:
     """m with the small parts of ~m it encloses filled (the ornaments drawn on the parchment)."""
-    lab, n = _label(~m)
+    lab, n = I._label(~m)
     sizes = np.bincount(lab.ravel(), minlength=n + 1)
     edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])))
     small = [k for k in range(1, n + 1) if sizes[k] < max_area and k not in edge]
@@ -244,7 +214,7 @@ def _rectangle(paper: np.ndarray, opaque: np.ndarray, notch: int = 12) -> np.nda
 
 def _boxes(m: np.ndarray, min_area: float) -> np.ndarray:
     """Each part of m at least min_area big as its bounding box (crates and plaques are square); the rest dropped."""
-    lab, n = _label(m)
+    lab, n = I._label(m)
     out = np.zeros_like(m)
     for k in np.nonzero(np.bincount(lab.ravel(), minlength=n + 1)[1:] >= min_area)[0] + 1:
         ys, xs = np.nonzero(lab == k)
