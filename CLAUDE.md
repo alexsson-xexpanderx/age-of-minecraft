@@ -92,6 +92,8 @@ putting `tools/` on `sys.path`.
   every tile (3 blocks to a tile, camera scale √2). Each new frame fills exactly the original frame's pixels.
 - **Don't change Pac-Man without asking.** His `.dat` patch, icon, sounds and name took many rounds of testing in
   the player's game.
+- **Seed randomness with `zlib.crc32`, never `hash()`.** Python's string hashes change every run, so the sprites and
+  previews would too (`Painter` seeds with crc32; `test_renders_are_reproducible` checks two hash seeds).
 - **Keep the `.bat` files' Windows line endings (CRLF).** Editing them with a tool that writes `\n` converts them.
 - **Windows players come first.** Look files up with the case-insensitive `pick()`. Never write into the player's
   `Data/` without a `.aom-backup`, and make sure `--restore` can undo every file the build touches.

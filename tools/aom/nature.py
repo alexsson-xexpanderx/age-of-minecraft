@@ -7,6 +7,8 @@ blocks, berry bushes become sweet berry bushes, and so on.
 """
 from __future__ import annotations
 
+import zlib
+
 import numpy as np
 
 from . import voxel as V
@@ -43,7 +45,7 @@ TREE_KINDS = ("oak", "birch", "spruce", "snowy_spruce", "jungle", "palm", "bambo
 
 def tree(kind: str, height_px: float = 110.0, seed: int = 0, part: str = "all") -> V.Structure:
     """A tree about `height_px` screen pixels tall. `part`: all, trunk (bottom half) or crown (top half)."""
-    rng = np.random.default_rng(seed * 7919 + hash(kind) % 1000)
+    rng = np.random.default_rng(seed * 7919 + zlib.crc32(kind.encode()) % 1000)  # hash() changes every run
     h = blocks_for_height(height_px)
     s = _s(f"tree_{kind}")
     c = 1

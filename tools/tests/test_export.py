@@ -5,7 +5,9 @@ reader, and a full build against a fake game folder.
 """
 from __future__ import annotations
 
+import os
 import struct
+import subprocess
 import sys
 import tempfile
 import zlib
@@ -312,6 +314,20 @@ def test_dat_reader():
     from aom import farmland
     assert {s for s, _, _ in farmland.farm_slps(terrains)} == {15004, 15005, 15021, 15040, 15023}
     assert {s for s, _, _ in farmland.farm_slps([])} == set(farmland.FARM_SLPS)  # no table: the original ids
+
+
+def test_renders_are_reproducible():
+    """Trees and damaged walls come out the same in every run (Python's hash() of a string changes per process)."""
+    code = ("import sys, hashlib; sys.path.insert(0, %r); "
+            "from aom import nature, fortifications as FT; from aom.voxel import all_blocks; "
+            "from aom.render import fit_camera, render; "
+            "roots = [nature.tree(k, 110, 1).part(all_blocks()) for k in ('oak', 'palm', 'jungle', 'bamboo')]; "
+            "roots.append(FT.wall_piece('stone', 'W', FT.PIECES[3], 3).part(all_blocks())); "
+            "print(hashlib.md5(b''.join(render(r, -45.0, camera=fit_camera(r, -45.0)).kind.tobytes() "
+            "for r in roots)).hexdigest())") % str(Path(__file__).resolve().parents[1])
+    runs = {subprocess.run([sys.executable, "-c", code], env={**os.environ, "PYTHONHASHSEED": seed},
+                           capture_output=True, text=True, check=True).stdout for seed in ("1", "2")}
+    assert len(runs) == 1, runs
 
 
 def test_rendered_sprite_matches_layout():

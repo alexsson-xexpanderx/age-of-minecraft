@@ -18,6 +18,8 @@ a wall arriving from any side meets it.
 """
 from __future__ import annotations
 
+import zlib
+
 import numpy as np
 
 from . import voxel as V
@@ -61,7 +63,7 @@ def wall_piece(kind: str, style: str, piece: str, damage: int = 0, progress: flo
     body, top, height = wall_materials(kind, st)
     s = _cell(f"wall_{kind}_{piece}")
     cells = _piece_cells(piece)
-    rng = np.random.default_rng(hash((kind, style, piece, damage)) % 2 ** 32)
+    rng = np.random.default_rng(zlib.crc32(f"{kind} {style} {piece} {damage}".encode()))  # hash() changes every run
     built = max(1, int(np.ceil(height * progress))) if progress < 1 else height
     for (x, y) in cells:
         for z in range(built):
