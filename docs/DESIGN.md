@@ -178,9 +178,8 @@ Minecraft's menu is a snowy block village at night with a blacksmith on the
 right, and each button a Minecraft thing in the original's exact place. The
 game draws only the edges and names of the Single Player menu's buttons, so the
 menu has a solid dark plate behind each of them: nothing shows through. The
-plates are only there while the Single Player menu is open (they are part of
-the Single Player button's highlighted picture, which the game shows then), so
-the closed menu shows the blacksmith as it is. Their
+game shows the same picture whether that menu is open or not, so the plates
+are always there. Their
 light border is drawn in shades a little darker than the plates instead, a soft
 shadow around each button. When
 Single Player is chosen, its shield and sign turn darker instead of glowing

@@ -64,9 +64,8 @@ putting `tools/` on `sys.path`.
    - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
      pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
      with exactly the known picture sizes (`menu.known`) is replaced. The Single Player menu's buttons get solid plates in the picture
-     (`menu.SUBMENU`, measured on photos) — not in the menu picture, but
-     in Single Player's highlighted pictures (11, 12; made bigger to the right and down, same top left and hotspot),
-     which the game shows while that menu is open — and `menu_border` sets the menu screen file's `bevel_colors` to shades a
+     (`menu.SUBMENU`, measured on photos; putting them in Single Player's
+     enlarged highlighted pictures instead, to show them only while that menu is open, didn't work in the game), and `menu_border` sets the menu screen file's `bevel_colors` to shades a
      little darker than the plates (`menu.BORDER`), instead of the game's light border; `DARKER` buttons darken instead of glowing.
    - The other screens (`screens.RESTYLED`: setup screens, dialogues, history, achievements, loading screen 50163) are
      found through the screen files (`screens.read`, `Game.screens`) and redrawn by `screens.hall`: parchment
