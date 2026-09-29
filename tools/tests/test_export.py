@@ -175,6 +175,7 @@ def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
     rng = np.random.default_rng(4)
     for k, (x, y) in enumerate(icons):
         px[y:y + 17, x:x + 26] = rng.choice(allowed[100:140], (17, 26))
+        px[y - 4:y + 20, x + 30:x + 70] = light  # the light box the game writes the amount in, in white
     top = h - 218
     px[top:] = frame
     px[top + 16:h - 8, w // 4 - 6:w * 2 // 3 + 6] = shaded  # the parchment's shaded border: the name is on it
@@ -325,8 +326,9 @@ def fake_game(root: Path) -> Path:
     for slp_id, tiles in ((15000, 100), (15004, 36), (15005, 36), (15021, 9), (15040, 9), (15023, 9)):
         terrain.put(slp_id, slp.encode([diamond(60 + k % 7) for k in range(tiles)]))
     terrain.write(data / "terrain.drs")
-    patch = Drs()  # UserPatch's own archive, already holding a sound
+    patch = Drs()  # UserPatch's own archive, already holding a sound, and a copy of the "no team" mark
     patch.put(15500, b"RIFF a sound", "wav")
+    patch.put(53300, slp.encode([marks[0], slp.SlpFrame(np.full((10, 10), 5, np.int16), (0, 0))]))
     patch.write(data / "gamedata_x1_p1.drs")
     boar = len(table)
     table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
@@ -528,8 +530,9 @@ def test_full_build(tmp: Path):
     ach = parse_jasc(fake_palette())
     for f in banners:
         px = f.pixels
-        for row in (21 + up - 8, 21 + up, 21 + up + 8):  # room for two lines
-            assert (px[row, 20:120] >= 0).all() and (ach[px[row, 20:120]] @ [0.299, 0.587, 0.114]).max() < 60
+        for row in (21 + up - 8, 21 + up, 21 + up + 8):  # room for two lines, on a middle grey
+            lum = ach[px[row, 20:120]] @ [0.299, 0.587, 0.114]
+            assert (px[row, 20:120] >= 0).all() and 70 < lum.mean() < 150
         assert (px[38 + up + 12:, 10:] == slp.TRANSPARENT).all()  # no shadow under it
     tabs = slp.decode(out.get(50765))  # Minecraft tabs: their top rows (under the buttons) left out
     assert len(tabs) == 12 and all((f.pixels[:14] == slp.TRANSPARENT).all() for f in tabs)
@@ -538,6 +541,10 @@ def test_full_build(tmp: Path):
     marks = slp.decode(out.get(50769))
     assert len(marks) == 5 and [f.pixels.shape for f in marks] == [(21, 37)] + [(44, 36)] * 4
     assert len({f.pixels.tobytes() for f in marks[1:]}) == 4  # four numbered shields
+    copy_before, copy_after = slp.decode(Drs(game / "Data" / "gamedata_x1_p1.drs").get(53300)), slp.decode(out.get(53300))
+    assert np.array_equal(copy_after[0].pixels, marks[0].pixels)  # its copy of the "no team" mark: redrawn the same
+    assert np.array_equal(copy_after[1].pixels, copy_before[1].pixels)  # its other picture: kept
+    assert "picture 0 of 53300 is a copy of the team marks (50769): redrawn too" in report
     # the mod's exe: our icon, and the window says Age of Minecraft; the game's name is gone from it
     from aom import pe
     exe = (game / "age2_x1" / "age_of_minecraft.exe").read_bytes()
@@ -595,6 +602,7 @@ def test_full_build(tmp: Path):
     assert new[806 + 21, 400] == grey and new[806 + 30, 650] == grey  # its shaded border and the tear, too
     assert new[900, 1100] == quant.indices(np.array([[139, 139, 139]]))[0]  # the minimap's dark -> a slot
     assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
+    assert new[16, 8 + 50] == quant.indices(np.array([[43, 43, 43]]))[0]  # the amounts' box: a dark slot
     new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels
     assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[6:23, 11:37], old[6:23, 11:37])
     assert ui.get(51101) is None  # no icons found: it keeps its look

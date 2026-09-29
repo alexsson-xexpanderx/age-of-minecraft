@@ -156,6 +156,7 @@ widescreen panels from the same pictures. The build repaints each one, every pix
 | AoE2 | Minecraft |
 |---|---|
 | Parchment (where the game writes the unit's details) | the grey of Minecraft's inventory, with a black edge, a white bevel at the top left and a dark one at the bottom right |
+| The resource bar's boxes (the game writes the amounts in white) | a dark slot, sunk in, so the white numbers read |
 | Dark areas (behind the minimap) | an inventory slot, sunk in |
 | Carved frames | planks, as dark or light as the original frame, so the game's text stays readable |
 | Resource icons: wood, food, gold, stone, population | an oak log, bread, a gold ingot, cobblestone, a villager's head |
@@ -213,21 +214,26 @@ achievements (their dark tabs would be lost on deepslate). The history book gets
 The loading screen is a Minecraft title screen: a blue sky with blocky clouds
 and a square sun, a floating island of blocks with a pond, oak trees, flowers
 and a little house, and the gold and grass block logo with a dark shadow.
+The bottom of the screen is light sky only, where the game writes its loading
+text in black.
 Only this screen uses its
 palette, which was nearly all greys, so it gets a palette of its own made from
 the new picture (the Windows colours stay where they were).
 
-The achievements, where the game writes white titles and every player's scores
-in their colour, are a dark grey window (Minecraft's `#373737`), and so are the
-timeline and the dark dialogue backgrounds. Under the window, on a dark oak
+The achievements are a dark grey window (Minecraft's `#373737`) for the game's
+white and cream titles, with a light grey panel on it where the scores are
+written in each player's colour: no single grey suits both. The timeline and
+the dark dialogue backgrounds are the dark grey too. Under the window, on a dark oak
 floor, the tabs (Score to Timeline) are Minecraft tabs: the chosen one in the
 window's grey, opening into it, the others darker. Their top rows used to carry
 on the parchment under the Play Again and Main Menu buttons; those rows are left
 out, so the tabs no longer run into the buttons. The flags the players' names
 are written on become Minecraft banners in the flag's own colour, on a dark oak
-pole, a little taller and wider than the flags, with a black stripe across
-them that holds a long name on two lines. The team
-marks are Minecraft shields with the team's number, and a dash for no team.
+pole, a little taller and wider than the flags, with a grey stripe across
+them that holds a long name on two lines. The game writes the name in white,
+in black or in the player's colour, and all three show on a middle grey. The team
+marks are Minecraft shields with the team's number, and a dash for no team;
+any exact copy of them in the game's files is redrawn too.
 
 Each picture is drawn in the palette of every screen that shows it, keeps its
 size and its see-through parts, and only the pictures the build knows, at

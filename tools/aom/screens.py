@@ -56,8 +56,9 @@ SHOWN_WITH = {FLAGS: 50061, TABS: 50061, TEAMS: 50061}  # no screen file names t
 LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
     50104: {"insets": [(503, 50, 790, 495)]},  # the game settings' own sheet
     50161: {"sheets": [(0, 10, 251, 588), (262, 10, 792, 588)], "insets": [(8, 18, 238, 390)]},  # the history book
-    50149: {"sheets": [(26, 0, 800, 540)], "window": "dark"},  # the achievements: white titles and every
-    # player's colour on a dark sheet; the tabs sit on the (wooden) table under it
+    50149: {"sheets": [(26, 0, 800, 540)], "window": "dark", "panels": [(34, 84, 792, 488)]},  # the achievements:
+    # white and cream titles on the dark sheet, the scores in every player's colour on a light panel on it (no grey
+    # suits both); the tabs sit on the (wooden) table under it
     50763: {"window": "dark"},  # the timeline's background
 }
 # one material around the windows of a picture: deepslate, or dark oak for these (the campaigns' dialogues, and the
@@ -68,7 +69,8 @@ PAPER, DARK = 0.38, 0.45  # parchment is lighter than PAPER; a picture darker th
 STONE, WOOD = 0.3, 0.24  # how light the deepslate and the planks are
 # the windows: (fill, light edge, dark edge). The game writes in white, cream, black and the players' colours: all
 # of them can be read on the middle grey; the dark one is for the achievements (white, cream and player colours)
-WINDOWS = {"mid": ("#6b6b6b", "#9a9a9a", "#3a3a3a"), "dark": ("#373737", "#5c5c5c", "#1c1c1c")}
+WINDOWS = {"mid": ("#6b6b6b", "#9a9a9a", "#3a3a3a"), "dark": ("#373737", "#5c5c5c", "#1c1c1c"),
+           "light": ("#b4b4b4", "#e0e0e0", "#5a5a5a")}
 SOLID = WINDOWS["dark"][0]  # a picture without parchment (the dark dialogue backgrounds)
 
 
@@ -304,18 +306,24 @@ def hall(rgb: np.ndarray, opaque: np.ndarray, sid: int = 0) -> np.ndarray:
         m = np.zeros_like(paper)
         m[y0:y1, x0:x1] = True
         I._bevel(out, m & paper, "#606060", shade, light, None)
+    for x0, y0, x1, y1 in lay.get("panels", []):  # a light panel on the window, sunk in
+        m = np.zeros_like(paper)
+        m[y0:y1, x0:x1] = True
+        fill_l, light_l, shade_l = WINDOWS["light"]
+        I._bevel(out, m & paper, fill_l, shade, light_l, I.GUI["edge"])
     return out
 
 
 BANNER_GROW = (6, 6, 20)  # a banner is this much taller above and below, and wider, than the flag it replaces
+STRIPE = 0.44  # the stripe the name is written on: the game writes it in white, black or the player's colour
 
 
 def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """A flag (RGB 0..1, and where it is drawn) as a Minecraft banner, BANNER_GROW bigger than the original (its
     hotspot moves down with it, so it stays centred on the name): wool in the flag's own colours (they are in its
     palette) on a dark oak pole, its end cut like a swallowtail, and across it, where the game writes the player's
-    name, a black stripe (Minecraft's "fess" pattern) with room for a long name on two lines, so a name in white
-    or in a player's colour can be read on it."""
+    name, a grey stripe (Minecraft's "fess" pattern) with room for a long name on two lines. The game writes the
+    name in white, in black or in the player's colour: a middle grey is the one stripe all three show on."""
     h0, w0 = opaque.shape
     rows = np.nonzero(opaque.mean(1) > 0.6)[0]  # the original's cloth, not the shadow under it
     top0, bottom0 = (int(rows.min()), int(rows.max()) + 1) if len(rows) else (4, h0 - 6)
@@ -336,7 +344,8 @@ def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     shade = np.tile(shade.repeat(I.PIXEL, 0).repeat(I.PIXEL, 1), (h // (16 * I.PIXEL) + 1, w // (16 * I.PIXEL) + 1))
     out = ramp[((0.35 + 0.35 * shade[:h, :w]) * (len(ramp) - 1)).astype(int)]  # its middle tones, not the folds
     stripe = (ys >= top + 5) & (ys < bottom - 5)
-    out[stripe] = _tiled("black_wool", (h, w), 0.09)[stripe]
+    grey = _tiled("gray_wool", (h, w), STRIPE)
+    out[stripe] = (STRIPE + (grey - STRIPE) * 0.35)[stripe]  # gray wool, its weave faint so the name stays clear
     cloth = (ys >= top) & (ys < bottom) & (xs >= 6) & (xs < w - 1)
     cloth &= ~(w - 1 - xs < (bottom - top) // 2 - np.abs(ys - mid) * 0.9)  # the swallowtail cut
     out[cloth & ~I._shrink(cloth, 1)] = 0.05
@@ -382,12 +391,12 @@ def team_mark(k: int, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     rim, white face) with the team's number on it."""
     h, w = opaque.shape
     out, drawn = np.zeros((h, w, 3)), np.zeros((h, w), bool)
-    if k == 0:
+    if k == 0:  # dark, so it shows on the light panel
         y0, x0 = h // 2 - 3, w // 2 - 9
         drawn[y0:y0 + 6, x0:x0 + 18] = True
         out[drawn] = 0.0
-        out[y0 + 1:y0 + 5, x0 + 1:x0 + 17] = colour("#c6c6c6")[:3]
-        out[y0 + 1:y0 + 2, x0 + 1:x0 + 17] = 1.0
+        out[y0 + 1:y0 + 5, x0 + 1:x0 + 17] = colour("#3a3a3a")[:3]
+        out[y0 + 1:y0 + 2, x0 + 1:x0 + 17] = colour("#5c5c5c")[:3]
         return out, drawn
     sw, sh = min(w, 32) // 2 * 2, min(h, 42) // 2 * 2  # the shield, whole 2-pixel blocks
     x0, y0 = (w - sw) // 2, (h - sh) // 2
@@ -465,6 +474,26 @@ def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0
     out = px.copy()
     out[opaque] = quantise(new, palettes)[opaque]
     return slp.SlpFrame(out.astype(np.int16), frame.hotspot)
+
+
+def copies(marks: list[slp.SlpFrame], frames: list[slp.SlpFrame]) -> list[tuple[int, int]]:
+    """(picture k, team mark j) for every picture of an SLP that is exactly one of the team marks: a copy the game
+    may draw instead of TEAMS' own."""
+    found = []
+    for k, f in enumerate(frames):
+        for j, m in enumerate(marks):
+            if f.pixels.shape == m.pixels.shape and np.array_equal(f.pixels, m.pixels):
+                found.append((k, j))
+                break
+    return found
+
+
+def encode_copies(original: bytes, found: list[tuple[int, int]], palettes: list[np.ndarray]) -> bytes:
+    """An SLP with its copies of the team marks redrawn (the other pictures kept)."""
+    frames = slp.decode(original)
+    for k, j in found:
+        frames[k] = redraw(TEAMS, frames[k], palettes, j)
+    return slp.encode(frames, props=slp.frame_props(original))
 
 
 def fits(sid: int, data: bytes) -> bool:

@@ -346,12 +346,16 @@ def _cost(job) -> int:
         return job[4] * (job[5] // 2 + 1)
     if job[0] == "static":
         return job[3] * 4
-    if job[0] in ("interface", "menu", "screen"):
+    if job[0] in ("interface", "menu", "screen", "team copies"):
         return 30
     return 20  # a farm texture: one render, cut into tiles
 
 
 def _render(job) -> tuple[int, bytes, int]:
+    if job[0] == "team copies":
+        _, slp_id, original, palettes, found = job
+        data = screens.encode_copies(original, found, palettes)
+        return slp_id, data, slp.info(data).num_frames
     if job[0] == "screen":
         _, slp_id, original, palettes = job
         data = screens.encode(slp_id, original, palettes)
@@ -529,6 +533,12 @@ def main(argv=None) -> int:
             if palettes:
                 jobs.append(("screen", sid, data, palettes))
                 panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
+        for sid, data, found in team_copies(game):
+            raws = [game.data_file(p) for p in screens.palette_ids(screens.TEAMS, screen_files)]
+            jobs.append(("team copies", sid, data, [parse_jasc(raw) for raw in raws if raw], found))
+            panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
+            log(f"team marks: picture{'s' if len(found) > 1 else ''} {', '.join(str(k) for k, _ in found)} of {sid} "
+                f"{'are copies' if len(found) > 1 else 'is a copy'} of the team marks ({screens.TEAMS}): redrawn too")
         loading = loading_plan(game, screen_files, log)
         if loading:
             panels.append((screens.LOADING, (loadscreen.W, loadscreen.H)))
@@ -611,6 +621,32 @@ def main(argv=None) -> int:
             log(f"  {NAME}'s own exe needs UserPatch's SetupAoC.exe in your game folder; until it is there the")
             log(f"  shortcut starts it with age2_x1.exe GAME={MOD}. Your normal game is not changed.")
     return 0
+
+
+def team_copies(game: Game) -> list[tuple[int, bytes, list[tuple[int, int]]]]:
+    """Every other picture in the interface and patch archives that is exactly one of the team marks (the game, or
+    UserPatch, may draw one of those): (id, file, [(picture, mark)])."""
+    data = game.original(screens.TEAMS)
+    if data is None or not screens.fits(screens.TEAMS, data):
+        return []
+    marks = slp.decode(data)
+    shapes = {m.pixels.shape for m in marks}
+    ids = set()
+    for name, drs in game._searched():
+        if name.lower().startswith(("interfac", "gamedata_x1_p1")):
+            ids |= drs.ids()
+    out = []
+    for sid in sorted(ids - {screens.TEAMS}):
+        other = game.original(sid)
+        try:
+            if other is None or not any((h, w) in shapes for w, h, _, _ in slp.info(other).sizes):
+                continue
+            found = screens.copies(marks, slp.decode(other))
+        except (ValueError, IndexError, struct.error):
+            continue
+        if found:
+            out.append((sid, other, found))
+    return out
 
 
 def loading_plan(game: Game, screen_files, log) -> Optional[tuple[bytes, int, np.ndarray]]:

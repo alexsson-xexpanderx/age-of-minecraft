@@ -72,7 +72,10 @@ putting `tools/` on `sys.path`.
      achievements' flags (`screens.FLAGS`, no screen file names them: `SHOWN_WITH` gives the achievements' palette)
      become banners coloured from each flag's own pixels, as that palette lacks Minecraft's wool colours. Its tabs
      (`TABS`, 12 pictures: each tab not chosen / chosen, told apart by the dark edge at their top) lose their top
-     rows, which ran under the Play Again and Main Menu buttons; the team marks (`TEAMS`) become numbered shields.
+     rows, which ran under the Play Again and Main Menu buttons; the team marks (`TEAMS`) become numbered shields,
+     and `team_copies` redraws exact copies of them anywhere in interfac/gamedata_x1_p1 (the game didn't show ours).
+     The game writes names in white, black or the player's colour, so the banners' stripe is a middle grey; the
+     scores are in player colours, so they sit on a light panel (`LAYOUTS` "panels") in the dark window.
    - A picture listed by screens with very different palettes only looks right in one: `screens.intended` picks
      it (neighbouring pixels most alike) and drops palettes too different to share colours with. The PNGs in
      `screen_originals/` use the first screen's palette, so some of them show scrambled colours.

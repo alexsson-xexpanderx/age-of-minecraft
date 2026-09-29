@@ -7,6 +7,7 @@ widescreen panels from the same pictures.
 
 Each picture is repainted in the Minecraft style, every pixel keeping its place:
 
+* the boxes in the resource bar, where the game writes the amounts in white, become dark sunk-in slots;
 * the parchment the game writes on (large light areas, with their shaded border) becomes the grey of Minecraft's
   inventory, with a straight top edge, its black edge, white bevel at the top left and dark bevel at the bottom
   right;
@@ -41,7 +42,8 @@ ICON_BOXES = [(8, 10), (85, 10), (162, 10), (239, 10), (316, 10)]  # top left of
 ICON_W, ICON_H = 26, 17
 RESOURCES = ("wood", "food", "gold", "stone", "population")
 GUI = {"panel": "#c6c6c6", "light": "#ffffff", "shade": "#555555", "edge": "#000000",
-       "slot": "#8b8b8b", "slot_light": "#ffffff", "slot_shade": "#373737"}
+       "slot": "#8b8b8b", "slot_light": "#ffffff", "slot_shade": "#373737",
+       "count": "#2b2b2b", "count_light": "#6b6b6b", "count_shade": "#111111"}  # where the bar's numbers are
 PLANKS = ("birch_planks", "oak_planks", "jungle_planks", "acacia_planks", "spruce_planks", "dark_oak_planks")
 LUMA = np.array([0.299, 0.587, 0.114])
 PIXEL = 2  # screen pixels per Minecraft pixel, like Minecraft's GUI scale 2
@@ -115,6 +117,15 @@ def _paper(lum: np.ndarray, opaque: np.ndarray) -> np.ndarray:
     return _shrink(_grow(paper, 6), 6) & opaque  # the game's letters and logo on it
 
 
+def _top_bar(opaque: np.ndarray) -> np.ndarray:
+    """The resource bar: the rows at the top that are drawn all the way across."""
+    full = opaque.mean(1) > 0.9
+    rows = len(full) if full.all() else int(np.argmin(full))
+    out = np.zeros_like(opaque)
+    out[:rows] = True
+    return out
+
+
 def _near_edge(m: np.ndarray, r: int, sides: str) -> np.ndarray:
     """Pixels of m within r pixels of m's top/left ("tl") or bottom/right ("br") edge."""
     s = 1 if sides == "tl" else -1
@@ -157,13 +168,16 @@ def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int,
     """A panel picture (RGB 0..1) in the Minecraft style; `icons` are the top left corners of the resource icons."""
     lum = rgb @ LUMA
     paper = _paper(lum, opaque)
-    slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper
-    frame = opaque & ~paper & ~slots
+    counts = paper & _top_bar(opaque)  # the resource bar's boxes: the game writes their numbers in white
+    paper &= ~counts
+    slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper & ~counts
+    frame = opaque & ~paper & ~slots & ~counts
     out = np.zeros_like(rgb)
     if frame.any():
         out[frame] = _tile(_planks(float(lum[frame].mean())), opaque.shape)[frame]
     _bevel(out, slots, GUI["slot"], GUI["slot_shade"], GUI["slot_light"], None)
     _bevel(out, paper, GUI["panel"], GUI["light"], GUI["shade"], GUI["edge"])
+    _bevel(out, counts, GUI["count"], GUI["count_shade"], GUI["count_light"], None)  # a dark slot, sunk in
     out[opaque & ~_shrink(opaque, PIXEL)] = parse(GUI["edge"])[:3]  # a black edge along the game view
     for (x, y), what in zip(icons or [], RESOURCES):
         icon = item(what)

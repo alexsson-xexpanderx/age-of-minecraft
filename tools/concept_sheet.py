@@ -524,6 +524,7 @@ def stand_in_panel(w: int = 1280, h: int = 1024) -> tuple[np.ndarray, np.ndarray
     for (x, y), col in zip(interface.ICON_BOXES, ((0.5, 0.3, 0.1), (0.8, 0.2, 0.2), (0.9, 0.75, 0.2),
                                                   (0.6, 0.6, 0.6), (0.3, 0.4, 0.8))):
         rgb[y + 3:y + 14, x + 6:x + 20] = col
+        rgb[y - 4:y + 20, x + 28:x + 74] = (0.82, 0.74, 0.58)  # the light box the game writes the amount in
     rgb[top:], drawn[top:] = carved(h - top, w, (0.42, 0.28, 0.16)), True
     rgb[top:top + 12] = carved(12, w, (0.55, 0.38, 0.2))
     rgb[top + 24:h - 14, 15:330] = carved(h - 14 - top - 24, 315, (0.3, 0.2, 0.12))
@@ -549,6 +550,12 @@ def interface_sheet(out: Path) -> None:
 
     head, gap = 34, 22
     before_img, after_img = strip(rgb), strip(after)
+    for img in (before_img, after_img):  # the amounts, as the game writes them: white with a black shadow
+        pic = Image.fromarray(img)
+        d = ImageDraw.Draw(pic)
+        for (x, y), amount in zip(interface.ICON_BOXES, ("40000", "40000", "20000", "10000", "4/5")):
+            d.text((x + 32, y - 2), amount, fill=(255, 255, 255), font=font(15), stroke_width=1, stroke_fill=(0, 0, 0))
+        img[...] = np.asarray(pic)
     canvas = Image.new("RGB", (before_img.shape[1], head + 2 * (before_img.shape[0] + gap)), PAPER)
     d = ImageDraw.Draw(canvas)
     d.text((10, 8), "The panels, Minecraft style: planks, inventory grey, slots and item icons", fill=INK,
