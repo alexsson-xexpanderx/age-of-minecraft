@@ -559,7 +559,7 @@ def main(argv=None) -> int:
     blanks.update(static_blanks)
     blanks = {s: why for s, why in blanks.items() if s not in target_slps and game.original(s) is not None}
 
-    log(f"plan: {len(jobs) - len(statics) - len(farms) - len(panels)} unit sprites, {len(statics)} building/scenery "
+    log(f"plan: {sum(j[0] == 'unit' for j in jobs)} unit sprites, {len(statics)} building/scenery "
         f"sprites, {len(farms)} farm textures and {len(panels)} interface pictures to render, {len(blanks)} layers to "
         f"blank, {len(skipped)} skipped")
     if args.dry_run:
