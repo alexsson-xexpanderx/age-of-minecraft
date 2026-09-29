@@ -199,12 +199,14 @@ def fake_game(root: Path) -> Path:
     interfac.put(51101, fake_panel(800, 600, []))  # its icons can't be found
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
+    interfac.put(50189, slp.encode([diamond(9)]))  # the main menu, and its palette
+    interfac.put(50589, fake_palette(), "bina")
     interfac.write(data / "interfac.drs")
     # the language files: Furious the Monkey Boy's name (5860), button (6860) and help (26860) texts
     monkey = {5860: "Furious the Monkey Boy", 6860: "Create <b>Furious the Monkey Boy<b> (<cost>)",
               26860: "Create <b>Furious the Monkey Boy<b> (<cost>)\nA very fast cheat unit.", 5861: "Next unit"}
     (root / "language_x1_p1.dll").write_bytes(langdll.build_dll({5860: monkey[5860], 9999: "UserPatch"}))
-    (root / "language_x1.dll").write_bytes(langdll.build_dll(monkey))
+    (root / "language_x1.dll").write_bytes(langdll.build_dll({**monkey, 4: "Age of Empires II Expansion"}))
     (root / "language.dll").write_bytes(langdll.build_dll({5079: "Militia"}))
     graphics = Drs()
     table = []
@@ -347,9 +349,10 @@ def test_rendered_sprite_matches_layout():
 def test_full_build(tmp: Path):
     game = fake_game(tmp / "aoe2")
     assert build_mod.main(["--game", str(game), "--jobs", "2"]) == 0
-    mod = game / "Games" / "AgeOfMinecraft"
-    xml = (game / "Games" / "AgeOfMinecraft.xml").read_bytes()
-    assert xml.startswith(b"\xef\xbb\xbf") and b"<path>AgeOfMinecraft</path>" in xml and b'id="18" name="korean"' in xml
+    mod = game / "Games" / "age_of_minecraft"
+    xml = (game / "Games" / "age_of_minecraft.xml").read_bytes()
+    assert xml.startswith(b"\xef\xbb\xbf") and b"<path>age_of_minecraft</path>" in xml and b'id="18" name="korean"' in xml
+    assert b"<name>Age of Minecraft</name>" in xml
     out = Drs(mod / "Data" / "graphics.drs")
     orig = Drs(game / "Data" / "graphics.drs")
     assert out.get(40000) == orig.get(40000)  # untouched files are copied as they were
@@ -397,12 +400,22 @@ def test_full_build(tmp: Path):
     assert all(np.array_equal(a.pixels, b.pixels) for a, b in zip(icons_after, icons_before))
     assert icons_after[170].pixels.shape == (36, 36) and len(np.unique(icons_after[170].pixels)) >= 4
     assert "trainable at the Wonder" in report and "Pac-Man is icon 170 (36x36)" in report
-    # his name: the mod has its own language_x1_p1.dll; the game's files are untouched
+    # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
+    p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
-    assert langdll.read_string(p1, 5860) == "Pac-Man" and langdll.read_string(p1, 9999) == "UserPatch"
-    assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
+    assert p1[:len(p1_before)][0x200:] == p1_before[0x200:]  # the game's copy, with a section added at its end
+    assert [langdll.read_string(p1, i) for i in (5860, 6860, 26860, 9999, 4)] == [
+        "Pac-Man", "Create <b>Pac-Man<b> (<cost>)", "Create <b>Pac-Man<b> (<cost>)\nA very fast cheat unit.",
+        "UserPatch", "Age of Minecraft"]
+    assert langdll.read_string(p1_before, 5860) == "Furious the Monkey Boy"
+    assert langdll.read_string((game / "language_x1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()
     assert "'Furious the Monkey Boy' is now 'Pac-Man'" in report
+    # the icon for the shortcut, and the main menu's pictures to draw a Minecraft menu over
+    ico = (mod / "age_of_minecraft.ico").read_bytes()
+    assert ico[:4] == b"\0\0\1\0" and struct.unpack_from("<H", ico, 4)[0] == 7
+    assert (mod / "menu_originals" / "50189_00.png").read_bytes()[:4] == b"\x89PNG"
+    assert "menu pictures: 50189: 1 pictures (97x49)" in report
     # his sounds: six new sounds in the .dat, their WAV files in the patch archive (on free ids)
     from aom.datfile import sound_table
     dat = datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
@@ -503,6 +516,37 @@ def test_direct_mode_and_restore(tmp: Path):
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() == dat_before
     assert {n: (game / n).read_bytes() for n in langdll.FILES} == lang_before
     assert not list(game.glob("*" + build_mod.BACKUP))
+
+
+def test_exe_icon():
+    """Our icon goes into the mod's exe in place: every icon picture redrawn at its size and colour depth."""
+    from aom import appicon, pe
+
+    def picture(w, bpp):
+        colours = 1 << bpp if bpp <= 8 else 0
+        pal = bytes(np.arange(4 * colours, dtype=np.uint8) * 3)
+        size = ((w * bpp + 31) // 32 * 4 + (w + 31) // 32 * 4) * w
+        return struct.pack("<IiiHHIIiiII", 40, w, 2 * w, 1, bpp, 0, 0, 0, 0, 0, 0) + pal + bytes(size)
+
+    pictures = [picture(32, 4), picture(16, 8), picture(48, 32)]
+    exe = pe.build({(pe.RT_ICON, k + 1, 1033): (pic, 0) for k, pic in enumerate(pictures)}, dll=False)
+    new, notes = appicon.into_exe(exe)
+    assert len(new) == len(exe) and notes == ["32x32 4-bit", "16x16 8-bit", "48x48 32-bit"]
+    places = [(at, at + size) for (t, _, _), (at, size, _) in pe.places(exe).items() if t == pe.RT_ICON]
+    assert all(any(a <= i < b for a, b in places) for i in range(len(exe)) if exe[i] != new[i])
+    assert all(new[a:b] != exe[a:b] for a, b in places)
+
+
+def test_language_file_copy():
+    """Strings go into a copy of a language DLL without moving any of its bytes; the copy still reads right."""
+    from aom import pe
+    dll = langdll.build_dll({5860: "Furious the Monkey Boy", 10000: "UserPatch text"})
+    new = langdll.with_strings(dll, {5860: "Pac-Man", 6860: "Create Pac-Man", 4: "Age of Minecraft"})
+    assert new[:len(dll)][0x200:] == dll[0x200:]
+    assert {i: langdll.read_string(new, i) for i in (4, 5860, 6860, 10000)} == {
+        4: "Age of Minecraft", 5860: "Pac-Man", 6860: "Create Pac-Man", 10000: "UserPatch text"}
+    h = pe.header(new)
+    assert len(h.sections) == 2 and struct.unpack_from("<I", new, h.opt + 64)[0] == pe.checksum(new, h.opt + 64)
 
 
 def test_pacman_sounds():

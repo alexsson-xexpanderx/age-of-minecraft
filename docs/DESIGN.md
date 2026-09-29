@@ -278,9 +278,15 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    tree they replace. The farm textures are found in the `.dat`'s terrain
    table (terrains 7, 8, 29, 30 and 31), and each of their tiles is redrawn
    in exactly the pixels of the original tile.
-5. **Install** as a UserPatch 1.5 data mod: `Games\AgeOfMinecraft.xml`,
-   `Games\AgeOfMinecraft\Data\graphics.drs`, `terrain.drs` and `interfac.drs`, and
-   `age2_x1\AgeOfMinecraft.exe` made by `SetupAoC.exe -g:AgeOfMinecraft`.
+5. **Install** as a UserPatch 1.5 data mod, a game of its own called Age of
+   Minecraft: `Games\age_of_minecraft.xml`,
+   `Games\age_of_minecraft\Data\graphics.drs`, `terrain.drs`, `interfac.drs`
+   and its own `language_x1_p1.dll` (the game's, with Pac-Man's name and
+   "Age of Minecraft" added in a new section at its end), and
+   `age2_x1\age_of_minecraft.exe` made by `SetupAoC.exe -g:age_of_minecraft`,
+   with the villager king icon put into its icon pictures in place. An "Age of
+   Minecraft" shortcut with the icon starts it (or, without that exe,
+   `age2_x1.exe GAME=age_of_minecraft`).
    A `--mode direct` fallback patches `Data\graphics.drs`,
    `Data\terrain.drs` and `Data\interfac.drs` with backups.
 

@@ -34,15 +34,21 @@ that folder: it needs the `tools` folder next to it.
 * Tip: if you extract the mod *inside* your Age of Empires II folder, it
   always finds the game.
 
-The build takes about two to ten minutes, depending on your PC. It writes:
+The build takes about two to ten minutes, depending on your PC. It makes
+**Age of Minecraft** a game of its own: your normal Age of Empires exe and
+files are not changed. It writes:
 
 ```
-Games\AgeOfMinecraft.xml                 the UserPatch mod definition
-Games\AgeOfMinecraft\Data\graphics.drs   your graphics with the Minecraft sprites swapped in
-Games\AgeOfMinecraft\Data\terrain.drs    your ground textures with Minecraft farms
-Games\AgeOfMinecraft\Data\interfac.drs   your screen panels in the Minecraft style
-Games\AgeOfMinecraft\aom_report.txt      what was replaced, what was skipped, and why
-age2_x1\AgeOfMinecraft.exe               created by UserPatch's SetupAoC.exe
+Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
+Games\age_of_minecraft\Data\graphics.drs      your graphics with the Minecraft sprites swapped in
+Games\age_of_minecraft\Data\terrain.drs       your ground textures with Minecraft farms
+Games\age_of_minecraft\Data\interfac.drs      your screen panels in the Minecraft style
+Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's name, and "Age of Minecraft"
+Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
+Games\age_of_minecraft\menu_originals\         your game's main menu pictures (for a Minecraft menu)
+Games\age_of_minecraft\aom_report.txt         what was replaced, what was skipped, and why
+age2_x1\age_of_minecraft.exe                  its own exe, made by UserPatch's SetupAoC.exe
+Age of Minecraft (shortcut)                   on your desktop and in the game folder, with the icon
 ```
 
 > If your game is under *Program Files*, Windows may block writing there and
@@ -51,21 +57,25 @@ age2_x1\AgeOfMinecraft.exe               created by UserPatch's SetupAoC.exe
 
 ## 4. Play
 
-Start **`age2_x1\AgeOfMinecraft.exe`**. Your normal `age2_x1.exe` stays
-exactly as it was.
+Double-click **Age of Minecraft** on your desktop (or in your game folder).
+It starts `age2_x1\age_of_minecraft.exe`. Your normal game starts as always
+and stays exactly as it was.
 
-**No `AgeOfMinecraft.exe`?** The end of the black window (under **RESULT**)
-says why. Everything shown there is also saved to **`aom_build_log.txt`**,
-next to `build_mod.bat`. You have two options:
+**Used `build_mod_direct.bat` before?** That one changed your normal game's
+files. Double-click **`restore_original.bat`** once to give your normal game
+its original files back; Age of Minecraft doesn't need them.
 
-1. Make the exe yourself. Open your game folder in File Explorer, type `cmd`
-   in the address bar and press Enter, then run
-   `SetupAoC.exe -g:AgeOfMinecraft`. This needs UserPatch's installer
-   `SetupAoC.exe` in that folder.
-2. Skip the exe: double-click **`build_mod_direct.bat`**. It puts the
-   Minecraft sprites into your normal game, so you start the game as usual.
-   Your original `graphics.drs`, `terrain.drs` and `interfac.drs` are backed
-   up first, and **`restore_original.bat`** puts them back.
+**No `age_of_minecraft.exe`?** The exe is made by UserPatch's installer,
+`SetupAoC.exe`, which must be in your game folder (it comes with UserPatch 1.5
+from <https://userpatch.aiscripters.net/>). Without it the shortcut still
+works: it starts your normal exe with `GAME=age_of_minecraft`, which tells
+UserPatch to load Age of Minecraft instead. The end of the black window (under
+**RESULT**) says which one you got; everything shown there is also saved to
+**`aom_build_log.txt`**, next to `build_mod.bat`.
+
+**Rather have the Minecraft look in your normal game?** Double-click
+**`build_mod_direct.bat`**: it puts everything into your normal game's files,
+each one backed up first, and **`restore_original.bat`** puts them back.
 
 ## Options
 
@@ -140,11 +150,13 @@ them in `previews/sounds/`. It is the only change the mod makes to the
 game's rules; `--no-wonder-pacman` leaves the rules alone.
 
 His name lives in the game's language files (`language_x1_p1.dll`,
-`language_x1.dll`, `language.dll`, in the game's main folder). `build_mod_direct.bat`
-renames him there, keeping a backup of each file it changes, and
-`restore_original.bat` puts them back. The UserPatch mod exe only reads its
-own `language_x1_p1.dll`; the report says whether his name could be changed
-there.
+`language_x1.dll`, `language.dll`, in the game's main folder). Age of
+Minecraft has its own `language_x1_p1.dll` with his name added, so your
+game's files stay as they are. `build_mod_direct.bat` renames him in the
+game's own files instead, keeping a backup of each file it changes, and
+`restore_original.bat` puts them back. Windows 11's Smart App Control refuses
+language files that were changed ("Bad Image", error 0xc0e90002); if you see
+that, Smart App Control has to be off.
 
 > Multiplayer: because the rules change, every player needs the same build
 > of the mod, or the game goes out of sync.
@@ -161,6 +173,6 @@ next to your Town Center:
 In a multiplayer game, cheats only work if "Allow cheats" is ticked in the
 game setup.
 
-**Please send back** `Games\AgeOfMinecraft\aom_report.txt` and a few
-screenshots. The report lists your game's full graphics table, so anything
+**Please send back** `Games\age_of_minecraft\aom_report.txt`, the pictures in
+`Games\age_of_minecraft\menu_originals\` and a few screenshots. The report lists your game's full graphics table, so anything
 that looks off can be mapped exactly in the next round.

@@ -12,6 +12,8 @@ from __future__ import annotations
 import struct
 from typing import Optional
 
+from . import pe
+
 RT_STRING = 6
 FILES = ("language_x1_p1.dll", "language_x1.dll", "language.dll")  # the order the game looks in
 
@@ -117,47 +119,41 @@ def set_string(data: bytes, sid: int, text: str) -> bytes:
     return bytes(out)
 
 
+def _block(strings: list[str]) -> bytes:
+    return b"".join(struct.pack("<H", len(t)) + t.encode("utf-16-le") for t in strings)
+
+
 def build_dll(strings: dict[int, str]) -> bytes:
-    """A minimal resource-only DLL with these strings (for tests)."""
+    """A resource-only DLL with just these strings."""
     blocks: dict[int, list[str]] = {}
     for sid, text in strings.items():
         blocks.setdefault(sid // 16 + 1, [""] * 16)[sid % 16] = text
-    ids = sorted(blocks)
-    # resource tree: root -> type 6 -> one entry per block -> language 1033 -> data
-    root = 16 + 8
-    type_dir = root
-    type_size = 16 + 8 * len(ids)
-    lang_dirs = type_dir + type_size
-    leaves = lang_dirs + 24 * len(ids)
-    payload = leaves + 16 * len(ids)
-    va, file_off = 0x1000, 0x200
-    tree = bytearray()
-    tree += struct.pack("<IIHHHH", 0, 0, 0, 0, 0, 1) + struct.pack("<II", RT_STRING, 0x80000000 | type_dir)
-    tree += struct.pack("<IIHHHH", 0, 0, 0, 0, 0, len(ids))
-    for k, b in enumerate(ids):
-        tree += struct.pack("<II", b, 0x80000000 | (lang_dirs + 24 * k))
-    datas = []
-    for k, b in enumerate(ids):
-        tree += struct.pack("<IIHHHH", 0, 0, 0, 0, 0, 1) + struct.pack("<II", 1033, leaves + 16 * k)
-        datas.append(b"".join(struct.pack("<H", len(s)) + s.encode("utf-16-le") for s in blocks[b]))
-    at = payload
-    for d in datas:
-        tree += struct.pack("<IIII", va + at, len(d), 0, 0)
-        at += (len(d) + 3) // 4 * 4
-    for d in datas:
-        tree += d + bytes((len(d) + 3) // 4 * 4 - len(d))
-    raw_size = (len(tree) + 0x1FF) // 0x200 * 0x200
-    pe = 0x40
-    head = bytearray(file_off)
-    head[:2] = b"MZ"
-    struct.pack_into("<I", head, 0x3C, pe)
-    head[pe:pe + 4] = b"PE\0\0"
-    struct.pack_into("<HHIIIHH", head, pe + 4, 0x14C, 1, 0, 0, 0, 224, 0x2102)
-    opt = pe + 24
-    struct.pack_into("<H", head, opt, 0x10B)
-    struct.pack_into("<I", head, opt + 92, 16)
-    struct.pack_into("<II", head, opt + 96 + 16, va, len(tree))
-    sec = opt + 224
-    head[sec:sec + 8] = b".rsrc\0\0\0"
-    struct.pack_into("<IIII", head, sec + 8, len(tree), va, raw_size, file_off)
-    return bytes(head) + bytes(tree) + bytes(raw_size - len(tree))
+    return pe.build({(RT_STRING, b, 1033): (_block(texts), 0) for b, texts in blocks.items()})
+
+
+def with_strings(data: bytes, strings: dict[int, str]) -> bytes:
+    """A copy of a language DLL with these strings set, added where it has none. Nothing in the original changes:
+    the new string table goes into a section added at the end (see pe.with_resources)."""
+    res = pe.resources(data)
+    langs = [lang for (rtype, _, lang) in res if rtype == RT_STRING]
+    lang = max(sorted(set(langs)), key=langs.count) if langs else 1033
+    for sid, text in strings.items():
+        block = sid // 16 + 1
+        keys = [k for k in res if k[0] == RT_STRING and k[1] == block] or [(RT_STRING, block, lang)]
+        for key in keys:
+            blob, codepage = res.get(key, (b"", 0))
+            texts = _parse_block(blob, 0, len(blob)) if blob else [""] * 16
+            texts[sid % 16] = text
+            res[key] = (_block(texts), codepage)
+    return pe.with_resources(data, res)
+
+
+def all_strings(data: bytes) -> dict[int, str]:
+    """Every string in the file (the first language's copy of each block)."""
+    out = {}
+    for block, places in string_blocks(data).items():
+        off, size = places[0]
+        for k, text in enumerate(_parse_block(data, off, size)):
+            if text:
+                out[(block - 1) * 16 + k] = text
+    return out

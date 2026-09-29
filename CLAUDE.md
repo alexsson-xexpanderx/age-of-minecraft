@@ -68,13 +68,17 @@ putting `tools/` on `sys.path`.
 5. Extra layers of composite sprites are replaced with empty SLPs of the same frame count. These come from
    `slpmap.BLANK`, `Game.delta_blanks` and `spritemap`'s blanks, and cover shadows, flags, sails, ram heads and
    roof pieces.
-6. `write_outputs` writes the UserPatch mod (`Games/AgeOfMinecraft/...`, then `SetupAoC.exe -g:AgeOfMinecraft`)
+6. `write_outputs` writes the UserPatch mod, a standalone game `MOD` = `age_of_minecraft` (`Games/age_of_minecraft/`),
    or patches `Data/` directly with backups. Then `apply_gameplay` runs:
    - `gameplay.py` + `datunits.py` patch the `.dat` so the Wonder trains Pac-Man, and give the Javelina its own
      sprites.
    - `sounds.py` WAVs go into `gamedata_x1_p1.drs`.
-   - `langdll.py` renames the unit.
-   Last, the build writes `aom_report.txt`.
+   - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,
+     `mod_language` gives the mod its own `language_x1_p1.dll` (`langdll.with_strings`: a new resource section
+     added by `pe.py`) with his texts and "Age of Minecraft".
+   The standalone mod then gets its exe (`SetupAoC.exe -g:age_of_minecraft`, icon swapped in place by
+   `appicon.into_exe`), "Age of Minecraft" shortcuts (PowerShell, Windows only) and the original menu pictures as
+   PNGs (`menu_originals/`). Last, the build writes `aom_report.txt`.
 
 ## Invariants that are easy to break
 

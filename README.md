@@ -27,9 +27,10 @@ the game, and [docs/UNITS.md](docs/UNITS.md) for the full unit list.
 
 You need AoE2: The Conquerors with UserPatch 1.5, and Python 3.
 Double-click **`build_mod.bat`** (it finds your game or asks for the folder),
-then start `age2_x1\AgeOfMinecraft.exe`. The build reads your own game files and
-writes a separate UserPatch mod, so your normal game stays untouched. Full
-steps and options are in [docs/INSTALL.md](docs/INSTALL.md).
+then double-click **Age of Minecraft** on your desktop. The build reads your own
+game files and makes Age of Minecraft a game of its own (a UserPatch mod with
+its own `age_of_minecraft.exe` and a villager king icon), so your normal game
+stays untouched. Full steps and options are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Previews
 
@@ -89,6 +90,8 @@ tools/aom/datfile.py     graphics and terrain table reader for empires2_x1_p1.da
 tools/aom/datunits.py    reads and patches the civilisations' unit tables in the .dat
 tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon, name and sounds
 tools/aom/langdll.py     reads and changes strings in the game's language DLLs
+tools/aom/pe.py          Windows DLL/exe resources: read them, give a copy new ones in an added section
+tools/aom/appicon.py     the villager king icon: the .ico file, and in place in the mod's own exe
 tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
 tools/aom/easter.py      Pac-Man and the ghost
 tools/aom/slpmap.py      which original sprite id each unit render replaces

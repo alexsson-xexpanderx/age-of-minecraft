@@ -4,13 +4,15 @@
     python tools/build_mod.py --game "C:\\Program Files (x86)\\Microsoft Games\\Age of Empires II"
 
 It reads your game's palette, sprite frame counts and graphics table, renders
-every Minecraft sprite to match exactly, and writes a UserPatch data mod:
+every Minecraft sprite to match exactly, and writes a UserPatch data mod, a game
+of its own called Age of Minecraft:
 
-    Games\\AgeOfMinecraft.xml
-    Games\\AgeOfMinecraft\\Data\\graphics.drs    your graphics.drs with our sprites swapped in
-    Games\\AgeOfMinecraft\\aom_report.txt        what was replaced, skipped and why
+    Games\\age_of_minecraft.xml
+    Games\\age_of_minecraft\\Data\\graphics.drs    your graphics.drs with our sprites swapped in
+    Games\\age_of_minecraft\\aom_report.txt        what was replaced, skipped and why
+    age2_x1\\age_of_minecraft.exe                 its own exe (by UserPatch's SetupAoC.exe), and shortcuts
 
-Your own Data folder is left alone. With --mode direct the sprites go into
+Your own Data folder and exe are left alone. With --mode direct the sprites go into
 Data\\graphics.drs itself instead (a backup is kept; --restore puts it back).
 Options: --only militia,archer (just some units)  --jobs 4  --dry-run
 """
@@ -27,6 +29,8 @@ import time
 import traceback
 from pathlib import Path
 from typing import Optional
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -66,8 +70,14 @@ def blank_group(why: str) -> str:
             return group
     return "buildings"
 
-MOD = "AgeOfMinecraft"
+MOD = "age_of_minecraft"  # the UserPatch data mod: Games\\age_of_minecraft, started by age2_x1\\age_of_minecraft.exe
+NAME = "Age of Minecraft"
 BACKUP = ".aom-backup"
+# the game's own name, where a language file has it as a string of its own: the mod's copy calls it NAME
+GAME_TITLES = ("Age of Empires II Expansion", "Age of Empires II: The Conquerors Expansion",
+               "Age of Empires II: The Conquerors")
+MENU_PICTURES = (50189, 50190, 50688)  # interfac.drs: the Conquerors main menu, its dialogue and its buttons
+MENU_PALETTE = 50589
 
 # The 18 Conquerors civilisations, in their standard ids (UserPatch data mod format).
 CIVS = [
@@ -86,7 +96,7 @@ CIVS = [
 def mod_xml() -> bytes:
     lines = ['<?xml version="1.0" encoding="utf-8"?>',
              f'<configuration game="{MOD}">',
-             "  <name>Age of Minecraft</name>",
+             f"  <name>{NAME}</name>",
              f"  <path>{MOD}</path>",
              '  <civilizations langId="10270" descId="20150" aiNameOffset="6840" uiBaseId="51100" uiStride="20" '
              'uiOffset="0">',
@@ -151,6 +161,7 @@ class Game:
         self.by_slp: dict[int, list[Graphic]] = {}
         for g in self.graphics_table.values():
             self.by_slp.setdefault(g.slp, []).append(g)
+        self.mod_strings: dict[int, str] = {}  # texts for the mod's own language file (standalone mode)
         self.terrains: list[Terrain] = []
         try:
             self.terrains = read_terrains(dat) if dat and self.graphics_table else []
@@ -519,7 +530,12 @@ def main(argv=None) -> int:
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
     if not args.no_dat and (pacman or javelina):
         apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina)
-    exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
+    exe_ok = False
+    if args.mode == "upmod":
+        mod_language(game, log)
+        exe_ok = not args.no_exe and make_exe(game.root, log)
+        make_shortcuts(game, exe_ok, log)
+        save_menu_pictures(game, out_dir, log)
     write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics, farms, panels,
                  dict(failed))
     log(f"done in {time.time() - started:.0f}s")
@@ -528,14 +544,13 @@ def main(argv=None) -> int:
     log(f"  sprites: {len(rendered)} written ({'direct into Data' if args.mode == 'direct' else out_dir})")
     if args.mode == "direct":
         log("  To play: start the game as usual. To undo: double-click restore_original.bat")
-    elif exe_ok:
-        log(f"  To play: start {game.root / 'age2_x1' / (MOD + '.exe')}")
     else:
-        log("  The mod exe is missing. Two ways to play:")
-        log(f"   1. In your game folder, open a command prompt and run:  SetupAoC.exe -g:{MOD}")
-        log(f"      then start age2_x1\\{MOD}.exe")
-        log("   2. Or skip the exe: double-click build_mod_direct.bat (puts the sprites into your normal game,")
-        log("      keeps a backup; restore_original.bat undoes it)")
+        log(f"  To play: double-click '{NAME}' on your desktop or in your game folder.")
+        if exe_ok:
+            log(f"  Or start {game.root / 'age2_x1' / (MOD + '.exe')}. Your normal game is not changed.")
+        else:
+            log(f"  {NAME}'s own exe needs UserPatch's SetupAoC.exe in your game folder; until it is there the")
+            log(f"  shortcut starts it with age2_x1.exe GAME={MOD}. Your normal game is not changed.")
     return 0
 
 
@@ -570,11 +585,117 @@ def make_exe(root: Path, log) -> bool:
     except (OSError, subprocess.SubprocessError) as exc:
         log(f"mod exe: could not run SetupAoC.exe ({exc})")
     if exe.exists():
+        add_icon(exe, log)
         return True
     folder = pick(root, "age2_x1")
     found = sorted(p.name for p in folder.iterdir() if p.suffix.lower() == ".exe") if folder else []
     log(f"mod exe: {exe} was not created. Exes in age2_x1: {', '.join(found) or 'none'}")
     return False
+
+
+def add_icon(exe: Path, log) -> None:
+    """Our icon in the mod's own exe (only that copy; the game's exe is never changed)."""
+    from aom import appicon
+    try:
+        data = exe.read_bytes()
+        new, notes = appicon.into_exe(data)
+    except (OSError, ValueError, struct.error) as exc:
+        log(f"icon: could not put it into {exe.name} ({exc})")
+        return
+    if new != data:
+        tmp = exe.with_name(exe.name + ".tmp")
+        tmp.write_bytes(new)
+        tmp.replace(exe)
+    log(f"icon: {exe.name} has the {NAME} icon ({', '.join(notes) or 'it has no icon pictures'})")
+
+
+def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
+    """'Age of Minecraft' shortcuts with our icon, on the desktop and in the game folder. They start the mod's exe,
+    or without one the game's exe with GAME=<mod> (UserPatch then loads Games\\<mod>.xml)."""
+    from aom import appicon
+    folder = (pick(game.root, "Games") or game.root / "Games") / MOD
+    folder.mkdir(parents=True, exist_ok=True)
+    icon = folder / f"{MOD}.ico"
+    icon.write_bytes(appicon.ico())
+    age2 = pick(game.root, "age2_x1") or game.root / "age2_x1"
+    target = age2 / f"{MOD}.exe" if exe_ok else (pick(age2, "age2_x1.exe") or age2 / "age2_x1.exe")
+    arguments = "" if exe_ok else f"GAME={MOD}"
+    if os.name != "nt":
+        log(f"shortcut: on Windows, '{NAME}' on the desktop and in the game folder starts {target.name} {arguments}")
+        return
+
+    def q(value) -> str:  # a PowerShell string
+        return "'" + str(value).replace("'", "''") + "'"
+
+    script = ("$shell = New-Object -ComObject WScript.Shell; "
+              f"foreach ($dir in @([Environment]::GetFolderPath('Desktop'), {q(game.root)})) {{ "
+              f"$s = $shell.CreateShortcut((Join-Path $dir {q(NAME + '.lnk')})); $s.TargetPath = {q(target)}; "
+              f"$s.Arguments = {q(arguments)}; $s.WorkingDirectory = {q(target.parent)}; "
+              f"$s.IconLocation = {q(str(icon) + ',0')}; $s.Description = {q(NAME)}; $s.Save() }}")
+    try:
+        done = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+                              timeout=60, capture_output=True, text=True, errors="replace")
+        if done.returncode:
+            raise OSError(done.stderr.strip()[-300:] or f"code {done.returncode}")
+        log(f"shortcut: '{NAME}' on your desktop and in {game.root} (starts {target.name} {arguments}".rstrip() + ")")
+    except (OSError, subprocess.SubprocessError) as exc:
+        log(f"shortcut: could not make it ({exc}); start {target} {arguments} instead")
+
+
+def mod_language(game: Game, log) -> None:
+    """The mod's own language_x1_p1.dll: the game's, with Pac-Man's texts (when he was patched) and the game's name
+    as NAME added. A UserPatch mod reads its own copy first, so the game's language files stay as they are."""
+    from aom import langdll, pe
+    files = {name.lower(): path.read_bytes() for name, path in game.language_files().items()}
+    strings = dict(game.mod_strings)
+    for name in langdll.FILES:
+        try:
+            for sid, text in (langdll.all_strings(files[name]).items() if name in files else ()):
+                if text.strip() in GAME_TITLES and sid not in strings:
+                    strings[sid] = NAME
+        except (langdll.DllError, pe.PeError, struct.error):
+            continue
+    if not strings:
+        log("language: nothing to add to the mod's language file")
+        return
+    p1 = files.get("language_x1_p1.dll")
+    try:
+        data = langdll.with_strings(p1, strings) if p1 else langdll.build_dll(strings)
+    except (langdll.DllError, pe.PeError, struct.error) as exc:
+        log(f"language: could not add to language_x1_p1.dll ({exc}); the mod gets a new one with its texts")
+        data = langdll.build_dll({**langdll.all_strings(p1), **strings})
+    write_game_file(game, "upmod", "language_x1_p1.dll", data, log)
+    log("language: the mod's language_x1_p1.dll has " + ", ".join(f"{sid} {text[:40]!r}"
+                                                                   for sid, text in sorted(strings.items())))
+
+
+def save_menu_pictures(game: Game, folder: Path, log) -> None:
+    """The game's main menu pictures as PNG files, so a Minecraft menu can be drawn over exactly the same places."""
+    from aom import appicon
+    raw = game.interfac.get(MENU_PALETTE, "bina")
+    palette = parse_jasc(raw) if raw else game.palette
+    out = folder / "menu_originals"
+    notes = []
+    for sid in MENU_PICTURES:
+        data = game.original(sid)
+        try:
+            frames = slp.decode(data) if data else []
+        except (ValueError, IndexError, struct.error) as exc:
+            notes.append(f"{sid}: could not read ({exc})")
+            continue
+        for k, f in enumerate(frames):
+            out.mkdir(parents=True, exist_ok=True)
+            rgba = np.zeros((*f.pixels.shape, 4), np.uint8)
+            solid = (f.pixels >= 0) & (f.pixels < 256)
+            rgba[solid, :3], rgba[solid, 3] = palette[f.pixels[solid]], 255
+            team = f.pixels >= slp.PLAYER
+            rgba[team, :3], rgba[team, 3] = palette[16 + f.pixels[team] - slp.PLAYER], 255
+            rgba[f.pixels == slp.SHADOW] = (0, 0, 0, 128)
+            (out / f"{sid}_{k:02d}.png").write_bytes(appicon.png(rgba))
+        if frames:
+            sizes = sorted({f"{f.pixels.shape[1]}x{f.pixels.shape[0]}" for f in frames})
+            notes.append(f"{sid}: {len(frames)} pictures ({', '.join(sizes)})")
+    log(f"menu pictures: {'; '.join(notes) or 'none found'}" + (f", saved in {out}" if out.exists() else ""))
 
 
 def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Path:
@@ -735,11 +856,17 @@ def rename_pacman(game: Game, mode: str, strings: dict[str, int], log) -> None:
     changed, notes = gameplay.rename_pacman({name: p.read_bytes() for name, p in paths.items()}, strings)
     for note in notes:
         log(note)
+    if mode == "upmod":  # the game's files stay as they are: his texts go into the mod's own language file
+        from aom import langdll
+        texts = {name.lower(): data for name, data in {**{n: p.read_bytes() for n, p in paths.items()},
+                                                        **changed}.items()}
+        for sid in strings.values():
+            text = next((t for t in (langdll.read_string(texts[n], sid) for n in langdll.FILES if n in texts) if t),
+                        None)
+            if text:
+                game.mod_strings[sid] = text
+        return
     for name, data in changed.items():
-        if mode == "upmod" and name.lower() != "language_x1_p1.dll":
-            log(f"Pac-Man's name: {name} left alone (a UserPatch mod only has its own language_x1_p1.dll); "
-                "build_mod_direct.bat renames him in the game's files")
-            continue
         write_game_file(game, mode, name, data, log, folder=game.root)
 
 
