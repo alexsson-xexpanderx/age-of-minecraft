@@ -16,7 +16,7 @@ Each picture is repainted in the Minecraft style, every pixel keeping its place:
 * everything else, the carved frames, becomes planks, as dark or light as the original frame was, so the
   game's white and black text stays readable on it;
 * where the panels meet the game view they get a black edge, like every Minecraft window;
-* the five resource icons in the top bar (wood, food, gold, stone, population) become an oak log, bread, a
+* the five resource icons in the top bar (wood, food, gold, stone, population) become an oak log, a leg of meat, a
   gold ingot, cobblestone and a villager's face.
 
 The icons sit at fixed places in the 1280x1024 pictures (openage's hardcoded/interface.py). In the smaller
@@ -326,20 +326,21 @@ def encode(original: bytes, big: Optional[bytes], palette: np.ndarray, quant: Qu
 # --------------------------------------------------------------------------- resource icons
 
 ART = {
-    "food": (["................",
-              "................",
-              "................",
-              "................",
-              "....kkkkkkkk....",
-              "..kkbbbbbbbbkk..",
-              ".kbbLbbLbbLbbbk.",
-              ".kbLbbLbbLbbbbk.",
-              "kbbbbbbbbbbbbbbk",
-              "kddddddddddddddk",
-              ".kddddddddddddk.",
-              "..kkkkkkkkkkkk..",
-              "................"],
-             {"k": "#3a2410", "b": "#b8732f", "L": "#e8b060", "d": "#8a5220"}),
+    "food": (["......kkkkkk....",  # a leg of meat on the bone, the way games draw meat
+              "....kkrRRrrrkk..",
+              "...krRRrrrrrrrk.",
+              "..krRrrrrrrrrrdk",
+              "..krrrrrrrrrrrdk",
+              "..krrrrrrrrrrddk",
+              "..krrrrrrrrrdddk",
+              "...krrrrrrrdddk.",
+              "...kkrrrrddddk..",
+              "..kwwkkdddkkk...",
+              ".kwwwk.kkk......",
+              "kwwwk...........",
+              "kwkwwk..........",
+              ".k.kk..........."],
+             {"k": "#2e0a08", "r": "#b8402c", "R": "#e07a5c", "d": "#7e2a1c", "w": "#f2eee0"}),
     "population": (None, {"k": "#24160c", "s": "#b8866c", "b": "#4a2c22", "w": "#f0f0f0", "g": "#2f8a3a",
                           "n": "#9a6c56", "m": "#7a5040"}),
     "gold": (["................",
