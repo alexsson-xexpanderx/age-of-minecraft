@@ -664,6 +664,15 @@ def test_screens():
     assert (out[25, 200] @ screens.LUMA) < 0.4  # the plaque: dark planks, so the game's white title stays readable
     dark = screens.hall(np.random.default_rng(1).uniform(0.05, 0.6, (60, 80, 3)) * (0.3, 0.5, 0.8), np.ones((60, 80), bool))
     assert np.allclose(dark, 139 / 255)  # no parchment: one solid grey, so text in every player colour shows
+    ramp = np.stack([np.arange(256)] * 3, -1)  # a picture made for a grey ramp, also listed with a scrambled one
+    scrambled = ramp[np.random.default_rng(2).permutation(256)]
+    px = np.tile(np.arange(40, 200), (30, 1)).astype(np.int16)
+    opaque_px = np.ones(px.shape, bool)
+    assert screens.intended(px, opaque_px, [scrambled, ramp])[0] is ramp
+    assert len(screens.intended(px, opaque_px, [scrambled, ramp])) == 1  # too different to share colours with
+    near = ramp.copy()
+    near[:5] = 255
+    assert len(screens.intended(px, opaque_px, [ramp, near])) == 2
     a = np.array([[0, 0, 0], [200, 200, 200], [250, 250, 250]] + [[255, 0, 0]] * 253)
     b = np.array([[0, 0, 0], [120, 120, 120], [210, 210, 210]] + [[255, 0, 0]] * 253)
     assert screens.quantise(np.full((1, 1, 3), 0.8), [a])[0, 0] == 1

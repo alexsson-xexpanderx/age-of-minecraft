@@ -57,6 +57,9 @@ SHOWN_WITH = {FLAGS: 50061}  # pictures no screen file names: shown on this scre
 LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
     50104: {"insets": [(503, 50, 790, 495)]},  # the game settings' own sheet
     50161: {"sheets": [(0, 10, 251, 588), (262, 10, 792, 588)], "insets": [(8, 18, 238, 390)]},  # the history book
+    50149: {"sheets": [(26, 0, 800, 540)], "fill": "slot", "wood": [(0, 540, 800, 600)]},  # the achievements: the
+    # scores are written on the sheet in every player's colour, so it is as light as the parchment was; the tabs
+    # sit on the wooden table under it
 }
 LUMA = I.LUMA
 PAPER, DARK = 0.38, 0.45  # parchment is lighter than PAPER; a picture darker than DARK on average is all deepslate
@@ -283,15 +286,18 @@ def hall(rgb: np.ndarray, opaque: np.ndarray, sid: int = 0) -> np.ndarray:
         out[rest & ~shadow] = tex * WOOD / (tex @ LUMA) if board else colour(SOLID)[:3]
         return out
     wood = _boxes(_opening(wood, 3), 0.01 * opaque.size) & rest & ~shadow
+    for x0, y0, x1, y1 in LAYOUTS.get(sid, {}).get("wood", []):
+        wood[y0:y1, x0:x1] = rest[y0:y1, x0:x1]
     stone = rest & ~shadow & ~wood
     out[stone] = _tiled("deepslate_tiles", opaque.shape, STONE)[stone]
     out[wood] = _tiled("dark_oak_planks", opaque.shape, WOOD)[wood]
     lay = LAYOUTS.get(sid, {})
     whole = paper.all() or (opaque.all() and paper.mean() > 0.97)
+    fill = I.GUI[lay.get("fill", "panel")]
     if whole:  # a texture the game fills a dialogue with: no window edges of its own
-        out[paper] = colour(I.GUI["panel"])[:3]
+        out[paper] = colour(fill)[:3]
         return out
-    I._bevel(out, paper, I.GUI["panel"], I.GUI["light"], I.GUI["shade"], I.GUI["edge"])
+    I._bevel(out, paper, fill, I.GUI["light"], I.GUI["shade"], I.GUI["edge"])
     for x0, y0, x1, y1 in lay.get("insets", []):  # a sheet on the sheet: sunk in, like a slot
         m = np.zeros_like(paper)
         m[y0:y1, x0:x1] = True
@@ -316,8 +322,8 @@ def loading(shape: tuple[int, int]) -> np.ndarray:
 def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """A flag (RGB 0..1, and where it is drawn) as a Minecraft banner the size of the original: wool in the flag's
     own colours (they are in its palette) on a dark oak pole, its end cut like a swallowtail, and across its middle,
-    where the game writes the player's name, a black stripe (Minecraft's "fess" pattern), so a name in white or in
-    a player's colour can be read on it."""
+    where the game writes the player's name (on two lines if it is long), a black stripe (Minecraft's "fess"
+    pattern), so a name in white or in a player's colour can be read on it."""
     h, w = opaque.shape
     rows = np.nonzero(opaque.mean(1) > 0.6)[0]  # the original's cloth, not the shadow under it
     top, bottom = (int(rows.min()), int(rows.max()) + 1) if len(rows) else (4, h - 6)
@@ -333,7 +339,7 @@ def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     shade = (wool - wool.min()) / max(1e-6, np.ptp(wool))  # the wool's weave, 0..1
     shade = np.tile(shade.repeat(I.PIXEL, 0).repeat(I.PIXEL, 1), (h // (16 * I.PIXEL) + 1, w // (16 * I.PIXEL) + 1))
     out = ramp[((0.35 + 0.35 * shade[:h, :w]) * (len(ramp) - 1)).astype(int)]  # its middle tones, not the folds
-    stripe = (ys >= mid - 8) & (ys < mid + 8)
+    stripe = (ys >= top + 5) & (ys < bottom - 5)  # tall enough for a name on two lines
     out[stripe] = _tiled("black_wool", (h, w), 0.09)[stripe]
     cloth = (ys >= top) & (ys < bottom) & (xs >= 6) & (xs < w - 1)
     cloth &= ~(w - 1 - xs < (bottom - top) // 2 - np.abs(ys - mid) * 0.9)  # the swallowtail cut
@@ -359,10 +365,31 @@ def quantise(rgb: np.ndarray, palettes: list[np.ndarray]) -> np.ndarray:
     return worst.argmin(1)[inverse].reshape(rgb.shape[:2])
 
 
+def intended(px: np.ndarray, opaque: np.ndarray, palettes: list[np.ndarray]) -> list[np.ndarray]:
+    """The palettes to draw a picture in, the one it was made for first. A picture two screens show in very
+    different palettes only looks right in one of them (in the other its colours are scrambled): the one where its
+    neighbouring pixels are most alike. Palettes only a few colours apart from that one are kept too."""
+    if len(palettes) < 2:
+        return palettes
+    both = opaque[:, 1:] & opaque[:, :-1]
+
+    def roughness(pal: np.ndarray) -> float:
+        rgb = np.asarray(pal, np.float64)[np.clip(px, 0, 255)][..., :3]
+        return float(np.abs(rgb[:, 1:] - rgb[:, :-1]).sum(-1)[both].mean()) if both.any() else 0.0
+
+    best = min(range(len(palettes)), key=lambda i: roughness(palettes[i]))
+    ref = np.asarray(palettes[best], np.float64)[:256, :3]
+    alike = [p for i, p in enumerate(palettes) if i != best and len(p) >= len(ref)
+             and (np.abs(np.asarray(p, np.float64)[:256, :3] - ref).sum(1) > 10).sum() <= 32]
+    return [palettes[best]] + alike
+
+
 def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray]) -> slp.SlpFrame:
-    """One screen picture redrawn, in the first of its palettes' colours and quantised for all of them."""
+    """One screen picture redrawn, in the colours of the palette it was made for, and quantised for it and those
+    like it."""
     px = frame.pixels
     opaque = (px >= 0) & (px < 256)
+    palettes = intended(px, opaque, palettes)
     if sid == FLAGS:
         new, drawn = banner(np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255, opaque)
         out = np.full(px.shape, slp.TRANSPARENT, np.int16)

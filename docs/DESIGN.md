@@ -213,9 +213,12 @@ becomes dark oak planks, dark as before. Screens without parchment, like the
 achievements and the dark blue and green dialogue backgrounds, are one solid
 grey, the grey of Minecraft's inventory slots. The game writes the
 achievements in each player's colour, and on a texture, or on a very dark or
-very light background, some of those colours can't be read. The flags the
+very light background, some of those colours can't be read. The achievements
+sheet is that grey too, as light as its parchment was, and the tabs under it
+sit on a dark oak floor, below the Play Again and Main Menu buttons. The flags the
 game writes the players' names on become Minecraft banners in the flag's own
-colour, on a dark oak pole, with a black stripe across the middle: the game
+colour, on a dark oak pole, with a black stripe across them (room for a name
+on two lines): the game
 writes most names in white, but some in the flag's own colour (red on the red
 flag), and both show on the stripe. The history book gets two grey pages, with its
 list of topics sunk in. The loading screen is Minecraft's dark dirt with the
