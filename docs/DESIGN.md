@@ -193,6 +193,22 @@ button pictures are cut from the new picture at the same places, with the
 original's glow colour around the new object. The build only replaces a menu
 whose pictures have the sizes it was designed for.
 
+### The other screens and the window
+
+Every other screen (game setup, options, scenario editor, history, victory,
+the dialogues) is described by a small screen file in `interfac.drs`: its
+pictures for the three screen sizes, its palette, and the colours the game
+draws its buttons and text in. The loading screen is a picture of its own.
+The build finds them all, lists them in the report and saves them as
+`screen_originals\`, so their Minecraft versions can be drawn to fit where
+the game puts its buttons and text. Those come next.
+
+The mod's own exe says **Age of Minecraft** in its window and on the taskbar:
+the text "Age of Empires II Expansion" is replaced where it stands on its own,
+in place, in `age_of_minecraft.exe` only. Other texts are left alone: longer
+ones that contain it, and the name the game's settings are saved under ("Age
+of Empires II: The Conquerors Expansion"), so your settings carry over.
+
 ### Nature and decorations
 
 | AoE2 | Minecraft |
@@ -317,7 +333,8 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    first, as WololoKingdoms does. `SetupAoC.exe -g:age_of_minecraft` makes
    `age2_x1\age_of_minecraft.exe` once (it returns at once and finishes when
    Install is clicked in its window, so the build waits for the exe), and the
-   villager king icon goes into its icon pictures in place. An "Age of
+   villager king icon goes into its icon pictures in place, and its window
+   title becomes "Age of Minecraft" (in place too). An "Age of
    Minecraft" shortcut with the icon starts it (or, without that exe,
    `age2_x1.exe GAME=age_of_minecraft`). The game's own `age2_x1.exe` is
    checked before and after `SetupAoC.exe` runs, and put back if it changed.

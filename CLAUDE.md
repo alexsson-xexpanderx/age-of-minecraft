@@ -83,8 +83,11 @@ putting `tools/` on `sys.path`.
    `gamedata_x1_p1.drs`: a UserPatch mod's Data folder is only read for that, its `.dat` and `language_x1_p1.dll`
    (the game looks in the patch archive first; WololoKingdoms does the same). It then gets its exe once
    (`SetupAoC.exe -g:age_of_minecraft` returns at once and finishes after Install is clicked, so `make_exe` waits;
-   icon swapped in place by `appicon.into_exe`), "Age of Minecraft" shortcuts (PowerShell, Windows only) and the original menu pictures as
-   PNGs (`menu_originals/`). Last, the build writes `aom_report.txt`.
+   icon swapped in place by `appicon.into_exe`, window title by `retitle`: only the NUL-bounded text "Age of Empires
+   II Expansion", never longer texts or the settings' registry name "...: The Conquerors Expansion"), "Age of Minecraft" shortcuts (PowerShell,
+   Windows only) and the original pictures as PNGs: `menu_originals/` and `screen_originals/` (every screen
+   file's backgrounds, found by `screens.read`, plus every other large interfac.drs picture, e.g. the loading
+   screen). Last, the build writes `aom_report.txt`, whose SCREENS section lists each screen file's settings.
 
 ## Invariants that are easy to break
 

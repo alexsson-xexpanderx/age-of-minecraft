@@ -84,6 +84,7 @@ tools/aom/gaia.py        map decorations: yurts, ruins, graves, flags, torches, 
 tools/aom/farmland.py    farms, which are terrain: Minecraft farmland and wheat in terrain.drs
 tools/aom/interface.py   the screen panels repainted: planks, inventory grey, slots and item icons
 tools/aom/menu.py        the main menu: a block village at night, every button a Minecraft thing in its place
+tools/aom/screens.py     the game's other screens: their screen files and pictures in interfac.drs
 tools/aom/props.py       renders buildings and scenery in the original sprite's frame layout
 tools/aom/slp.py         SLP 2.0N sprite encoder/decoder
 tools/aom/drs.py         DRS archive reader/writer
@@ -93,7 +94,7 @@ tools/aom/datunits.py    reads and patches the civilisations' unit tables in the
 tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon, name and sounds
 tools/aom/langdll.py     reads and changes strings in the game's language DLLs
 tools/aom/pe.py          Windows DLL/exe resources: read them, give a copy new ones in an added section
-tools/aom/appicon.py     the villager king icon: the .ico file, and in place in the mod's own exe
+tools/aom/appicon.py     the villager king icon: the .ico file, and in place in the mod's own exe (and PNGs)
 tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
 tools/aom/easter.py      Pac-Man and the ghost
 tools/aom/slpmap.py      which original sprite id each unit render replaces

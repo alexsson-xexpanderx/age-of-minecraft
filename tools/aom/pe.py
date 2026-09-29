@@ -164,6 +164,16 @@ def checksum(data: bytes, at: int) -> int:
     return total + len(data)
 
 
+def with_checksum(data: bytes) -> bytes:
+    """The file with its PE checksum brought up to date; a file without one (0) keeps none."""
+    h = header(data)
+    if not struct.unpack_from("<I", data, h.opt + 64)[0]:
+        return data
+    out = bytearray(data)
+    struct.pack_into("<I", out, h.opt + 64, checksum(out, h.opt + 64))
+    return bytes(out)
+
+
 def build(res: Resources, dll: bool = True) -> bytes:
     """A resource-only DLL (no code, no entry point) holding these resources."""
     payload = tree(res, 0x1000)

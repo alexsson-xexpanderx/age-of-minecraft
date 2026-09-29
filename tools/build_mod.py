@@ -34,7 +34,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from aom import farmland, interface, menu, slp  # noqa: E402
+from aom import farmland, interface, menu, screens, slp  # noqa: E402
 from aom.datfile import Graphic, Terrain, read_graphics, read_terrains  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import blank, render_frames  # noqa: E402
@@ -79,6 +79,7 @@ GAME_TITLES = ("Age of Empires II Expansion", "Age of Empires II: The Conquerors
                "Age of Empires II: The Conquerors")
 MENU_PICTURES = (50189, 50190, 50688)  # interfac.drs: the Conquerors main menu, its dialogue and its buttons
 MENU_PALETTE = 50589
+EXE_TITLE = "Age of Empires II Expansion"  # the game window's title: the mod's own exe calls it NAME
 
 # The 18 Conquerors civilisations, in their standard ids (UserPatch data mod format).
 CIVS = [
@@ -192,6 +193,19 @@ class Game:
         """The sprite archives, then terrain.drs (farms) and interfac.drs (the screen panels)."""
         more = [("terrain.drs", self.terrain)] if self.terrain is not None else []
         return self.archives + more + [("interfac.drs", self.interfac)]
+
+    def data_file(self, fid: int) -> Optional[bytes]:
+        """A data file (a palette, a screen file) from the first archive that has it."""
+        for _, drs in self._searched():
+            if fid in drs.ids("bina"):
+                return drs.get(fid, "bina")
+        return None
+
+    def screens(self) -> tuple[list[screens.Screen], dict[int, int]]:
+        """The screen files, and every screen picture with its palette (not the main menu or the panels)."""
+        found = screens.read(sorted(set().union(*(d.ids("bina") for _, d in self._searched()))), self.data_file)
+        slps = sorted(s for _, d in self._searched() for s in d.ids() if s in screens.INTERFACE)
+        return found, screens.pictures(found, slps, self.original, set(MENU_PICTURES))
 
     def original(self, slp_id: int) -> Optional[bytes]:
         for _, drs in self._searched():
@@ -507,8 +521,10 @@ def main(argv=None) -> int:
     log(f"plan: {len(jobs) - len(statics) - len(farms) - len(panels)} unit sprites, {len(statics)} building/scenery "
         f"sprites, {len(farms)} farm textures and {len(panels)} interface panels to render, {len(blanks)} layers to "
         f"blank, {len(skipped)} skipped")
+    screen_files, screen_pictures = game.screens()
     if args.dry_run:
-        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics, farms, panels)
+        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics, farms, panels,
+                     screen_files=screen_files, screen_pictures=screen_pictures)
         return 0
 
     started = time.time()
@@ -550,8 +566,9 @@ def main(argv=None) -> int:
         exe_ok = not args.no_exe and make_exe(game.root, log)
         make_shortcuts(game, exe_ok, log)
         save_menu_pictures(game, out_dir, log)
+        save_screen_pictures(game, screen_pictures, out_dir, log)
     write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics, farms, panels,
-                 dict(failed))
+                 dict(failed), screen_files, screen_pictures)
     log(f"done in {time.time() - started:.0f}s")
     log("")
     log("RESULT")
@@ -587,7 +604,7 @@ def make_exe(root: Path, log) -> bool:
     exe = age2 / f"{MOD}.exe"
     if exe.exists():
         log(f"mod exe: {exe} is there (made by an earlier build)")
-        add_icon(exe, log)
+        finish_exe(exe, log)
         return True
     setup = find_setup(root)
     if setup is None:
@@ -621,7 +638,7 @@ def make_exe(root: Path, log) -> bool:
         log("mod exe: SetupAoC.exe changed your age2_x1.exe; it is put back as it was")
     if exe.exists():
         log(f"mod exe: made {exe}")
-        add_icon(exe, log)
+        finish_exe(exe, log)
         return True
     found = sorted(p.name for p in age2.iterdir() if p.suffix.lower() == ".exe") if age2.is_dir() else []
     log(f"mod exe: {exe.name} was not made. Exes in age2_x1: {', '.join(found) or 'none'}")
@@ -638,20 +655,55 @@ def _installer_running() -> bool:
         return True
 
 
-def add_icon(exe: Path, log) -> None:
-    """Our icon in the mod's own exe (only that copy; the game's exe is never changed)."""
-    from aom import appicon
+def finish_exe(exe: Path, log) -> None:
+    """Our icon and name in the mod's own exe (only that copy; the game's exe is never changed). Both are changed
+    in place, so no other byte of the exe moves."""
+    from aom import appicon, pe
     try:
         data = exe.read_bytes()
-        new, notes = appicon.into_exe(data)
-    except (OSError, ValueError, struct.error) as exc:
-        log(f"icon: could not put it into {exe.name} ({exc})")
+    except OSError as exc:
+        log(f"mod exe: could not read {exe.name} ({exc})")
         return
+    try:
+        new, notes = appicon.into_exe(data)
+        log(f"icon: {exe.name} has the {NAME} icon ({', '.join(notes) or 'it has no icon pictures'})")
+    except (ValueError, struct.error) as exc:
+        new = data
+        log(f"icon: could not put it into {exe.name} ({exc})")
+    new, places = retitle(new)
+    if places:
+        log(f"window title: '{EXE_TITLE}' is now '{NAME}' in {exe.name} ({places} places)")
+    elif any(t in new for t in _texts(NAME)):
+        log(f"window title: {exe.name} already says '{NAME}'")
+    else:
+        log(f"window title: '{EXE_TITLE}' is not in {exe.name}; the window keeps its title")
     if new != data:
+        try:
+            new = pe.with_checksum(new)
+        except (pe.PeError, struct.error):
+            pass
         tmp = exe.with_name(exe.name + ".tmp")
         tmp.write_bytes(new)
         tmp.replace(exe)
-    log(f"icon: {exe.name} has the {NAME} icon ({', '.join(notes) or 'it has no icon pictures'})")
+
+
+def _texts(text: str) -> list[bytes]:
+    """A text as the exe can hold it, on its own: between zero bytes, as single-byte or UTF-16 characters."""
+    return [b"\0" + text.encode("latin-1") + b"\0", b"\0\0" + text.encode("utf-16-le") + b"\0\0"]
+
+
+def retitle(data: bytes, old: str = EXE_TITLE, new: str = NAME) -> tuple[bytes, int]:
+    """The exe with the text `old` (only where it stands on its own, not inside a longer text) replaced by `new`,
+    padded with zero bytes to the same length. Returns it and how many places changed."""
+    out, count = bytearray(data), 0
+    for find, put in zip(_texts(old), _texts(new)):
+        put = put[:-1].ljust(len(find) - 1, b"\0") + put[-1:]
+        at = out.find(find)
+        while at >= 0:
+            out[at:at + len(find)] = put
+            count += 1
+            at = out.find(find, at + len(find) - 1)
+    return bytes(out), count
 
 
 def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
@@ -740,14 +792,16 @@ def mod_language(game: Game, log) -> None:
                                                                    for sid, text in sorted(strings.items())))
 
 
-def save_menu_pictures(game: Game, folder: Path, log) -> None:
-    """The game's main menu pictures as PNG files, so a Minecraft menu can be drawn over exactly the same places."""
+def save_pictures(game: Game, pictures: dict[int, int], out: Path) -> list[str]:
+    """Pictures from the game's files as PNG files (<id>_<frame>.png), each in its palette; notes on each."""
     from aom import appicon
-    raw = game.interfac.get(MENU_PALETTE, "bina")
-    palette = parse_jasc(raw) if raw else game.palette
-    out = folder / "menu_originals"
+    palettes: dict[int, np.ndarray] = {}
     notes = []
-    for sid in MENU_PICTURES:
+    for sid, pal in pictures.items():
+        if pal not in palettes:
+            raw = game.data_file(pal)
+            palettes[pal] = parse_jasc(raw) if raw else game.palette
+        palette = palettes[pal]
         data = game.original(sid)
         try:
             frames = slp.decode(data) if data else []
@@ -756,17 +810,36 @@ def save_menu_pictures(game: Game, folder: Path, log) -> None:
             continue
         for k, f in enumerate(frames):
             out.mkdir(parents=True, exist_ok=True)
-            rgba = np.zeros((*f.pixels.shape, 4), np.uint8)
-            solid = (f.pixels >= 0) & (f.pixels < 256)
-            rgba[solid, :3], rgba[solid, 3] = palette[f.pixels[solid]], 255
-            team = f.pixels >= slp.PLAYER
-            rgba[team, :3], rgba[team, 3] = palette[16 + f.pixels[team] - slp.PLAYER], 255
-            rgba[f.pixels == slp.SHADOW] = (0, 0, 0, 128)
+            px = f.pixels
+            if ((px >= 0) & (px < 256)).all():  # an opaque picture: a small paletted PNG
+                (out / f"{sid}_{k:02d}.png").write_bytes(appicon.png(px.astype(np.uint8), palette))
+                continue
+            rgba = np.zeros((*px.shape, 4), np.uint8)
+            solid = (px >= 0) & (px < 256)
+            rgba[solid, :3], rgba[solid, 3] = palette[px[solid]], 255
+            team = px >= slp.PLAYER
+            rgba[team, :3], rgba[team, 3] = palette[16 + px[team] - slp.PLAYER], 255
+            rgba[px == slp.SHADOW] = (0, 0, 0, 128)
             (out / f"{sid}_{k:02d}.png").write_bytes(appicon.png(rgba))
         if frames:
             sizes = sorted({f"{f.pixels.shape[1]}x{f.pixels.shape[0]}" for f in frames})
             notes.append(f"{sid}: {len(frames)} pictures ({', '.join(sizes)})")
+    return notes
+
+
+def save_menu_pictures(game: Game, folder: Path, log) -> None:
+    """The game's main menu pictures as PNG files, so a Minecraft menu can be drawn over exactly the same places."""
+    out = folder / "menu_originals"
+    notes = save_pictures(game, {sid: MENU_PALETTE for sid in MENU_PICTURES}, out)
     log(f"menu pictures: {'; '.join(notes) or 'none found'}" + (f", saved in {out}" if out.exists() else ""))
+
+
+def save_screen_pictures(game: Game, pictures: dict[int, int], folder: Path, log) -> None:
+    """The pictures of the game's other screens (setup, options, loading, dialogues...) as PNG files, so Minecraft
+    ones can be drawn to fit their layout."""
+    out = folder / "screen_originals"
+    notes = save_pictures(game, pictures, out)
+    log(f"screen pictures: {len(notes)} saved in {out}" if notes else "screen pictures: none found")
 
 
 def write_outputs(game: Game, mode: str, rendered: dict[int, bytes], log) -> Path:
@@ -960,7 +1033,7 @@ def restore(root: Path) -> int:
 
 
 def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=(),
-                 farms=(), panels=(), failed=None) -> None:
+                 farms=(), panels=(), failed=None, screen_files=(), screen_pictures=None) -> None:
     lines = ["Age of Minecraft build report", "=" * 30, *header, "", "REPLACED (slp, unit, action, frames x angles)"]
     for t, n, frames, angles, mirrored, source in sorted(planned, key=lambda p: p[0].slp):
         m = " mirrored" if mirrored else ""
@@ -980,6 +1053,26 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
     for s, (w, h) in panels:
         result = "planned" if failed is None else ("Minecraft style" if s not in failed else failed[s])
         lines.append(f"  {s:6d}  {w}x{h:<5d} {result}")
+    lines += ["", "SCREENS (screen file: its pictures and palette, then its settings)"]
+
+    def sizes(sid: int) -> str:
+        data = game.original(sid)
+        try:
+            found = slp.info(data).sizes if data else []
+        except (ValueError, IndexError):
+            return "unreadable"
+        if not found:
+            return "not in your files"
+        return f"{found[0][0]}x{found[0][1]}" + (f", {len(found)} pictures" if len(found) > 1 else "")
+
+    named = set()
+    for sc in screen_files:
+        named |= set(sc.backgrounds)
+        pics = ", ".join(f"{b} ({sizes(b)})" for b in sc.backgrounds) or "no pictures of its own"
+        lines.append(f"  {sc.id:6d}  {pics}; palette {sc.palette}")
+        lines.append("          " + " | ".join(" ".join([k, *v]) for k, v in sc.fields.items()))
+    lines += ["", "OTHER LARGE PICTURES (slp, size)"]
+    lines += [f"  {s:6d}  {sizes(s)}" for s in sorted(screen_pictures or {}) if s not in named]
     lines += ["", "BLANKED LAYERS"] + [f"  {s:6d}  {why}" for s, why in sorted(blanks.items())]
     lines += ["", "SKIPPED"] + [f"  {t.slp:6d}  {t.unit:24s} {t.action:7s} {why}" for t, why in skipped]
     covered = {p[0].unit for p in planned}

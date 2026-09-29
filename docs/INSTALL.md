@@ -45,8 +45,9 @@ Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man at the Wonder
 Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's name, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
 Games\age_of_minecraft\menu_originals\         your game's main menu pictures (for a Minecraft menu)
+Games\age_of_minecraft\screen_originals\       your game's other screens (setup, loading, dialogues...)
 Games\age_of_minecraft\aom_report.txt         what was replaced, what was skipped, and why
-age2_x1\age_of_minecraft.exe                  its own exe, made by UserPatch's SetupAoC.exe
+age2_x1\age_of_minecraft.exe                  its own exe, made by UserPatch's SetupAoC.exe: its window says "Age of Minecraft"
 Age of Minecraft (shortcut)                   on your desktop and in the game folder, with the icon
 ```
 
@@ -180,5 +181,6 @@ In a multiplayer game, cheats only work if "Allow cheats" is ticked in the
 game setup.
 
 **Please send back** `Games\age_of_minecraft\aom_report.txt`, the pictures in
-`Games\age_of_minecraft\menu_originals\` and a few screenshots. The report lists your game's full graphics table, so anything
+`Games\age_of_minecraft\menu_originals\` and `screen_originals\` (zip the
+folders) and a few screenshots. The report lists your game's full graphics table, so anything
 that looks off can be mapped exactly in the next round.

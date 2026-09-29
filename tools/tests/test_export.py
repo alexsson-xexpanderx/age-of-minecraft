@@ -219,6 +219,15 @@ def fake_game(root: Path) -> Path:
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.put(50189, fake_menu())  # the main menu, and its palette
     interfac.put(50589, fake_palette(), "bina")
+    # a screen file (the game setup) with its pictures and palette, the loading screen no screen file names, an icon
+    interfac.put(50053, b"background1_files      setup1.slp none 50100 -1\r\n"
+                        b"background2_files      setup2.slp none 50101 -1\r\n"
+                        b"background3_files      none none -1 -1\r\n"
+                        b"palette_file           setup.pal 50532\r\n"
+                        b"text_color1            255 255 255\r\n", "bina")
+    interfac.put(50532, fake_palette(), "bina")
+    for sid, (w, h) in ((50100, (800, 600)), (50101, (1024, 768)), (50163, (800, 600)), (50700, (36, 36))):
+        interfac.put(sid, slp.encode([slp.SlpFrame(np.full((h, w), 90, np.int16), (0, 0))]))
     interfac.write(data / "interfac.drs")
     # the language files: Furious the Monkey Boy's name (5860), button (6860) and help (26860) texts
     monkey = {5860: "Furious the Monkey Boy", 6860: "Create <b>Furious the Monkey Boy<b> (<cost>)",
@@ -364,11 +373,20 @@ def test_rendered_sprite_matches_layout():
     assert (px >= slp.PLAYER).any() and (px == slp.SHADOW).any() and (px == slp.OBSTRUCTION).any()
 
 
+def fake_exe() -> bytes:
+    """The mod's exe as UserPatch makes it: an icon, and the game's name as the window title (both text kinds)."""
+    from aom import pe
+    icon = struct.pack("<IiiHHIIiiII", 40, 32, 64, 1, 32, 0, 0, 0, 0, 0, 0) + bytes(32 * 32 * 4 + 4 * 32)
+    title = b"\0Age of Empires II Expansion\0" + "\0Age of Empires II Expansion\0".encode("utf-16-le")
+    return pe.build({(pe.RT_ICON, 1, 1033): (icon, 0), (10, 1, 1033): (title, 0)}, dll=False)
+
+
 def test_full_build(tmp: Path):
     game = fake_game(tmp / "aoe2")
     for leftover in ("Games/AoM.xml", "age2_x1/AoM.exe", "Games/age_of_minecraft/Data/graphics.drs"):
         (game / leftover).parent.mkdir(parents=True, exist_ok=True)  # what earlier builds left behind
         (game / leftover).write_bytes(b"old")
+    (game / "age2_x1" / "age_of_minecraft.exe").write_bytes(fake_exe())  # made by an earlier build
     assert build_mod.main(["--game", str(game), "--jobs", "2"]) == 0
     mod = game / "Games" / "age_of_minecraft"
     xml = (game / "Games" / "age_of_minecraft.xml").read_bytes()
@@ -440,6 +458,21 @@ def test_full_build(tmp: Path):
     assert ico[:4] == b"\0\0\1\0" and struct.unpack_from("<H", ico, 4)[0] == 7
     assert (mod / "menu_originals" / "50189_00.png").read_bytes()[:4] == b"\x89PNG"
     assert "menu pictures: 50189: 53 pictures" in report
+    # the other screens' pictures, to draw Minecraft ones over: the setup screen's, and the loading screen
+    saved = sorted(p.name for p in (mod / "screen_originals").iterdir())
+    assert saved == ["50100_00.png", "50101_00.png", "50163_00.png"]
+    assert out.get(50100) is None and out.get(50163) is None  # not changed yet
+    assert "  50053  50100 (800x600), 50101 (1024x768); palette 50532" in report
+    assert "text_color1 255 255 255" in report and "  50163  800x600" in report
+    # the mod's exe: our icon, and the window says Age of Minecraft; the game's name is gone from it
+    from aom import pe
+    exe = (game / "age2_x1" / "age_of_minecraft.exe").read_bytes()
+    assert len(exe) == len(fake_exe()) and exe != fake_exe()
+    assert b"\0Age of Minecraft\0" in exe and "\0Age of Minecraft\0".encode("utf-16-le") in exe
+    assert b"Empires" not in exe and "Empires".encode("utf-16-le") not in exe
+    h = pe.header(exe)
+    assert struct.unpack_from("<I", exe, h.opt + 64)[0] == pe.checksum(exe, h.opt + 64)
+    assert "window title: 'Age of Empires II Expansion' is now 'Age of Minecraft' in age_of_minecraft.exe (2 " in report
     # his sounds: six new sounds in the .dat, their WAV files in the patch archive (on free ids)
     from aom.datfile import sound_table
     dat = datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
@@ -562,6 +595,19 @@ def test_exe_icon():
     places = [(at, at + size) for (t, _, _), (at, size, _) in pe.places(exe).items() if t == pe.RT_ICON]
     assert all(any(a <= i < b for a, b in places) for i in range(len(exe)) if exe[i] != new[i])
     assert all(new[a:b] != exe[a:b] for a, b in places)
+
+
+def test_exe_title():
+    """The window title changes only where the game's name stands on its own, and keeps every byte in place."""
+    old = "Age of Empires II Expansion"
+    data = (b"MZ\0" + old.encode() + b"\0" + b"x" + old.encode() + b"\0\0" + old.encode() + b" Setup\0"
+            + ("\0" + old + "\0").encode("utf-16-le"))
+    new, n = build_mod.retitle(data)
+    assert n == 2 and len(new) == len(data)
+    assert new.startswith(b"MZ\0Age of Minecraft\0\0\0")
+    assert b"x" + old.encode() + b"\0" in new and old.encode() + b" Setup" in new  # inside longer texts: kept
+    assert new.endswith("\0Age of Minecraft".encode("utf-16-le") + bytes(2 * (len(old) - 16) + 2))
+    assert build_mod.retitle(new) == (new, 0)
 
 
 def test_language_file_copy():

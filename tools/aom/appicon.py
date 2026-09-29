@@ -10,6 +10,7 @@ from __future__ import annotations
 import struct
 import zlib
 from functools import lru_cache
+from typing import Optional
 
 import numpy as np
 
@@ -48,15 +49,17 @@ def image(size: int) -> np.ndarray:
     return out
 
 
-def png(pixels: np.ndarray) -> bytes:
-    """A PNG file of an RGB or RGBA uint8 image."""
-    h, w, c = pixels.shape
+def png(pixels: np.ndarray, palette: Optional[np.ndarray] = None) -> bytes:
+    """A PNG file of an RGB or RGBA uint8 image, or of palette indices (h x w uint8) with their palette."""
+    h, w = pixels.shape[:2]
+    kind = 3 if palette is not None else (6 if pixels.shape[2] == 4 else 2)
 
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    def chunk(name: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + name + data + struct.pack(">I", zlib.crc32(name + data))
 
     rows = b"".join(b"\0" + pixels[y].tobytes() for y in range(h))
-    return (PNG_SIGNATURE + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6 if c == 4 else 2, 0, 0, 0))
+    colours = b"" if palette is None else chunk(b"PLTE", np.asarray(palette, np.uint8)[:256, :3].tobytes())
+    return (PNG_SIGNATURE + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, kind, 0, 0, 0)) + colours
             + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
 
 
