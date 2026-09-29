@@ -203,26 +203,26 @@ game, the loading screen) is described by a small screen file in
 colours the game draws its buttons and text in. The build finds them all,
 lists them in the report and saves them as `screen_originals\`.
 
-Almost all of them are light parchment, and the game writes on it in black,
-or in light letters with a black shadow. So the parchment stays as light as it
-was: the **deepslate hall** makes each sheet a window in the grey of
-Minecraft's inventory, with straight edges and Minecraft's white and dark
-bevel, and everything around it deepslate tiles. The wood (the crate the
-setup screen's buttons sit on, the plaques titles are written on in white)
-becomes dark oak planks, dark as before. Screens without parchment, like the
-achievements and the dark blue and green dialogue backgrounds, are one solid
-grey, the grey of Minecraft's inventory slots. The game writes the
-achievements in each player's colour, and on a texture, or on a very dark or
-very light background, some of those colours can't be read. The achievements
-sheet is that grey too, as light as its parchment was, and the tabs under it
-sit on a dark oak floor, below the Play Again and Main Menu buttons. The flags the
-game writes the players' names on become Minecraft banners in the flag's own
-colour, on a dark oak pole, with a black stripe across them (room for a name
-on two lines): the game
-writes most names in white, but some in the flag's own colour (red on the red
-flag), and both show on the stripe. The history book gets two grey pages, with its
-list of topics sunk in. The loading screen is Minecraft's dark dirt with the
-block logo in grey stone (its palette has greys, not gold or green).
+Almost all of them are parchment, and the game writes on it in white, in
+cream with a black shadow, in black, or in the players' colours. The **deepslate
+hall** makes each sheet a Minecraft window in a middle grey, where all of those
+can be read, with straight edges and Minecraft's light and dark bevel, and
+everything around it deepslate tiles. The wood (the crate the setup screen's
+buttons sit on, the plaques titles are written on in white) becomes dark oak
+planks. The history book gets two grey pages, with its list of topics sunk in.
+The loading screen is Minecraft's dark dirt with the block logo in grey stone
+(its palette has greys, not gold or green).
+
+The achievements, where the game writes white titles and every player's scores
+in their colour, are a dark grey window (Minecraft's `#373737`), and so are the
+timeline and the dark dialogue backgrounds. Under the window, on a dark oak
+floor, the tabs (Score to Timeline) are Minecraft tabs: the chosen one in the
+window's grey, opening into it, the others darker. Their top rows used to carry
+on the parchment under the Play Again and Main Menu buttons; those rows are left
+out, so the tabs no longer run into the buttons. The flags the players' names
+are written on become Minecraft banners in the flag's own colour, on a dark oak
+pole, with a black stripe across them (room for a name on two lines). The team
+marks are Minecraft shields with the team's number, and a dash for no team.
 
 Each picture is drawn in the palette of every screen that shows it, keeps its
 size and its see-through parts, and only the pictures the build knows, at

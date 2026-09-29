@@ -249,6 +249,13 @@ def fake_game(root: Path) -> Path:
         px[38:42, 10:80] = 3
         flags.append(slp.SlpFrame(px, (0, 0)))
     interfac.put(50762, slp.encode(flags))
+    tabs = [slp.SlpFrame(np.full((78, 107), 60 + k, np.int16), (0, 0)) for k in range(12)]  # six tabs, twice
+    for k in range(0, 12, 2):  # not chosen: a dark edge between the sheet above and the tab
+        tabs[k].pixels[21:24] = 0
+    interfac.put(50765, slp.encode(tabs))
+    marks = [slp.SlpFrame(np.full((21, 37), 70, np.int16), (0, 0))]  # no team, then teams 1 to 4
+    marks += [slp.SlpFrame(np.full((44, 36), 71 + k, np.int16), (0, 0)) for k in range(4)]
+    interfac.put(50769, slp.encode(marks))
     for pal in (50531, 50532, 50533, 50563):
         interfac.put(pal, fake_palette(), "bina")
     interfac.put(50100, fake_screen(800, 600))
@@ -487,7 +494,9 @@ def test_full_build(tmp: Path):
     assert "menu pictures: 50189: 53 pictures" in report
     # the other screens' pictures, to draw Minecraft ones over: the setup screen's, and the loading screen
     saved = sorted(p.name for p in (mod / "screen_originals").iterdir())
-    assert saved == ["50100_00.png", "50101_00.png", "50149_00.png", "50163_00.png"] + [f"50762_0{k}.png" for k in range(8)]
+    assert saved == (["50100_00.png", "50101_00.png", "50149_00.png", "50163_00.png"]
+                     + [f"50762_0{k}.png" for k in range(8)] + [f"50765_{k:02d}.png" for k in range(12)]
+                     + [f"50769_0{k}.png" for k in range(5)])
     assert "  50053  50100 (800x600), 50101 (1024x768); palette 50532" in report
     assert "text_color1 255 255 255" in report and "  50061  50149 (640x480); palette 50531" in report
     # the screens in the Minecraft style: the parchment is the inventory's grey, the loading screen dirt
@@ -498,7 +507,7 @@ def test_full_build(tmp: Path):
         a, b = slp.decode(ui_before.get(sid)), slp.decode(out.get(sid))
         assert len(a) == len(b) == 1 and a[0].pixels.shape == b[0].pixels.shape
         assert not np.array_equal(a[0].pixels, b[0].pixels)
-    grey = screens.quantise(np.full((1, 1, 3), 198 / 255), [parse_jasc(fake_palette())])[0, 0]
+    grey = screens.quantise(np.full((1, 1, 3), 107 / 255), [parse_jasc(fake_palette())])[0, 0]
     assert slp.decode(out.get(50100))[0].pixels[300, 200] == grey
     assert out.get(50149) is None and out.get(50700) is None  # a picture it doesn't know, and an icon
     assert "screen picture 50149 is not the one this build knows" in report
@@ -510,6 +519,13 @@ def test_full_build(tmp: Path):
         px = f.pixels
         assert (px[21, 20:100] >= 0).all() and (ach[px[21, 20:100]] @ [0.299, 0.587, 0.114]).max() < 60
         assert (px[40:, 10:] == slp.TRANSPARENT).all()  # no shadow under it
+    tabs = slp.decode(out.get(50765))  # Minecraft tabs: their top rows (under the buttons) left out
+    assert len(tabs) == 12 and all((f.pixels[:14] == slp.TRANSPARENT).all() for f in tabs)
+    assert all((tabs[k].pixels[17:20, 40] >= 0).all() for k in range(1, 12, 2))  # a chosen one opens upwards
+    assert all((tabs[k].pixels[17:20, 40] == slp.TRANSPARENT).all() for k in range(0, 12, 2))
+    marks = slp.decode(out.get(50769))
+    assert len(marks) == 5 and [f.pixels.shape for f in marks] == [(21, 37)] + [(44, 36)] * 4
+    assert len({f.pixels.tobytes() for f in marks[1:]}) == 4  # four numbered shields
     # the mod's exe: our icon, and the window says Age of Minecraft; the game's name is gone from it
     from aom import pe
     exe = (game / "age2_x1" / "age_of_minecraft.exe").read_bytes()
@@ -660,10 +676,10 @@ def test_screens():
     assert paper[20:h - 14, 14:140].all() and paper[50:h - 14, 140:260].all()  # the tears and the ornament: gone
     assert not paper[:8].any() and not paper[14:46, 144:256].any()  # the frame and the plaque stay apart
     out = screens.hall(rgb, opaque)
-    assert np.allclose(out[150, 200], 198 / 255, atol=0.01)  # the inventory's grey
+    assert np.allclose(out[150, 200], 107 / 255, atol=0.01)  # a middle grey: white and black text both show
     assert (out[25, 200] @ screens.LUMA) < 0.4  # the plaque: dark planks, so the game's white title stays readable
     dark = screens.hall(np.random.default_rng(1).uniform(0.05, 0.6, (60, 80, 3)) * (0.3, 0.5, 0.8), np.ones((60, 80), bool))
-    assert np.allclose(dark, 139 / 255)  # no parchment: one solid grey, so text in every player colour shows
+    assert np.allclose(dark, 55 / 255)  # no parchment: one solid dark grey, so light text and player colours show
     ramp = np.stack([np.arange(256)] * 3, -1)  # a picture made for a grey ramp, also listed with a scrambled one
     scrambled = ramp[np.random.default_rng(2).permutation(256)]
     px = np.tile(np.arange(40, 200), (30, 1)).astype(np.int16)

@@ -64,12 +64,14 @@ putting `tools/` on `sys.path`.
      with exactly the known picture sizes (`menu.known`) is replaced.
    - The other screens (`screens.RESTYLED`: setup screens, dialogues, history, achievements, loading screen 50163) are
      found through the screen files (`screens.read`, `Game.screens`) and redrawn by `screens.hall`: parchment
-     (`screens.sheets`) becomes Minecraft's inventory grey, frames deepslate, wood dark oak, keeping the original's
-     lightness so the game's black text and light text with black shadow stay readable. `screens.quantise` picks
+     (`screens.sheets`) becomes a window in a middle grey (`screens.WINDOWS`: white, cream, black and player colours
+     all readable), frames deepslate, wood dark oak; the achievements and timeline are the dark window. `screens.quantise` picks
      colours good in every palette a picture is shown in; `LAYOUTS` gives the sheets of a few pictures by hand.
      Pictures without parchment are one solid colour (the game writes scores in player colours on them). The
      achievements' flags (`screens.FLAGS`, no screen file names them: `SHOWN_WITH` gives the achievements' palette)
-     become banners coloured from each flag's own pixels, as that palette lacks Minecraft's wool colours.
+     become banners coloured from each flag's own pixels, as that palette lacks Minecraft's wool colours. Its tabs
+     (`TABS`, 12 pictures: each tab not chosen / chosen, told apart by the dark edge at their top) lose their top
+     rows, which ran under the Play Again and Main Menu buttons; the team marks (`TEAMS`) become numbered shields.
    - A picture listed by screens with very different palettes only looks right in one: `screens.intended` picks
      it (neighbouring pixels most alike) and drops palettes too different to share colours with. The PNGs in
      `screen_originals/` use the first screen's palette, so some of them show scrambled colours.

@@ -43,6 +43,8 @@ MIN_SIZE = (250, 130)  # smaller pictures are buttons and icons, not screens
 ALSO_SAVED = (50761, 50762, 50765, 50769)  # smaller pictures of the achievements: icons, flags, tabs, team shields
 LOADING = 50163  # the Conquerors' loading screen (screen file 50063)
 FLAGS = 50762  # the achievements' flags, one picture per player colour: the game writes each player's name on one
+TABS = 50765  # the achievements' tabs (Score ... Timeline), each as it looks chosen and not chosen
+TEAMS = 50769  # the achievements' team marks: none, then teams 1 to 4
 RESTYLED = {  # picture -> its size: the screens this module redraws
     50100: (800, 600), 50101: (1024, 768), 50102: (1280, 1024), 50103: (800, 600), 50104: (800, 600),  # setup
     50270: (388, 258), 50190: (259, 138), 50202: (800, 600), 50204: (800, 600),  # their dialogues
@@ -51,20 +53,23 @@ RESTYLED = {  # picture -> its size: the screens this module redraws
     50127: (273, 182), 50161: (800, 600), 50149: (800, 600), 50145: (800, 600), 50763: (268, 270),  # editor, history
     53161: (500, 408), 53162: (500, 408), 53163: (500, 408), 53164: (500, 408),  # the campaigns' dialogues
     53171: (500, 408), 53172: (500, 408), 53173: (500, 408), 53174: (500, 408),
-    LOADING: (800, 600), FLAGS: None,
+    LOADING: (800, 600), FLAGS: None, TABS: None, TEAMS: None,
 }
-SHOWN_WITH = {FLAGS: 50061}  # pictures no screen file names: shown on this screen (the achievements), in its palette
+SHOWN_WITH = {FLAGS: 50061, TABS: 50061, TEAMS: 50061}  # no screen file names them: shown on the achievements
 LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
     50104: {"insets": [(503, 50, 790, 495)]},  # the game settings' own sheet
     50161: {"sheets": [(0, 10, 251, 588), (262, 10, 792, 588)], "insets": [(8, 18, 238, 390)]},  # the history book
-    50149: {"sheets": [(26, 0, 800, 540)], "fill": "slot", "wood": [(0, 540, 800, 600)]},  # the achievements: the
-    # scores are written on the sheet in every player's colour, so it is as light as the parchment was; the tabs
-    # sit on the wooden table under it
+    50149: {"sheets": [(26, 0, 800, 540)], "window": "dark", "wood": [(0, 540, 800, 600)]},  # the achievements:
+    # white titles and every player's colour on a dark sheet; the tabs sit on the wooden table under it
+    50763: {"window": "dark"},  # the timeline's background
 }
 LUMA = I.LUMA
 PAPER, DARK = 0.38, 0.45  # parchment is lighter than PAPER; a picture darker than DARK on average is all deepslate
 STONE, WOOD = 0.3, 0.24  # how light the deepslate and the planks are
-SOLID = I.GUI["slot"]  # a picture without parchment: every player colour can be read on it
+# the windows: (fill, light edge, dark edge). The game writes in white, cream, black and the players' colours: all
+# of them can be read on the middle grey; the dark one is for the achievements (white, cream and player colours)
+WINDOWS = {"mid": ("#6b6b6b", "#9a9a9a", "#3a3a3a"), "dark": ("#373737", "#5c5c5c", "#1c1c1c")}
+SOLID = WINDOWS["dark"][0]  # a picture without parchment (the dark dialogue backgrounds)
 
 
 @dataclass
@@ -293,15 +298,15 @@ def hall(rgb: np.ndarray, opaque: np.ndarray, sid: int = 0) -> np.ndarray:
     out[wood] = _tiled("dark_oak_planks", opaque.shape, WOOD)[wood]
     lay = LAYOUTS.get(sid, {})
     whole = paper.all() or (opaque.all() and paper.mean() > 0.97)
-    fill = I.GUI[lay.get("fill", "panel")]
+    fill, light, shade = WINDOWS[lay.get("window", "mid")]
     if whole:  # a texture the game fills a dialogue with: no window edges of its own
         out[paper] = colour(fill)[:3]
         return out
-    I._bevel(out, paper, fill, I.GUI["light"], I.GUI["shade"], I.GUI["edge"])
+    I._bevel(out, paper, fill, light, shade, I.GUI["edge"])
     for x0, y0, x1, y1 in lay.get("insets", []):  # a sheet on the sheet: sunk in, like a slot
         m = np.zeros_like(paper)
         m[y0:y1, x0:x1] = True
-        I._bevel(out, m & paper, "#b8b8b8", I.GUI["shade"], I.GUI["light"], None)
+        I._bevel(out, m & paper, "#606060", shade, light, None)
     return out
 
 
@@ -350,16 +355,82 @@ def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     return out, cloth | pole
 
 
+def tab(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """An achievements tab as a Minecraft tab (RGB 0..1, and where it is drawn), the size of the original. Its top
+    rows carry on the sheet above it, under the Play Again and Main Menu buttons: those are left out, so the tab
+    no longer runs into them. A chosen tab (no dark edge at its top) is the dark window's grey and opens into the
+    window; the others are darker, each a button on the wooden floor, with a gap between them."""
+    h, w = opaque.shape
+    lum = rgb @ LUMA
+    rows = lum[:, 15:-15].mean(1) if w > 30 else lum.mean(1)
+    chosen = rows[8:34].min() > 0.75 * np.median(rows)  # no dark edge between the sheet and the tab
+    top = 16 if chosen else 20
+    ys, xs = np.mgrid[0:h, 0:w]
+    body = (ys >= top) & (xs >= 2) & (xs < w - 2)
+    fill, light, shade = WINDOWS["dark"] if chosen else ("#262626", "#474747", "#141414")
+    out = np.zeros((h, w, 3))
+    out[body] = colour(fill)[:3]
+    ring = body & ~I._shrink(body, 1)
+    if chosen:  # open at the top
+        ring &= ys > top
+    inner = body & ~ring
+    out[inner & ~I._shrink(inner, I.PIXEL) & ((xs < 6) | (ys < top + 4 + I.PIXEL))] = colour(light)[:3]
+    out[inner & ~I._shrink(inner, I.PIXEL) & (xs >= w - 6)] = colour(shade)[:3]
+    out[ring] = 0.0
+    return out, body
+
+
+DIGITS = {"1": ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
+          "2": [".###.", "#...#", "....#", "..##.", ".#...", "#....", "#####"],
+          "3": [".###.", "#...#", "....#", "..##.", "....#", "#...#", ".###."],
+          "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."]}
+
+
+def team_mark(k: int, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Team mark k (RGB 0..1, and where it is drawn): 0 is no team, a stone dash; 1 to 4 a Minecraft shield (iron
+    rim, white face) with the team's number on it."""
+    h, w = opaque.shape
+    out, drawn = np.zeros((h, w, 3)), np.zeros((h, w), bool)
+    if k == 0:
+        y0, x0 = h // 2 - 3, w // 2 - 9
+        drawn[y0:y0 + 6, x0:x0 + 18] = True
+        out[drawn] = 0.0
+        out[y0 + 1:y0 + 5, x0 + 1:x0 + 17] = colour("#c6c6c6")[:3]
+        out[y0 + 1:y0 + 2, x0 + 1:x0 + 17] = 1.0
+        return out, drawn
+    sw, sh = min(w, 32) // 2 * 2, min(h, 42) // 2 * 2  # the shield, whole 2-pixel blocks
+    x0, y0 = (w - sw) // 2, (h - sh) // 2
+    ys, xs = np.mgrid[0:h, 0:w]
+    u, v = (xs - x0) // 2, (ys - y0) // 2  # in blocks
+    bw, bh = sw // 2, sh // 2
+    point = np.maximum(0, v - (bh - 5)) * 1.2  # the shield narrows to a point at the bottom
+    shape = (u >= 0) & (u < bw) & (v >= 0) & (v < bh) & (u >= point) & (u < bw - point)
+    rim = shape & ~I._shrink(shape, 2)
+    out[shape] = colour("#e8e8e2")[:3]
+    out[shape & (u >= bw // 2)] = colour("#c8c8c2")[:3]  # its right half in shade
+    out[rim] = colour("#7c7c7c")[:3]
+    out[shape & ~I._shrink(shape, 1)] = colour("#2a2a2a")[:3]
+    glyph = DIGITS[str(min(k, 4))]
+    gy, gx = y0 + (sh - 7 * 3) // 2 - 2, x0 + (sw - 5 * 3) // 2
+    for r, row in enumerate(glyph):
+        for c, ch in enumerate(row):
+            if ch == "#":
+                out[gy + 3 * r:gy + 3 * r + 3, gx + 3 * c:gx + 3 * c + 3] = colour("#202020")[:3]
+    return out, shape
+
+
 def quantise(rgb: np.ndarray, palettes: list[np.ndarray]) -> np.ndarray:
     """Palette indices for RGB pixels (0..1), each the one that looks best in all the palettes the picture is
-    shown in (the worst match over them is smallest)."""
+    shown in (the worst match over them is smallest). A wrong hue counts double a wrong lightness: a grey window
+    stays grey in a palette of browns, a little lighter or darker rather than purple."""
     flat = np.clip(rgb.reshape(-1, 3) * 255 + 0.5, 0, 255).astype(np.int64)
     keys = (flat[:, 0] << 16) | (flat[:, 1] << 8) | flat[:, 2]
     uniq, inverse = np.unique(keys, return_inverse=True)
-    cols = _lab(np.stack([(uniq >> 16) & 255, (uniq >> 8) & 255, uniq & 255], -1).astype(np.float64))
+    hue = np.array([1.0, 2.0, 2.0])
+    cols = _lab(np.stack([(uniq >> 16) & 255, (uniq >> 8) & 255, uniq & 255], -1).astype(np.float64)) * hue
     worst = np.zeros((len(uniq), 256))
     for pal in palettes:
-        lab = _lab(np.asarray(pal, np.float64)[:256])
+        lab = _lab(np.asarray(pal, np.float64)[:256]) * hue
         worst[:, :len(lab)] = np.maximum(worst[:, :len(lab)], ((cols[:, None] - lab[None]) ** 2).sum(-1))
         worst[:, len(lab):] = np.inf
     return worst.argmin(1)[inverse].reshape(rgb.shape[:2])
@@ -384,14 +455,16 @@ def intended(px: np.ndarray, opaque: np.ndarray, palettes: list[np.ndarray]) -> 
     return [palettes[best]] + alike
 
 
-def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray]) -> slp.SlpFrame:
-    """One screen picture redrawn, in the colours of the palette it was made for, and quantised for it and those
-    like it."""
+def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0) -> slp.SlpFrame:
+    """Picture k of a screen SLP redrawn, in the colours of the palette it was made for, and quantised for it and
+    those like it."""
     px = frame.pixels
     opaque = (px >= 0) & (px < 256)
     palettes = intended(px, opaque, palettes)
-    if sid == FLAGS:
-        new, drawn = banner(np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255, opaque)
+    if sid in (FLAGS, TABS, TEAMS):
+        rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
+        new, drawn = (banner(rgb, opaque) if sid == FLAGS else tab(rgb, opaque) if sid == TABS
+                      else team_mark(k, opaque))
         out = np.full(px.shape, slp.TRANSPARENT, np.int16)
         out[drawn] = quantise(new, palettes)[drawn]
         return slp.SlpFrame(out, frame.hotspot)
@@ -410,9 +483,14 @@ def fits(sid: int, data: bytes) -> bool:
         return False
     if sid == FLAGS:  # eight pennants, about 150 by 45
         return len(sizes) == 8 and all(140 <= w <= 165 and 36 <= h <= 56 for w, h, _, _ in sizes)
+    if sid == TABS:  # six tabs, each chosen and not, about 107 by 78
+        return len(sizes) == 12 and all(95 <= w <= 120 and 70 <= h <= 86 for w, h, _, _ in sizes)
+    if sid == TEAMS:  # no team, about 37 by 21, and four shields about 37 by 45
+        return (len(sizes) == 5 and 25 <= sizes[0][0] <= 50 and 12 <= sizes[0][1] <= 30
+                and all(28 <= w <= 48 and 36 <= h <= 56 for w, h, _, _ in sizes[1:]))
     return sid in RESTYLED and len(sizes) == 1 and sizes[0][:2] == RESTYLED[sid]
 
 
 def encode(sid: int, original: bytes, palettes: list[np.ndarray]) -> bytes:
     frames = slp.decode(original)
-    return slp.encode([redraw(sid, f, palettes) for f in frames], props=slp.frame_props(original))
+    return slp.encode([redraw(sid, f, palettes, k) for k, f in enumerate(frames)], props=slp.frame_props(original))
