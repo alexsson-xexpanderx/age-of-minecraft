@@ -516,7 +516,6 @@ def main(argv=None) -> int:
             else:
                 log(f"main menu: picture {menu.MENU} is not the one this build knows; it keeps its look")
         # the other screens: the setup screens, the dialogues, the history, the loading screen
-        shown_in = screens.palettes(screen_files)
         for sid in sorted(screens.RESTYLED):
             data = game.original(sid)
             if data is None:
@@ -524,7 +523,7 @@ def main(argv=None) -> int:
             if not screens.fits(sid, data):
                 log(f"screen picture {sid} is not the one this build knows; it keeps its look")
                 continue
-            raws = [game.data_file(p) for p in shown_in.get(sid, [screens.MAIN_PALETTE])]
+            raws = [game.data_file(p) for p in screens.palette_ids(sid, screen_files)]
             palettes = [parse_jasc(raw) for raw in raws if raw]
             if palettes:
                 jobs.append(("screen", sid, data, palettes))

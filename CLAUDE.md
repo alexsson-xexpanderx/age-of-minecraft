@@ -67,6 +67,9 @@ putting `tools/` on `sys.path`.
      (`screens.sheets`) becomes Minecraft's inventory grey, frames deepslate, wood dark oak, keeping the original's
      lightness so the game's black text and light text with black shadow stay readable. `screens.quantise` picks
      colours good in every palette a picture is shown in; `LAYOUTS` gives the sheets of a few pictures by hand.
+     Pictures without parchment are one solid colour (the game writes scores in player colours on them). The
+     achievements' flags (`screens.FLAGS`, no screen file names them: `SHOWN_WITH` gives the achievements' palette)
+     become banners coloured from each flag's own pixels, as that palette lacks Minecraft's wool colours.
    - `terrain.drs` and `interfac.drs` are searched by `Game.original`/`holders` (`Game._searched`) but kept out of
      `Game.archives`, so Pac-Man's icon and sound code sees exactly the archives it always did.
 3. `Game.layout()` takes each sprite's frames per angle, angle count and mirroring from the `.dat`, falling back

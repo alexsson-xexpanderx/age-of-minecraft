@@ -14,8 +14,12 @@ the dark frames around it become deepslate tiles and the wood (crates, the plaqu
 planks, as dark as the original. Pictures without parchment (the achievements, the blue and green dialogue
 backgrounds) are one solid colour, the grey of Minecraft's inventory slots: the game writes the achievements in
 each player's colour, and on a texture or a dark or light background some of those can't be read. A wooden board
-is solid dark oak. The loading screen is Minecraft's dark dirt with the block logo in grey stone. Each picture is drawn in every palette the
-game shows it in (`quantise`), and only the pictures in RESTYLED, at those sizes, are changed.
+is solid dark oak. The loading screen is Minecraft's dark dirt with the block logo in grey stone. The
+achievements' flags become Minecraft banners in their own colours, with a black stripe where the game writes each
+player's name (in white, or in a colour the game chooses, which can be the flag's own).
+
+Each picture is drawn in every palette the game shows it in (`quantise`), and only the pictures in RESTYLED, at
+those sizes, are changed.
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ PANELS = range(51101, 51161)  # the in-game panels: interface.py
 MIN_SIZE = (250, 130)  # smaller pictures are buttons and icons, not screens
 ALSO_SAVED = (50761, 50762, 50765, 50769)  # smaller pictures of the achievements: icons, flags, tabs, team shields
 LOADING = 50163  # the Conquerors' loading screen (screen file 50063)
+FLAGS = 50762  # the achievements' flags, one picture per player colour: the game writes each player's name on one
 RESTYLED = {  # picture -> its size: the screens this module redraws
     50100: (800, 600), 50101: (1024, 768), 50102: (1280, 1024), 50103: (800, 600), 50104: (800, 600),  # setup
     50270: (388, 258), 50190: (259, 138), 50202: (800, 600), 50204: (800, 600),  # their dialogues
@@ -46,8 +51,9 @@ RESTYLED = {  # picture -> its size: the screens this module redraws
     50127: (273, 182), 50161: (800, 600), 50149: (800, 600), 50145: (800, 600), 50763: (268, 270),  # editor, history
     53161: (500, 408), 53162: (500, 408), 53163: (500, 408), 53164: (500, 408),  # the campaigns' dialogues
     53171: (500, 408), 53172: (500, 408), 53173: (500, 408), 53174: (500, 408),
-    LOADING: (800, 600),
+    LOADING: (800, 600), FLAGS: None,
 }
+SHOWN_WITH = {FLAGS: 50061}  # pictures no screen file names: shown on this screen (the achievements), in its palette
 LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
     50104: {"insets": [(503, 50, 790, 495)]},  # the game settings' own sheet
     50161: {"sheets": [(0, 10, 251, 588), (262, 10, 792, 588)], "insets": [(8, 18, 238, 390)]},  # the history book
@@ -139,6 +145,15 @@ def palettes(screens: list[Screen]) -> dict[int, list[int]]:
             if pal not in out.setdefault(sid, []):
                 out[sid].append(pal)
     return out
+
+
+def palette_ids(sid: int, screens: list[Screen]) -> list[int]:
+    """The palettes a picture is drawn in: those of every screen that shows it (SHOWN_WITH for the ones no screen
+    file names), or the main palette."""
+    if sid in SHOWN_WITH:
+        host = next((s for s in screens if s.id == SHOWN_WITH[sid] and s.palette), None)
+        return [host.palette] if host else [MAIN_PALETTE]
+    return palettes(screens).get(sid, [MAIN_PALETTE])
 
 
 # --------------------------------------------------------------------------- masks
@@ -298,6 +313,37 @@ def loading(shape: tuple[int, int]) -> np.ndarray:
     return out
 
 
+def banner(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """A flag (RGB 0..1, and where it is drawn) as a Minecraft banner the size of the original: wool in the flag's
+    own colours (they are in its palette) on a dark oak pole, its end cut like a swallowtail, and across its middle,
+    where the game writes the player's name, a black stripe (Minecraft's "fess" pattern), so a name in white or in
+    a player's colour can be read on it."""
+    h, w = opaque.shape
+    rows = np.nonzero(opaque.mean(1) > 0.6)[0]  # the original's cloth, not the shadow under it
+    top, bottom = (int(rows.min()), int(rows.max()) + 1) if len(rows) else (4, h - 6)
+    mid = (top + bottom) // 2
+    ys, xs = np.mgrid[0:h, 0:w]
+    cloth_px = rgb[opaque & (ys >= top) & (ys < bottom)]
+    if len(cloth_px):  # its own colour: the pixels nearest its usual hue (not the green shadow's)
+        hue = cloth_px - (cloth_px @ LUMA)[:, None]
+        off = np.abs(hue - np.median(hue, axis=0)).sum(1)
+        cloth_px = cloth_px[off <= np.percentile(off, 60)]
+    ramp = cloth_px[np.argsort(cloth_px @ LUMA)] if len(cloth_px) else np.full((1, 3), 0.5)
+    wool = V.all_blocks()["white_wool"].faces["front"][..., :3] @ LUMA
+    shade = (wool - wool.min()) / max(1e-6, np.ptp(wool))  # the wool's weave, 0..1
+    shade = np.tile(shade.repeat(I.PIXEL, 0).repeat(I.PIXEL, 1), (h // (16 * I.PIXEL) + 1, w // (16 * I.PIXEL) + 1))
+    out = ramp[((0.35 + 0.35 * shade[:h, :w]) * (len(ramp) - 1)).astype(int)]  # its middle tones, not the folds
+    stripe = (ys >= mid - 8) & (ys < mid + 8)
+    out[stripe] = _tiled("black_wool", (h, w), 0.09)[stripe]
+    cloth = (ys >= top) & (ys < bottom) & (xs >= 6) & (xs < w - 1)
+    cloth &= ~(w - 1 - xs < (bottom - top) // 2 - np.abs(ys - mid) * 0.9)  # the swallowtail cut
+    out[cloth & ~I._shrink(cloth, 1)] = 0.05
+    pole = (xs < 6) & (ys >= max(0, top - 4)) & (ys < min(h, bottom + 6))
+    out[pole] = _tiled("dark_oak_log", (h, w), 0.2)[pole]
+    out[pole & ((xs == 0) | (xs == 5))] = 0.05
+    return out, cloth | pole
+
+
 def quantise(rgb: np.ndarray, palettes: list[np.ndarray]) -> np.ndarray:
     """Palette indices for RGB pixels (0..1), each the one that looks best in all the palettes the picture is
     shown in (the worst match over them is smallest)."""
@@ -317,6 +363,11 @@ def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray]) -> slp.Slp
     """One screen picture redrawn, in the first of its palettes' colours and quantised for all of them."""
     px = frame.pixels
     opaque = (px >= 0) & (px < 256)
+    if sid == FLAGS:
+        new, drawn = banner(np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255, opaque)
+        out = np.full(px.shape, slp.TRANSPARENT, np.int16)
+        out[drawn] = quantise(new, palettes)[drawn]
+        return slp.SlpFrame(out, frame.hotspot)
     rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
     new = loading(px.shape) if sid == LOADING else hall(rgb, opaque, sid)
     out = px.copy()
@@ -330,6 +381,8 @@ def fits(sid: int, data: bytes) -> bool:
         sizes = slp.info(data).sizes
     except (ValueError, IndexError):
         return False
+    if sid == FLAGS:  # eight pennants, about 150 by 45
+        return len(sizes) == 8 and all(140 <= w <= 165 and 36 <= h <= 56 for w, h, _, _ in sizes)
     return sid in RESTYLED and len(sizes) == 1 and sizes[0][:2] == RESTYLED[sid]
 
 

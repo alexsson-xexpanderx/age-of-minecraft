@@ -241,7 +241,15 @@ def fake_game(root: Path) -> Path:
                         b"text_color1            255 255 255\r\n", "bina")
     interfac.put(50054, b"background2_files scr2B none 50101 -1\r\npalette_file scr3 50533\r\n", "bina")
     interfac.put(50063, b"background1_files scrstart none 50163 -1\r\npalette_file scrstart 50563\r\n", "bina")
-    for pal in (50532, 50533, 50563):
+    interfac.put(50061, b"background1_files scr10B none 50149 -1\r\npalette_file scr_ach 50531\r\n", "bina")
+    flags = []  # the achievements' flags, one per player colour: a pennant with a shadow under it
+    for k in range(8):
+        px = np.full((46, 150 + k), slp.TRANSPARENT, np.int16)
+        px[4:38, :140] = 20 + k
+        px[38:42, 10:80] = 3
+        flags.append(slp.SlpFrame(px, (0, 0)))
+    interfac.put(50762, slp.encode(flags))
+    for pal in (50531, 50532, 50533, 50563):
         interfac.put(pal, fake_palette(), "bina")
     interfac.put(50100, fake_screen(800, 600))
     interfac.put(50101, fake_screen(1024, 768))
@@ -479,12 +487,13 @@ def test_full_build(tmp: Path):
     assert "menu pictures: 50189: 53 pictures" in report
     # the other screens' pictures, to draw Minecraft ones over: the setup screen's, and the loading screen
     saved = sorted(p.name for p in (mod / "screen_originals").iterdir())
-    assert saved == ["50100_00.png", "50101_00.png", "50149_00.png", "50163_00.png"]
+    assert saved == ["50100_00.png", "50101_00.png", "50149_00.png", "50163_00.png"] + [f"50762_0{k}.png" for k in range(8)]
     assert "  50053  50100 (800x600), 50101 (1024x768); palette 50532" in report
-    assert "text_color1 255 255 255" in report and "  50149  640x480" in report  # not the size the build knows
+    assert "text_color1 255 255 255" in report and "  50061  50149 (640x480); palette 50531" in report
     # the screens in the Minecraft style: the parchment is the inventory's grey, the loading screen dirt
     from aom import screens
     ui_before = Drs(game / "Data" / "interfac.drs")
+    flags_before = slp.decode(ui_before.get(50762))
     for sid in (50100, 50101, 50163):
         a, b = slp.decode(ui_before.get(sid)), slp.decode(out.get(sid))
         assert len(a) == len(b) == 1 and a[0].pixels.shape == b[0].pixels.shape
@@ -494,6 +503,13 @@ def test_full_build(tmp: Path):
     assert out.get(50149) is None and out.get(50700) is None  # a picture it doesn't know, and an icon
     assert "screen picture 50149 is not the one this build knows" in report
     assert "   50163  800x600   Minecraft style" in report
+    banners = slp.decode(out.get(50762))  # the flags: banners, each its own size, with a dark stripe for the name
+    assert [f.pixels.shape for f in banners] == [f.pixels.shape for f in flags_before]
+    ach = parse_jasc(fake_palette())
+    for f in banners:
+        px = f.pixels
+        assert (px[21, 20:100] >= 0).all() and (ach[px[21, 20:100]] @ [0.299, 0.587, 0.114]).max() < 60
+        assert (px[40:, 10:] == slp.TRANSPARENT).all()  # no shadow under it
     # the mod's exe: our icon, and the window says Age of Minecraft; the game's name is gone from it
     from aom import pe
     exe = (game / "age2_x1" / "age_of_minecraft.exe").read_bytes()
