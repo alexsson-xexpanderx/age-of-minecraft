@@ -16,8 +16,6 @@ Writes into previews/ by default:
     walls.png           wall lines in every direction, with corners, as the game places them
     sounds/*.wav        Pac-Man's sounds (clicking on him, orders, training, bites, death)
     nature.png          trees, resources and map decorations
-    farms.png           farms, which are terrain: being built, grown and exhausted
-    interface.png       the resource bar and bottom panel in the Minecraft style (on a stand-in panel)
 and docs/UNITS.md, the full unit list.
 """
 from __future__ import annotations
@@ -31,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aom.animation import DIRECTIONS, pose  # noqa: E402
-from aom import farmland, interface, props  # noqa: E402
+from aom import props  # noqa: E402
 from aom.voxel import BUILDING_HEADING  # noqa: E402
 from aom.colors import PLAYER_COLORS  # noqa: E402
 from aom.geometry import Pose  # noqa: E402
@@ -211,32 +209,22 @@ def tile_xy(i: float, j: float) -> tuple[int, int]:
 
 
 def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, margin: int = 24,
-            shore: float = None, fields=()) -> tuple[int, int]:
+            shore: float = None) -> None:
     """Draw (frame, player, x, y) sprites with hotspots at map pixel (x, y), cropped to fit.
 
-    With `shore`, map tiles whose i coordinate is at least `shore` are water. `fields` are farms, which the game
-    draws as terrain: (stage, tile i, tile j) of each farm's centre. Returns the map pixel of the image's corner.
+    With `shore`, map tiles whose i coordinate is at least `shore` are water.
     """
     items = [(f, player, x - f.hotspot[0], y - f.hotspot[1], y) for f, player, x, y in placed]
-    patches = []
-    for stage, i, j in fields:
-        patch = farmland.preview(stage)
-        x, y = tile_xy(i, j)
-        patches.append((patch, x - patch.shape[1] // 2, y - patch.shape[0] // 2))
-    boxes = [(x, y, x + f.kind.shape[1], y + f.kind.shape[0]) for f, _, x, y, _ in items]
-    boxes += [(x, y, x + p.shape[1], y + p.shape[0]) for p, x, y in patches]
-    x0 = min(b[0] for b in boxes) - margin
-    y0 = min(b[1] for b in boxes) - margin
-    x1 = max(b[2] for b in boxes) + margin
-    y1 = max(b[3] for b in boxes) + margin
+    x0 = min(x for _, _, x, _, _ in items) - margin
+    y0 = min(y for _, _, _, y, _ in items) - margin
+    x1 = max(x + f.kind.shape[1] for f, _, x, _, _ in items) + margin
+    y1 = max(y + f.kind.shape[0] for f, _, _, y, _ in items) + margin
     canvas = ground(x1 - x0, y1 - y0, 3)
     if shore is not None:
         yy, xx = np.mgrid[y0:y1, x0:x1]
         i = (xx / (TILE_W / 2) + yy / (TILE_H / 2)) / 2
         wet = i >= shore
         canvas[wet] = ground(x1 - x0, y1 - y0, 5, water=True)[wet]
-    for patch, x, y in patches:
-        blend(canvas, patch, x - x0, y - y0)
     for f, _, x, y, _ in items:  # shadows go under every sprite
         shadow = np.zeros((*f.kind.shape, 4), np.uint8)
         shadow[f.kind == SHADOW] = (0, 0, 0, 102)
@@ -244,7 +232,6 @@ def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, ma
     for f, player, x, y, _ in sorted(items, key=lambda it: it[4]):  # back to front
         blend(canvas, f.to_rgba(player, shadow_alpha=0), x - x0, y - y0)
     Image.fromarray(zoom(canvas, k)).save(out)
-    return x0, y0
 
 
 def place_units(army, units: dict[str, Unit]) -> list[tuple[Frame, int, int, int]]:
@@ -395,7 +382,8 @@ def nature_sheet(out: Path) -> None:
             ("Resources", [("gold", {"model": "ore", "kind": "gold"}), ("gold", {"model": "ore", "kind": "gold",
                                                                                  "variant": 3}),
                            ("stone", {"model": "ore", "kind": "stone"}), ("berries", {"model": "berry_bush"}),
-                           ("stump", {"model": "stump"}), ("fish trap", {"model": "fish_trap", "stage": 1.0})]),
+                           ("stump", {"model": "stump"}), ("farm", B("FARM", "G", 1, stage=1.0)),
+                           ("fish trap", {"model": "fish_trap", "stage": 1.0})]),
             ("Decorations", [(n, {"model": "gaia", "name": n}) for n in
                              ("yurt", "pavilion", "ruins", "statue", "graves", "heads", "stone_head", "rug")]
              + [("cactus", {"model": "cactus", "variant": 2}), ("rocks", {"model": "rock", "variant": 1}),
@@ -462,7 +450,8 @@ def village_scene(out: Path, units: dict[str, Unit]) -> None:
     """A Dark Age start: Town Center, houses, a mill with fields, a lumber camp at the forest, mines."""
     placed = place_buildings([(B("RTWC", "G", 1), 4.0, 4.0), (B("HOUS", "G", 1), -0.5, 6.0),
                               (B("HOUS", "G", 1), 3.0, -0.5, 1), (B("HOUS", "G", 1), 8.5, 1.0, 2),
-                              (B("MILL", "W", 2), 9.0, 7.5), (B("SMIL", "W", 2), -1.5, 10.5),
+                              (B("MILL", "W", 2), 9.0, 7.5), (B("FARM", "G", 1, stage=1.0), 9.0, 10.5),
+                              (B("FARM", "G", 1, stage=0.5), 12.0, 7.5), (B("SMIL", "W", 2), -1.5, 10.5),
                               (B("MINE", "W", 2), 4.0, 11.0)])
     for k, (i, j) in enumerate(((-3.5, 12.5), (-2.5, 13.5), (-3.5, 14.5), (-4.5, 13.5), (-1.5, 14.5), (-4.5, 11.5),
                                 (-2.5, 15.5), (-5.5, 14.5))):
@@ -481,79 +470,7 @@ def village_scene(out: Path, units: dict[str, Unit]) -> None:
         ("deer", 7, 12.4, 12.6, 2, "idle", 0), ("wolf", 7, 13.6, 10.2, 2, "walk", 0.5),
         ("hawk", 7, 6.0, 1.0, 1, "walk", 0.25),
     ]
-    compose(placed + place_units(folk, units), out, fields=[("ripe", 9.0, 10.5), ("growing", 12.0, 7.5)])
-
-
-def farms_sheet(out: Path, units: dict[str, Unit]) -> None:
-    """The farm's stages side by side, as 3x3 tile fields on the grass, with a farmer on the grown one."""
-    fields = [(stage, 3.5 * n, -3.5 * n) for n, stage in enumerate(farmland.STAGES)]
-    folk = [("villager_farmer", 1, 10.8, -10.2, 1, "attack", 0.6)]
-    tmp = out.with_suffix(".tmp.png")
-    x0, _ = compose(place_units(folk, units), tmp, k=1, margin=12, fields=fields)
-    img = Image.open(tmp)
-    tmp.unlink()
-    head, foot = 34, 24
-    canvas = Image.new("RGB", (img.width, img.height + head + foot), PAPER)
-    canvas.paste(img, (0, head))
-    d = ImageDraw.Draw(canvas)
-    d.text((10, 8), "Farms are terrain: built in three stages, then grown, then exhausted", fill=INK, font=font(20))
-    for stage, i, j in fields:
-        caption = farmland.STAGES[stage]
-        x = tile_xy(i, j)[0] - x0 - d.textlength(caption, font=font(12)) / 2
-        d.text((x, head + img.height + 4), caption, fill=MUTED, font=font(12))
-    canvas = canvas.resize((canvas.width * 2, canvas.height * 2), Image.NEAREST)
-    canvas.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, optimize=True)
-
-
-def stand_in_panel(w: int = 1280, h: int = 1024) -> tuple[np.ndarray, np.ndarray]:
-    """A panel picture shaped like the game's (its own is not in this repository): RGB 0..1 and where it is drawn.
-
-    A carved top bar with five resource icons, and a bottom panel with the command area, the parchment and the
-    dark area behind the minimap."""
-    rng = np.random.default_rng(0)
-
-    def carved(rows: int, cols: int, base) -> np.ndarray:
-        grain = 0.06 * np.sin(np.arange(cols) / 3.0)[None, :, None]
-        return np.clip(np.array(base) + rng.normal(0, 0.05, (rows, cols, 1)) + grain, 0, 1)
-
-    rgb, drawn = np.zeros((h, w, 3)), np.zeros((h, w), bool)
-    top = h - 218
-    rgb[:32], drawn[:32] = carved(32, w, (0.36, 0.24, 0.14)), True
-    for (x, y), col in zip(interface.ICON_BOXES, ((0.5, 0.3, 0.1), (0.8, 0.2, 0.2), (0.9, 0.75, 0.2),
-                                                  (0.6, 0.6, 0.6), (0.3, 0.4, 0.8))):
-        rgb[y + 3:y + 14, x + 6:x + 20] = col
-    rgb[top:], drawn[top:] = carved(h - top, w, (0.42, 0.28, 0.16)), True
-    rgb[top:top + 12] = carved(12, w, (0.55, 0.38, 0.2))
-    rgb[top + 24:h - 14, 15:330] = carved(h - 14 - top - 24, 315, (0.3, 0.2, 0.12))
-    rgb[top + 24:h - 14, 350:840] = np.clip(np.array((0.86, 0.78, 0.6)) + rng.normal(0, 0.03, (180, 490, 1)), 0, 1)
-    rgb[top + 24:h - 14, 880:w - 20] = (0.05, 0.05, 0.06)
-    return rgb, drawn
-
-
-def interface_sheet(out: Path) -> None:
-    """The resource bar and the bottom panel, before and after, on a stand-in for the game's own panel."""
-    rgb, drawn = stand_in_panel()
-    after = interface.restyle(rgb, drawn, interface.ICON_BOXES)
-    top = rgb.shape[0] - 218
-
-    def strip(img: np.ndarray) -> np.ndarray:
-        view = (img * 255 + 0.5).astype(np.uint8)
-        view[~drawn] = GRASS[0]
-        return np.concatenate([view[:32], view[:24] * 0 + np.array(GRASS[0], np.uint8), view[top:]])
-
-    head, gap = 34, 22
-    before_img, after_img = strip(rgb), strip(after)
-    canvas = Image.new("RGB", (before_img.shape[1], head + 2 * (before_img.shape[0] + gap)), PAPER)
-    d = ImageDraw.Draw(canvas)
-    d.text((10, 8), "The panels, Minecraft style: planks, inventory grey, slots and item icons", fill=INK,
-           font=font(20))
-    y = head
-    for label, img in (("a stand-in for the game's own panel (the build repaints yours)", before_img),
-                       ("after", after_img)):
-        d.text((10, y + 3), label, fill=MUTED, font=font(13))
-        canvas.paste(Image.fromarray(img), (0, y + gap))
-        y += gap + img.shape[0]
-    canvas.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, optimize=True)
+    compose(placed + place_units(folk, units), out)
 
 
 # --------------------------------------------------------------------------- unit list
@@ -599,8 +516,6 @@ def main() -> None:
     walls_scene(out / "walls.png")
     pacman_sounds(out / "sounds")
     nature_sheet(out / "nature.png")
-    farms_sheet(out / "farms.png", units)
-    interface_sheet(out / "interface.png")
     unit_table(units, ROOT / "docs" / "UNITS.md")
     print(f"previews written to {out}")
 

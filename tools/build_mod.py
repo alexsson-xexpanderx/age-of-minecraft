@@ -30,8 +30,8 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from aom import farmland, interface, slp  # noqa: E402
-from aom.datfile import Graphic, Terrain, read_graphics, read_terrains  # noqa: E402
+from aom import slp  # noqa: E402
+from aom.datfile import Graphic, read_graphics  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import blank, render_frames  # noqa: E402
 from aom.palette import Quantiser, parse_jasc  # noqa: E402
@@ -40,7 +40,7 @@ from aom.slpmap import BLANK, NAME_PREFIXES, SHARED, SUFFIX_ACTIONS, TARGETS, Ta
 from aom import spritemap  # noqa: E402
 
 # --only also accepts these groups of buildings and scenery
-STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface"}
+STATIC_GROUPS = {"buildings", "walls", "wonders", "nature", "decorations", "projectiles"}
 
 
 def static_group(spec: dict) -> str:
@@ -68,10 +68,6 @@ def blank_group(why: str) -> str:
 
 MOD = "AgeOfMinecraft"
 BACKUP = ".aom-backup"
-# The game's language files. Earlier builds renamed Pac-Man in them, but Windows 11's Smart App Control refuses
-# to load a DLL that was changed ("Bad Image", error 0xc0e90002) and the game no longer starts. The build never
-# changes a DLL or an exe, and puts back the originals an earlier build changed.
-LANGUAGE_FILES = ("language_x1_p1.dll", "language_x1.dll", "language.dll")
 
 # The 18 Conquerors civilisations, in their standard ids (UserPatch data mod format).
 CIVS = [
@@ -136,14 +132,10 @@ class Game:
             if drs is not None:
                 self.archives.append((name, drs))
         self.archives.append((self.graphics_path.name, self.graphics))
-        terrain = self._drs("terrain.drs")  # the ground's textures, farms among them
-        if terrain is not None:
-            self.archives.append(("terrain.drs", terrain))
         interfac = self._drs("interfac.drs")
         self.interfac = interfac
         if interfac is None or interfac.get(50500, "bina") is None:
             raise SystemExit("Could not find the game palette (interfac.drs, 50500).")
-        self.archives.append(("interfac.drs", interfac))  # the panels, and the unit icons
         self.palette = parse_jasc(interfac.get(50500, "bina"))
         self.graphics_table: dict[int, Graphic] = {}
         dat = pick(self.data, "empires2_x1_p1.dat")
@@ -158,12 +150,17 @@ class Game:
         self.by_slp: dict[int, list[Graphic]] = {}
         for g in self.graphics_table.values():
             self.by_slp.setdefault(g.slp, []).append(g)
-        self.terrains: list[Terrain] = []
-        try:
-            self.terrains = read_terrains(dat) if dat and self.graphics_table else []
-            log(f"terrain table: {sum(t.enabled for t in self.terrains)} terrains in use")
-        except Exception as exc:  # farms then fall back to the original game's texture ids
-            log(f"terrain table: could not read ({exc}); farms use the original game's texture ids")
+
+    def language_files(self) -> dict[str, Path]:
+        """The game's language files (unit names and help texts), read from their originals if backed up."""
+        from aom.langdll import FILES
+        found = {}
+        for name in FILES:
+            p = pick(self.root, name)
+            if p is not None:
+                backup = p.with_name(p.name + BACKUP)
+                found[p.name] = backup if backup.exists() else p
+        return found
 
     def _drs(self, name: str) -> Optional[Drs]:
         p = pick(self.data, name)
@@ -305,29 +302,7 @@ def _init(palette) -> None:
     _STATE["units"] = {}
 
 
-def _cost(job) -> int:
-    """Roughly how long a job takes to render."""
-    if job[0] == "unit":
-        return job[4] * (job[5] // 2 + 1)
-    if job[0] == "static":
-        return job[3] * 4
-    if job[0] == "interface":
-        return 30
-    return 20  # a farm texture: one render, cut into tiles
-
-
 def _render(job) -> tuple[int, bytes, int]:
-    if job[0] == "interface":
-        _, slp_id, original, big = job
-        try:
-            data = interface.encode(original, big, _STATE["quant"].palette, _STATE["quant"])
-        except ValueError as exc:  # its resource icons weren't found: it keeps its look
-            return slp_id, None, str(exc)
-        return slp_id, data, slp.info(data).num_frames
-    if job[0] == "terrain":
-        _, slp_id, stage, original = job
-        data = farmland.encode(stage, original, _STATE["quant"])
-        return slp_id, data, slp.info(data).num_frames
     if job[0] == "static":
         _, slp_id, spec, num_frames, frames, angles, mirrored, original = job
         from aom.props import render_static
@@ -441,29 +416,6 @@ def main(argv=None) -> int:
         static_blanks = {s: why for s, why in sprite_plan.blanks.items()
                          if only is None or blank_group(why) in only}
 
-    # farms are terrain: their textures in terrain.drs become Minecraft farmland
-    farms: list[tuple[int, str, str, int]] = []
-    if only is None or only & {"farms", "buildings"}:
-        for slp_id, stage, source in farmland.farm_slps(game.terrains):
-            data = game.original(slp_id)
-            if data is None:
-                skipped.append((Target(slp_id, "farm", stage), f"farm texture ({source}) not in your game files"))
-                continue
-            try:
-                n = slp.info(data).num_frames
-            except ValueError as exc:
-                skipped.append((Target(slp_id, "farm", stage), str(exc)))
-                continue
-            jobs.append(("terrain", slp_id, stage, data))
-            farms.append((slp_id, stage, source, n))
-
-    # the panels at the top and bottom of the screen, one picture per civilisation and screen size
-    panels: list[tuple[int, tuple[int, int]]] = []
-    if only is None or "interface" in only:
-        for slp_id, size, data, big in interface.panels(game.original):
-            jobs.append(("interface", slp_id, data, big))
-            panels.append((slp_id, size))
-
     target_slps = {j[1] for j in jobs}
     blanks = {} if only else {s: why for s, why in BLANK}
     if not only:
@@ -471,17 +423,16 @@ def main(argv=None) -> int:
     blanks.update(static_blanks)
     blanks = {s: why for s, why in blanks.items() if s not in target_slps and game.original(s) is not None}
 
-    log(f"plan: {len(jobs) - len(statics) - len(farms) - len(panels)} unit sprites, {len(statics)} building/scenery "
-        f"sprites, {len(farms)} farm textures and {len(panels)} interface panels to render, {len(blanks)} layers to "
-        f"blank, {len(skipped)} skipped")
+    log(f"plan: {len(jobs) - len(statics)} unit sprites and {len(statics)} building/scenery sprites to render, "
+        f"{len(blanks)} layers to blank, {len(skipped)} skipped")
     if args.dry_run:
-        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics, farms, panels)
+        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics)
         return 0
 
     started = time.time()
     rendered: dict[int, bytes] = {}
     failed: list[tuple[int, str]] = []
-    jobs.sort(key=_cost, reverse=True)  # big ones first
+    jobs.sort(key=lambda j: -(j[4] * (j[5] // 2 + 1) if j[0] == "unit" else j[3] * 4))  # big ones first
     with mp.Pool(args.jobs, initializer=_init, initargs=(game.palette,)) as pool:
         for n, (slp_id, data, count) in enumerate(pool.imap_unordered(_safe_render, jobs), 1):
             if data is None:  # one broken sprite must not stop the whole build: keep the original
@@ -506,14 +457,12 @@ def main(argv=None) -> int:
         raise SystemExit(f"Windows would not let us write {exc.filename}.\n"
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
-    put_back_dlls(game, log)
     pacman = not args.no_wonder_pacman and (only is None or "pacman" in only)
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
     if not args.no_dat and (pacman or javelina):
         apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina)
     exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
-    write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics, farms, panels,
-                 dict(failed))
+    write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics)
     log(f"done in {time.time() - started:.0f}s")
     log("")
     log("RESULT")
@@ -633,7 +582,7 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
     if game.dat_path is None:
         log(".dat changes: no empires2_x1_p1.dat found, skipped")
         return
-    archives = game.archives  # interfac.drs is among them
+    archives = list(game.archives) + ([("interfac.drs", game.interfac)] if game.interfac is not None else [])
     sheets = gameplay.icon_sheets(archives) if pacman else []
     icon = gameplay.new_icon_index(sheets) if sheets else None
     quant = Quantiser(game.palette)
@@ -681,6 +630,7 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         drs.write(tmp)
         write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
+    rename_pacman(game, mode, patch.pacman_strings, log)
 
 
 def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):
@@ -719,22 +669,19 @@ def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):
         yield rid
 
 
-def put_back_dlls(game: Game, log) -> None:
-    """Undo earlier builds' language file changes: the originals back from their backups, and no changed copy
-    left in the mod's Data folder (see LANGUAGE_FILES)."""
-    for name in LANGUAGE_FILES:
-        live = pick(game.root, name)
-        backup = live.with_name(live.name + BACKUP) if live is not None else None
-        if backup is not None and backup.exists():
-            shutil.copy2(backup, live)
-            backup.unlink()
-            log(f"put back your original {live.name}: an earlier build changed it, and Windows refuses changed DLLs")
-    mod_data = (pick(game.root, "Games") or game.root / "Games") / MOD / "Data"
-    for name in LANGUAGE_FILES:
-        copy = pick(mod_data, name)
-        if copy is not None:
-            copy.unlink()
-            log(f"removed {copy}: an earlier build's changed copy, and Windows refuses changed DLLs")
+def rename_pacman(game: Game, mode: str, strings: dict[str, int], log) -> None:
+    """Pac-Man's name in the language files. The mod exe reads language_x1_p1.dll from the mod's Data folder."""
+    from aom import gameplay
+    paths = game.language_files()
+    changed, notes = gameplay.rename_pacman({name: p.read_bytes() for name, p in paths.items()}, strings)
+    for note in notes:
+        log(note)
+    for name, data in changed.items():
+        if mode == "upmod" and name.lower() != "language_x1_p1.dll":
+            log(f"Pac-Man's name: {name} left alone (a UserPatch mod only has its own language_x1_p1.dll); "
+                "build_mod_direct.bat renames him in the game's files")
+            continue
+        write_game_file(game, mode, name, data, log, folder=game.root)
 
 
 def restore(root: Path) -> int:
@@ -751,8 +698,7 @@ def restore(root: Path) -> int:
     return 0
 
 
-def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=(),
-                 farms=(), panels=(), failed=None) -> None:
+def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=()) -> None:
     lines = ["Age of Minecraft build report", "=" * 30, *header, "", "REPLACED (slp, unit, action, frames x angles)"]
     for t, n, frames, angles, mirrored, source in sorted(planned, key=lambda p: p[0].slp):
         m = " mirrored" if mirrored else ""
@@ -765,13 +711,6 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
                                                                      "letter", "name", "direction", "open",
                                                                      "part", "anchor_offset", "half") if k in spec)
         lines.append(f"  {sp.slp:6d}  {sp.source:14s} {what:60s} {n:3d} frames [{spec.get('mode')}] {sp.note}")
-    lines += ["", "FARMS (terrain texture slp, stage, found by, tiles)"]
-    lines += [f"  {s:6d}  {stage:8s} {farmland.STAGES[stage]:32s} {source:28s} {n:3d} tiles"
-              for s, stage, source, n in farms]
-    lines += ["", "INTERFACE PANELS (slp, screen size, result)"]
-    for s, (w, h) in panels:
-        result = "planned" if failed is None else ("Minecraft style" if s not in failed else failed[s])
-        lines.append(f"  {s:6d}  {w}x{h:<5d} {result}")
     lines += ["", "BLANKED LAYERS"] + [f"  {s:6d}  {why}" for s, why in sorted(blanks.items())]
     lines += ["", "SKIPPED"] + [f"  {t.slp:6d}  {t.unit:24s} {t.action:7s} {why}" for t, why in skipped]
     covered = {p[0].unit for p in planned}
@@ -784,10 +723,6 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
                               for d in g.deltas)
             lines.append(f"  {gid:5d} {g.name:22s} {g.slp:6d} {g.frame_count:4d} {g.angle_count:3d} {g.mirroring:2d}"
                          f"  {deltas}")
-    if game.terrains:
-        lines += ["", "TERRAIN TABLE (id, enabled, name, file, slp, rows x cols)"]
-        lines += [f"  {t.id:3d} {int(t.enabled):2d} {t.name:14s} {t.filename:14s} {t.slp:6d} {t.rows} x {t.cols}"
-                  for t in game.terrains]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"report: {path}")
 

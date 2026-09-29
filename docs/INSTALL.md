@@ -39,8 +39,6 @@ The build takes about two to ten minutes, depending on your PC. It writes:
 ```
 Games\AgeOfMinecraft.xml                 the UserPatch mod definition
 Games\AgeOfMinecraft\Data\graphics.drs   your graphics with the Minecraft sprites swapped in
-Games\AgeOfMinecraft\Data\terrain.drs    your ground textures with Minecraft farms
-Games\AgeOfMinecraft\Data\interfac.drs   your screen panels in the Minecraft style
 Games\AgeOfMinecraft\aom_report.txt      what was replaced, what was skipped, and why
 age2_x1\AgeOfMinecraft.exe               created by UserPatch's SetupAoC.exe
 ```
@@ -64,20 +62,19 @@ next to `build_mod.bat`. You have two options:
    `SetupAoC.exe` in that folder.
 2. Skip the exe: double-click **`build_mod_direct.bat`**. It puts the
    Minecraft sprites into your normal game, so you start the game as usual.
-   Your original `graphics.drs`, `terrain.drs` and `interfac.drs` are backed
-   up first, and **`restore_original.bat`** puts them back.
+   Your original `graphics.drs` is backed up first, and
+   **`restore_original.bat`** puts it back.
 
 ## Options
 
 | Command | What it does |
 |---|---|
 | `build_mod.bat "<game>" --only militia,archer,villager` | build only some units, for a quick test (keys are listed in [UNITS.md](UNITS.md)) |
-| `build_mod.bat "<game>" --only buildings,farms,walls,wonders,nature,decorations,projectiles` | build only buildings and scenery (any of these groups; `buildings` includes the farms) |
-| `build_mod.bat "<game>" --only interface` | build only the Minecraft-style panels at the top and bottom of the screen |
+| `build_mod.bat "<game>" --only buildings,walls,wonders,nature,decorations,projectiles` | build only buildings and scenery (any of these groups) |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
-| `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs`, the farms into `Data\terrain.drs` and the panels into `Data\interfac.drs` (no mod exe needed); each file is backed up first as `<name>.aom-backup` |
-| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file and the icons) |
-| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder, and the cheat unit keeps its icon) |
+| `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs` (no mod exe needed); a backup is kept as `graphics.drs.aom-backup` |
+| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, the rules file, the icons and the language files) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder, and the cheat unit keeps its name and icon) |
 | `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man at the Wonder, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
@@ -87,18 +84,7 @@ next to `build_mod.bat`. You have two options:
   villagers share the Minecraft villager models.
 * All buildings are replaced, in the five village styles (West European,
   Central European, Middle Eastern, Asian, Meso-American) and every age, with
-  walls, gates, towers, castles, docks and the eighteen wonders.
-* Farms are Minecraft farmland. A farm is part of the ground in this game,
-  so the build replaces its textures in `terrain.drs`. While a villager
-  builds a farm, the wheat sprouts and grows. A finished farm is ripe golden
-  wheat, and an exhausted farm is dry farmland. The edges blend into the
-  grass as the original farms do.
-* The panels at the top and bottom of the screen are Minecraft style. The
-  parchment is the grey of Minecraft's inventory, the dark area behind the
-  minimap is an inventory slot, and the carved frames are planks. The
-  resource icons are an oak log (wood), bread (food), a gold ingot,
-  cobblestone (stone) and a villager's head (population). If a panel's icons
-  can't be found, that panel keeps its original look, and the report says so.
+  walls, gates, towers, castles, docks, farms and the eighteen wonders.
 * The map is replaced too: forests, chopped trees, gold and stone mines,
   berry bushes, rocks, plants, animals, fish and decorations.
 * Projectiles: Minecraft arrows and bolts, spinning axes, snowballs from the
@@ -116,16 +102,15 @@ next to `build_mod.bat`. You have two options:
 * A few original sprite files hold a frame or two more than the game uses.
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.
-* Still original: cliffs, bridges, the rest of the terrain, fire and explosions, ships sinking,
-  and the menus and buttons. Unit names are unchanged.
+* Still original: cliffs, bridges, terrain, fire and explosions, ships sinking,
+  and the game's interface. Unit names are unchanged, except Pac-Man's.
 
 ## Easter eggs
 
 **Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
 first button trains **Pac-Man** (500 food, 500 gold, 30 seconds, 250 hit
-points; he takes 1 population like any unit), with his own Pac-Man icon. On
-screen he keeps the cheat unit's name, "Furious the Monkey Boy" (see below).
-He is faster than any unit in the game, even
+points; he takes 1 population like any unit), with his own Pac-Man icon, and
+the game calls him **Pac-Man**. He is faster than any unit in the game, even
 the Cobra Car cheat: 5 tiles a second, more than three times a Hussar. This
 works for every civilisation. He is infantry, not a wild animal like the cheat
 unit: he boards Transport Ships (and gets off again on any shore), walks on
@@ -140,11 +125,11 @@ them in `previews/sounds/`. It is the only change the mod makes to the
 game's rules; `--no-wonder-pacman` leaves the rules alone.
 
 His name lives in the game's language files (`language_x1_p1.dll`,
-`language_x1.dll`, `language.dll`), and those are DLLs. Windows 11's Smart App
-Control refuses to load a DLL that was changed, and then the game doesn't
-start ("Bad Image", error 0xc0e90002). So the mod never changes them, and he
-keeps the Monkey Boy's name. If an earlier build renamed him, the next build
-puts your original language files back by itself.
+`language_x1.dll`, `language.dll`, in the game's main folder). `build_mod_direct.bat`
+renames him there, keeping a backup of each file it changes, and
+`restore_original.bat` puts them back. The UserPatch mod exe only reads its
+own `language_x1_p1.dll`; the report says whether his name could be changed
+there.
 
 > Multiplayer: because the rules change, every player needs the same build
 > of the mod, or the game goes out of sync.

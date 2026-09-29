@@ -16,8 +16,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import build_mod  # noqa: E402
-from aom import slp  # noqa: E402
-from aom.datfile import read_graphics, read_terrains  # noqa: E402
+from aom import langdll, slp  # noqa: E402
+from aom.datfile import read_graphics  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import render_frames  # noqa: E402
 from aom.palette import Quantiser, parse_jasc  # noqa: E402
@@ -106,24 +106,8 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     return bytes(out)
 
 
-FAKE_TERRAINS = {0: ("Grass", 15000), 7: ("Farm", 15004), 8: ("Farm (dead)", 15005), 29: ("Farm 1", 15021),
-                 30: ("Farm 2", 15040), 31: ("Farm 3", 15023)}  # Farm 2 on another id: it must come from the .dat
-
-
-def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
-    """The terrain block after the graphics: map sizes, 19 tile sizes, padding, 42 terrains (mirrors aom.datfile)."""
-    b = bytearray(struct.pack("<6i", 0, 0, 0, 0, 0, 0))
-    b += struct.pack("<57h", *([97, 49, 0] * 19)) + bytes(2)
-    for i in range(42):
-        name, slp_id = terrains.get(i, ("", -1))
-        rec = bytearray(struct.pack("<bb13s13si", 1 if name else 0, 0, name.encode(), f"t{i}".encode(), slp_id))
-        rec += bytes(192 - len(rec)) + struct.pack("<hhh", -1, 3 if 29 <= i <= 31 else 6, 3 if 29 <= i <= 31 else 6)
-        b += rec + bytes(436 - len(rec))
-    return bytes(b)
-
-
-def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> bytes:
-    """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and terrains and unit tables)."""
+def fake_dat(graphics: list[dict], civs: bytes = b"") -> bytes:
+    """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and unit tables)."""
     b = bytearray(b"VER 5.7\0")
     restrictions, terrains = 2, 3
     b += struct.pack("<HH", restrictions, terrains)
@@ -143,40 +127,9 @@ def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> by
         b += struct.pack("<bhbb", 0, gid, g.get("mirror", 1), 0)
         for d in g.get("deltas", []):
             b += struct.pack("<hhihhhh", d, 0, 0, 0, 0, -1, 0)
-    if ground is not None:
-        b += fake_terrains(ground)
     b += civs
     c = zlib.compressobj(9, zlib.DEFLATED, -15)
     return c.compress(bytes(b)) + c.flush()
-
-
-def diamond(fill: int = 60) -> slp.SlpFrame:
-    """A terrain tile: a 97x49 diamond, as in terrain.drs."""
-    px = np.full((49, 97), slp.TRANSPARENT, np.int16)
-    for r in range(49):
-        k = 24 - abs(r - 24)
-        px[r, 48 - 2 * k:48 + 2 * k + 1] = fill
-    return slp.SlpFrame(px, (0, 0))
-
-
-def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
-    """An in-game panel picture: a carved top bar with resource icons, and a bottom panel with parchment and a
-    dark minimap area; the game view between them is transparent."""
-    pal = parse_jasc(fake_palette())
-    lum = pal @ [0.299, 0.587, 0.114] / 255
-    allowed = [i for i in range(256) if not (16 <= i < 144 and i % 16 < 8)]  # not the team colours
-    light, dark = max(allowed, key=lambda i: lum[i]), min(allowed, key=lambda i: lum[i])
-    frame = min(allowed, key=lambda i: abs(lum[i] - 0.35))
-    px = np.full((h, w), slp.TRANSPARENT, np.int16)
-    px[:32] = frame
-    rng = np.random.default_rng(4)
-    for k, (x, y) in enumerate(icons):
-        px[y:y + 17, x:x + 26] = rng.choice(allowed[100:140], (17, 26))
-    top = h - 218
-    px[top:] = frame
-    px[top + 24:h - 14, w // 4:w * 2 // 3] = light
-    px[top + 24:h - 14, w * 2 // 3 + 30:w - 20] = dark
-    return slp.encode([slp.SlpFrame(px, (0, 0))])
 
 
 def fake_game(root: Path) -> Path:
@@ -184,19 +137,15 @@ def fake_game(root: Path) -> Path:
     data.mkdir(parents=True)
     interfac = Drs()
     interfac.put(50500, fake_palette(), "bina")
-    boxes = [(8, 10), (85, 10), (162, 10), (239, 10), (316, 10)]
-    interfac.put(51141, fake_panel(1280, 1024, boxes))  # a civilisation's panels at 1280x1024
-    big = slp.decode(interfac.get(51141))[0].pixels
-    mid = slp.decode(fake_panel(1024, 768, []))[0]
-    for x, y in boxes:  # at 1024x768 the same icons sit elsewhere
-        mid.pixels[y - 4:y + 13, x + 3:x + 29] = big[y:y + 17, x:x + 26]
-    interfac.put(51121, slp.encode([mid]))
-    interfac.put(51101, fake_panel(800, 600, []))  # its icons can't be found
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.write(data / "interfac.drs")
-    for name in build_mod.LANGUAGE_FILES:  # the language files: DLLs, which the build must never change
-        (root / name).write_bytes(b"MZ" + name.encode() * 20)
+    # the language files: Furious the Monkey Boy's name (5860), button (6860) and help (26860) texts
+    monkey = {5860: "Furious the Monkey Boy", 6860: "Create <b>Furious the Monkey Boy<b> (<cost>)",
+              26860: "Create <b>Furious the Monkey Boy<b> (<cost>)\nA very fast cheat unit.", 5861: "Next unit"}
+    (root / "language_x1_p1.dll").write_bytes(langdll.build_dll({5860: monkey[5860], 9999: "UserPatch"}))
+    (root / "language_x1.dll").write_bytes(langdll.build_dll(monkey))
+    (root / "language.dll").write_bytes(langdll.build_dll({5079: "Militia"}))
     graphics = Drs()
     table = []
     # militia (5 sprites), archer (5), a battering ram with a separate swinging head and wheels
@@ -249,10 +198,6 @@ def fake_game(root: Path) -> Path:
     extra = Drs()  # some sprites only exist in gamedata_x1.drs
     extra.put(5157, build_mod.blank(17 * 5))
     extra.write(data / "gamedata_x1.drs")
-    terrain = Drs()  # grass, and the farms: 6x6 tiles for the farm and the dead farm, 3x3 for the stages
-    for slp_id, tiles in ((15000, 100), (15004, 36), (15005, 36), (15021, 9), (15040, 9), (15023, 9)):
-        terrain.put(slp_id, slp.encode([diamond(60 + k % 7) for k in range(tiles)]))
-    terrain.write(data / "terrain.drs")
     patch = Drs()  # UserPatch's own archive, already holding a sound
     patch.put(15500, b"RIFF a sound", "wav")
     patch.write(data / "gamedata_x1_p1.drs")
@@ -261,8 +206,7 @@ def fake_game(root: Path) -> Path:
     for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
                                  ("BOARJ_RN", 5160, 10), ("BOARJ_SN", 5161, 5), ("BOARJ_WN", 5162, 10)):
         table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8})  # only 5157 has a file
-    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar),
-                                                       FAKE_TERRAINS))
+    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar)))
     return root
 
 
@@ -302,12 +246,6 @@ def test_dat_reader():
     g = read_graphics(fake_dat(table))
     assert g[0].name == "ARCHER_FIRE" and g[0].slp == 2 and g[0].stored_angles == 5
     assert g[1].deltas[0].graphic_id == 0 and g[1].stored_angles == 8
-    terrains = read_terrains(fake_dat(table, ground=FAKE_TERRAINS))
-    assert len(terrains) == 42 and terrains[7].name == "Farm" and terrains[30].slp == 15040
-    assert (terrains[29].rows, terrains[29].cols) == (3, 3) and not terrains[5].enabled
-    from aom import farmland
-    assert {s for s, _, _ in farmland.farm_slps(terrains)} == {15004, 15005, 15021, 15040, 15023}
-    assert {s for s, _, _ in farmland.farm_slps([])} == set(farmland.FARM_SLPS)  # no table: the original ids
 
 
 def test_rendered_sprite_matches_layout():
@@ -323,8 +261,6 @@ def test_rendered_sprite_matches_layout():
 
 def test_full_build(tmp: Path):
     game = fake_game(tmp / "aoe2")
-    (game / "Games" / "AgeOfMinecraft" / "Data").mkdir(parents=True)  # an earlier build's changed copy
-    (game / "Games" / "AgeOfMinecraft" / "Data" / "language_x1_p1.dll").write_bytes(b"MZ changed")
     assert build_mod.main(["--game", str(game), "--jobs", "2"]) == 0
     mod = game / "Games" / "AgeOfMinecraft"
     xml = (game / "Games" / "AgeOfMinecraft.xml").read_bytes()
@@ -376,9 +312,12 @@ def test_full_build(tmp: Path):
     assert all(np.array_equal(a.pixels, b.pixels) for a, b in zip(icons_after, icons_before))
     assert icons_after[170].pixels.shape == (36, 36) and len(np.unique(icons_after[170].pixels)) >= 4
     assert "trainable at the Wonder" in report and "Pac-Man is icon 170 (36x36)" in report
-    # no DLL is ever changed or copied: Windows refuses changed DLLs
-    assert not list((mod / "Data").glob("*.dll"))
-    assert all((game / n).read_bytes() == b"MZ" + n.encode() * 20 for n in build_mod.LANGUAGE_FILES)
+    # his name: the mod has its own language_x1_p1.dll; the game's files are untouched
+    p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
+    assert langdll.read_string(p1, 5860) == "Pac-Man" and langdll.read_string(p1, 9999) == "UserPatch"
+    assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
+    assert not (mod / "Data" / "language_x1.dll").exists()
+    assert "'Furious the Monkey Boy' is now 'Pac-Man'" in report
     # his sounds: six new sounds in the .dat, their WAV files in the patch archive (on free ids)
     from aom.datfile import sound_table
     dat = datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
@@ -405,31 +344,6 @@ def test_full_build(tmp: Path):
     assert slp.info(x1.get(5157)).num_frames == 85
     assert x1.get(5157) != Drs(game / "Data" / "gamedata_x1.drs").get(5157)
     assert "6 x 8 angles mirrored  [dat, plus 2 unused frames]" in report
-    # farms are terrain: their textures in terrain.drs become Minecraft farmland, in the same tile shapes
-    ground, ground_before = Drs(mod / "Data" / "terrain.drs"), Drs(game / "Data" / "terrain.drs")
-    assert ground.get(15000) == ground_before.get(15000)  # grass stays
-    for slp_id in (15004, 15005, 15021, 15040, 15023):
-        new, old = slp.decode(ground.get(slp_id)), slp.decode(ground_before.get(slp_id))
-        assert len(new) == len(old)
-        for a, b in zip(new, old):
-            assert np.array_equal(a.pixels >= 0, b.pixels >= 0) and a.hotspot == b.hotspot
-            assert a.pixels.max() < slp.PLAYER and not np.array_equal(a.pixels, b.pixels)
-    ripe = slp.decode(ground.get(15004))[0].pixels
-    overlap = (ripe[24:, 48:] >= 0) & (ripe[:25, :49] >= 0)  # the tile to the lower right lies over this corner
-    assert np.array_equal(ripe[24:, 48:][overlap], ripe[:25, :49][overlap])  # so the tiles join up
-    assert "FARMS" in report and "terrain 30 'Farm 2'" in report and "TERRAIN TABLE" in report
-    # the panels: planks, inventory grey and slots, with Minecraft resource icons; the game view stays open
-    ui, ui_before = Drs(mod / "Data" / "interfac.drs"), Drs(game / "Data" / "interfac.drs")
-    quant = Quantiser(parse_jasc(fake_palette()))
-    new, old = slp.decode(ui.get(51141))[0].pixels, slp.decode(ui_before.get(51141))[0].pixels
-    assert new.shape == old.shape and np.array_equal(new < 0, old < 0)
-    assert new[900, 600] == quant.indices(np.array([[198, 198, 198]]))[0]  # parchment -> inventory grey
-    assert new[900, 1100] == quant.indices(np.array([[139, 139, 139]]))[0]  # the minimap's dark -> a slot
-    assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
-    new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels
-    assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[6:23, 11:37], old[6:23, 11:37])
-    assert ui.get(51101) == ui_before.get(51101)  # no icons found: it keeps its look
-    assert "INTERFACE PANELS" in report and "Minecraft style" in report and "were not found" in report
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
 
@@ -450,31 +364,26 @@ def test_direct_mode_and_restore(tmp: Path):
     game = fake_game(tmp / "aoe2")
     before = (game / "Data" / "graphics.drs").read_bytes()
     dat_before = (game / "Data" / "empires2_x1_p1.dat").read_bytes()
-    lang_before = {n: (game / n).read_bytes() for n in build_mod.LANGUAGE_FILES}
-    (game / ("language_x1.dll" + build_mod.BACKUP)).write_bytes(lang_before["language_x1.dll"])
-    (game / "language_x1.dll").write_bytes(b"MZ changed by an earlier build")  # Windows would refuse it
-    ground_before = (game / "Data" / "terrain.drs").read_bytes()
-    panel_before = Drs(game / "Data" / "interfac.drs").get(51141)
+    lang_before = {n: (game / n).read_bytes() for n in langdll.FILES}
     for _ in range(2):  # building twice starts from the originals again
-        assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia,pacman,farms,interface",
+        assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia,pacman",
                                "--jobs", "1"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() != before
     assert (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).read_bytes() == before
-    assert (game / "Data" / "terrain.drs").read_bytes() != ground_before
-    assert (game / "Data" / ("terrain.drs" + build_mod.BACKUP)).read_bytes() == ground_before
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() != dat_before
-    # the original language file is back, its backup gone, and no DLL was changed
-    assert {n: (game / n).read_bytes() for n in build_mod.LANGUAGE_FILES} == lang_before
-    assert not (game / ("language_x1.dll" + build_mod.BACKUP)).exists()
+    x1 = (game / "language_x1.dll").read_bytes()
+    assert [langdll.read_string(x1, i) for i in (5860, 6860, 26860, 5861)] == [
+        "Pac-Man", "Create <b>Pac-Man<b> (<cost>)", "Create <b>Pac-Man<b> (<cost>)\nA very fast cheat unit.",
+        "Next unit"]
+    assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Pac-Man"
+    assert (game / "language.dll").read_bytes() == lang_before["language.dll"]  # nothing of his in it
     icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     assert len(icons) == 171  # one icon added, not one per build
-    assert Drs(game / "Data" / "interfac.drs").get(51141) != panel_before  # the panel too, in the same file
     assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15511))
     assert build_mod.main(["--game", str(game), "--restore"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() == before
-    assert (game / "Data" / "terrain.drs").read_bytes() == ground_before
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() == dat_before
-    assert {n: (game / n).read_bytes() for n in build_mod.LANGUAGE_FILES} == lang_before
+    assert {n: (game / n).read_bytes() for n in langdll.FILES} == lang_before
     assert not list(game.glob("*" + build_mod.BACKUP))
 
 
@@ -498,6 +407,22 @@ def test_pacman_sounds():
     silent = bytearray(struct.pack("<h", -1))  # an animation with no sound gets ours as its own
     gameplay._graphic_sound(silent, Graphic(2, "mkyby_DN", "", 2, 0, 10, 2, 0.1, 0, 0, [], -1, 0, -1), 601)
     assert struct.unpack("<h", silent)[0] == 601
+
+
+def test_language_files():
+    from aom import gameplay
+    x1 = langdll.build_dll({5860: "Furious the Monkey Boy", 6860: "Create Furious the Monkey Boy", 5861: "Next"})
+    p1 = langdll.build_dll({100: "UserPatch"})  # does not have him: the game falls back to language_x1.dll
+    changed, notes = gameplay.rename_pacman({"language_x1_p1.dll": p1, "language_x1.dll": x1},
+                                            {"name": 5860, "creation": 6860, "help": 26860})
+    assert list(changed) == ["language_x1.dll"] and len(changed["language_x1.dll"]) == len(x1)
+    assert langdll.read_string(changed["language_x1.dll"], 6860) == "Create Pac-Man"
+    assert langdll.read_string(changed["language_x1.dll"], 5861) == "Next"
+    short = langdll.build_dll({5860: "Mono"})  # a name shorter than "Pac-Man" cannot grow in place
+    changed, notes = gameplay.rename_pacman({"language_x1.dll": short}, {"name": 5860})
+    assert not changed and "does not fit" in notes[-1]
+    changed, notes = gameplay.rename_pacman({"language_x1.dll": p1}, {"name": 5860})
+    assert not changed and "in none of the language files" in notes[0]
 
 
 def main() -> None:

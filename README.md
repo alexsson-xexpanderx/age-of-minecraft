@@ -8,10 +8,9 @@ serve as battering rams, dispenser minecarts as mangonels, and a TNT cannon as
 the bombard. Creepers are the petards, and the fleet sails under team-coloured
 wool. All 90 units are modelled, and every building too: houses, town centers,
 castles, walls and gates in five Minecraft village styles that upgrade with
-each age, the eighteen wonders, wheat farms, and the whole map (forests, gold
-and stone, berry bushes, animals, fish and decorations). Even the panels at the
-top and bottom of the screen look like Minecraft's inventory. And an easter
-egg: build a Wonder and it trains Pac-Man.
+each age, the eighteen wonders, and the whole map (forests, gold and stone,
+berry bushes, animals, fish and decorations). And an easter egg: build a
+Wonder and it trains Pac-Man.
 
 ![battle](previews/battle.png)
 
@@ -51,8 +50,6 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/walls.png` | wall lines in every direction and with corners, placed as the game places them |
 | `previews/wonders.png` | the eighteen wonders and the scenario monuments |
 | `previews/nature.png` | trees, resources and map decorations |
-| `previews/farms.png` | farms, which the game draws as ground: being built, grown and exhausted |
-| `previews/interface.png` | the resource bar and bottom panel in the Minecraft style, on a stand-in for the game's own panel |
 | `previews/player_colors.png` | a unit in all 8 player colours |
 | `previews/roster_easter.png` | the easter eggs: Pac-Man and a ghost in the cheat units' slots |
 | `previews/sounds/pacman_*.wav` | Pac-Man's sounds: clicking on him, orders, training, bites and his death |
@@ -79,15 +76,14 @@ tools/aom/fortifications.py  walls, gates, towers and castles
 tools/aom/wonders.py     the eighteen wonders and scenario monuments
 tools/aom/nature.py      trees, stumps, mines, berry bushes, rocks and plants
 tools/aom/gaia.py        map decorations: yurts, ruins, graves, flags, torches, the relic
-tools/aom/farmland.py    farms, which are terrain: Minecraft farmland and wheat in terrain.drs
-tools/aom/interface.py   the screen panels repainted: planks, inventory grey, slots and item icons
 tools/aom/props.py       renders buildings and scenery in the original sprite's frame layout
 tools/aom/slp.py         SLP 2.0N sprite encoder/decoder
 tools/aom/drs.py         DRS archive reader/writer
 tools/aom/palette.py     game palette and colour matching
-tools/aom/datfile.py     graphics and terrain table reader for empires2_x1_p1.dat
+tools/aom/datfile.py     graphics table reader for empires2_x1_p1.dat
 tools/aom/datunits.py    reads and patches the civilisations' unit tables in the .dat
-tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon and sounds
+tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon, name and sounds
+tools/aom/langdll.py     reads and changes strings in the game's language DLLs
 tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
 tools/aom/easter.py      Pac-Man and the ghost
 tools/aom/slpmap.py      which original sprite id each unit render replaces
@@ -101,5 +97,5 @@ tools/tests/             format round trips and a full build against a fake game
 ## Status
 
 All 90 units, every building in all five styles and ages, walls and gates,
-the wonders, the farms, and the map's nature and animals are modelled and
-exported. The next step is testing them together in the game.
+the wonders, and the map's nature and animals are modelled and exported. The
+next step is testing them together in the game.

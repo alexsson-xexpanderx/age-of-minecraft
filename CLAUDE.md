@@ -48,19 +48,12 @@ putting `tools/` on `sys.path`.
 
 **Game files → mod (`build_mod.main`).**
 1. `Game` opens the player's DRS archives (the patch archives take precedence), the palette (`interfac.drs` 50500),
-   and the `.dat`'s graphics and terrain tables. If a `*.aom-backup` exists, it always reads that instead, so
+   the `.dat` graphics table and the language DLLs. If a `*.aom-backup` exists, it always reads that instead, so
    rebuilding after `--mode direct` starts from the originals.
 2. It chooses the targets:
    - Units use fixed SLP ids from `slpmap.TARGETS`, plus `Game.name_targets` (graphic name prefixes).
    - Buildings, walls, trees and decorations are never listed by id. `spritemap.plan()` finds them by parsing the
      `.dat`'s systematic graphic names (e.g. `BRKS3NNM` = barracks, Castle Age, main sprite, Middle Eastern).
-   - Farms are terrain, not sprites. `datfile.read_terrains` reads the `.dat`'s terrain table, and
-     `farmland.farm_slps` picks terrains 7, 8 and 29–31. If the table can't be read, it falls back to the original
-     ids. Their textures in `terrain.drs` are redrawn one diamond tile per frame.
-   - The screen panels are full-screen pictures in `interfac.drs` (51101–51160, one per civ and screen size).
-     `interface.py` repaints them by brightness class and puts item icons over the resource icons. `terrain.drs`
-     and `interfac.drs` are in `Game.archives`, so `write_outputs` writes them like any other archive, and the
-     Pac-Man icon edit goes into the same `interfac.drs`.
 3. `Game.layout()` takes each sprite's frames per angle, angle count and mirroring from the `.dat`, falling back
    to the SLP header. Rendering must match the original layout exactly. After rendering, the build refuses to
    write any SLP whose frame count differs from the original.
@@ -73,6 +66,7 @@ putting `tools/` on `sys.path`.
    - `gameplay.py` + `datunits.py` patch the `.dat` so the Wonder trains Pac-Man, and give the Javelina its own
      sprites.
    - `sounds.py` WAVs go into `gamedata_x1_p1.drs`.
+   - `langdll.py` renames the unit.
    Last, the build writes `aom_report.txt`.
 
 ## Invariants that are easy to break
@@ -87,11 +81,6 @@ putting `tools/` on `sys.path`.
 - **Take counts from the game.** Frame and angle counts always come from the player's files, never from code.
   With mirroring, `a // 2 + 1` angles are stored (S, SW, W, NW, N) and the game mirrors the rest.
 - **Wall frames have a fixed meaning:** 0 `/`, 1 `\`, 2 the post (at ends and corners), 3 `--`, 4 `|`.
-- **Terrain tiles must fit together.** The game picks a terrain frame by map position, so a farm texture repeats
-  every tile (3 blocks to a tile, camera scale √2). Each new frame fills exactly the original frame's pixels.
-- **Never change a DLL or an exe.** Windows 11's Smart App Control refuses to load a changed DLL ("Bad Image",
-  0xc0e90002) and the game won't start. That's why Pac-Man keeps the Monkey Boy's name. `put_back_dlls` undoes the
-  language DLL edits that earlier builds made. Data files (`.drs`, `.dat`) are fine.
 - **Windows players come first.** Look files up with the case-insensitive `pick()`. Never write into the player's
   `Data/` without a `.aom-backup`, and make sure `--restore` can undo every file the build touches.
 - **Textures are original pixel art made in code** (`textures.py` ASCII-art grids, noise and team-colour specs).

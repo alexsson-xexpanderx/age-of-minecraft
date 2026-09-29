@@ -93,13 +93,12 @@ def _encode_frame(frame: SlpFrame) -> tuple[bytes, bytes]:
     return bytes(edges), rows
 
 
-def encode(frames: list[SlpFrame], props: list[tuple[int, int]] = None) -> bytes:
-    """`props`: each frame's (palette offset, properties), to keep the original's (see `frame_props`)."""
+def encode(frames: list[SlpFrame]) -> bytes:
     header = b"2.0N" + struct.pack("<i", len(frames)) + COMMENT
     infos = bytearray()
     body = bytearray()
     pos = 32 + 32 * len(frames)
-    for k, f in enumerate(frames):
+    for f in frames:
         h, w = f.pixels.shape
         edges, rows = _encode_frame(f)
         outline_off = pos
@@ -109,9 +108,7 @@ def encode(frames: list[SlpFrame], props: list[tuple[int, int]] = None) -> bytes
         for r in rows:
             offsets += struct.pack("<I", data_off + len(commands))
             commands += r
-        palette, properties = props[k] if props else (0, 0)
-        infos += struct.pack("<IIIIiiii", cmd_table_off, outline_off, palette, properties, w, h,
-                             f.hotspot[0], f.hotspot[1])
+        infos += struct.pack("<IIIIiiii", cmd_table_off, outline_off, 0, 0, w, h, f.hotspot[0], f.hotspot[1])
         chunk = edges + offsets + commands
         body += chunk
         pos += len(chunk)
@@ -194,12 +191,6 @@ def info(data: bytes) -> SlpInfo:
         raise ValueError(f"unsupported SLP version {version!r}")
     sizes = [struct.unpack_from("<iiii", data, 32 + 32 * i + 16) for i in range(n)]
     return SlpInfo(n, sizes)
-
-
-def frame_props(data: bytes) -> list[tuple[int, int]]:
-    """Each frame's palette offset and properties, as stored."""
-    n = struct.unpack_from("<i", data, 4)[0]
-    return [struct.unpack_from("<II", data, 32 + 32 * i + 8) for i in range(n)]
 
 
 def decode(data: bytes) -> list[SlpFrame]:

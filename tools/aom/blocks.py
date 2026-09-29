@@ -545,10 +545,6 @@ def blocks() -> dict[str, BlockType]:
     B["shroomlight"] = u(noise_fill(p, "#f09a4a", 0.1))
     B["beacon"] = u(framed(p, "#8ae8e8", "#cfe8f0", 0.03))
     B["white_carpet"] = B["white_wool"]
-    dry = noise_fill(p, "#8a6444", 0.08, (("#9c7552", 0.15),))  # farmland nothing grows on any more
-    for r in (2, 6, 10, 14):
-        dry[r] = _c("#6e4e33")
-    B["dry_farmland"] = BlockType({**{f: B["dirt"].faces[f] for f in FACES}, "top": dry})
     return B
 
 
