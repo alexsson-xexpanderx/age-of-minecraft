@@ -350,7 +350,7 @@ def _cost(job) -> int:
         return job[4] * (job[5] // 2 + 1)
     if job[0] == "static":
         return job[3] * 4
-    if job[0] in ("interface", "menu", "screen", "team copies"):
+    if job[0] in ("interface", "menu", "screen", "team copies", "recolour"):
         return 30
     return 20  # a farm texture: one render, cut into tiles
 
@@ -361,12 +361,19 @@ def _render(job) -> tuple[int, bytes, int]:
         data = screens.encode_copies(original, found, palettes)
         return slp_id, data, slp.info(data).num_frames
     if job[0] == "screen":
-        _, slp_id, original, palettes = job
-        data = screens.encode(slp_id, original, palettes)
+        _, slp_id, original, palettes, out = job
+        data = screens.encode(slp_id, original, palettes, out)
         return slp_id, data, slp.info(data).num_frames
-    if job[0] == "menu":
-        _, slp_id, original, palette = job
-        frames = menu.pictures(slp.decode(original), palette, Quantiser(palette))
+    if job[0] == "menu":  # the menu's picture, drawn for its new palette (the old one is for the old glow colours)
+        _, slp_id, original, palette, new = job
+        frames = menu.pictures(slp.decode(original), palette, menu.Nearest(new))
+        data = slp.encode(frames, props=slp.frame_props(original))
+        return slp_id, data, len(frames)
+    if job[0] == "recolour":  # the same pictures, each pixel the nearest colour in the new palette
+        _, slp_id, original, palette, new = job
+        near = menu.Nearest(new).indices(np.asarray(palette, np.int64)[:256, :3])
+        frames = [slp.SlpFrame(np.where((f.pixels >= 0) & (f.pixels < 256), near[np.clip(f.pixels, 0, 255)],
+                                        f.pixels).astype(np.int16), f.hotspot) for f in slp.decode(original)]
         data = slp.encode(frames, props=slp.frame_props(original))
         return slp_id, data, len(frames)
     if job[0] == "interface":
@@ -518,11 +525,18 @@ def main(argv=None) -> int:
             jobs.append(("interface", slp_id, data))
             panels.append((slp_id, size))
         data, raw = game.original(menu.MENU), game.interfac.get(menu.PALETTE, "bina")
+        old_menu = new_menu = None  # the main menu's palette, and its new one
         if data is not None and raw is not None:
             if menu.known([(w, h) for w, h, _, _ in slp.info(data).sizes]):
-                jobs.append(("menu", menu.MENU, data, parse_jasc(raw)))
+                old_menu = parse_jasc(raw)
+                new_menu = menu_palette(game, old_menu)
+                jobs.append(("menu", menu.MENU, data, old_menu, new_menu))
                 panels.append((menu.MENU, (800, 600)))
-                menu_border(game, screen_files, parse_jasc(raw), log)
+                icons = game.original(MENU_PICTURES[2])
+                if icons is not None:  # the menu's checkboxes and arrows: the same, in its new palette
+                    jobs.append(("recolour", MENU_PICTURES[2], icons, old_menu, new_menu))
+                    panels.append((MENU_PICTURES[2], tuple(slp.info(icons).sizes[0][:2])))
+                menu_settings(game, screen_files, new_menu, log)
             else:
                 log(f"main menu: picture {menu.MENU} is not the one this build knows; it keeps its look")
         # the other screens: the setup screens, the dialogues, the history, the loading screen
@@ -533,10 +547,12 @@ def main(argv=None) -> int:
             if not screens.fits(sid, data):
                 log(f"screen picture {sid} is not the one this build knows; it keeps its look")
                 continue
-            raws = [game.data_file(p) for p in screens.palette_ids(sid, screen_files)]
-            palettes = [parse_jasc(raw) for raw in raws if raw]
-            if palettes:
-                jobs.append(("screen", sid, data, palettes))
+            ids = [p for p in screens.palette_ids(sid, screen_files) if game.data_file(p)]
+            palettes = [old_menu if p == menu.PALETTE and old_menu is not None else parse_jasc(game.data_file(p))
+                        for p in ids]  # (the archives already hold the menu's new one)
+            out = [new_menu if p == menu.PALETTE and new_menu is not None else pal for p, pal in zip(ids, palettes)]
+            if palettes:  # a picture shown with the main menu's palette is drawn for its new colours
+                jobs.append(("screen", sid, data, palettes, out if menu.PALETTE in ids else None))
                 panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
         copied = team_copies(game)
         teams = team_places(game, [screens.TEAMS] + [sid for sid, _, _ in copied])
@@ -687,17 +703,43 @@ def loading_plan(game: Game, screen_files, log) -> Optional[tuple[bytes, int, np
     return data, ids[0], parse_jasc(raw)
 
 
-def menu_border(game: Game, screen_files, palette: np.ndarray, log) -> None:
-    """The main menu's screen file with its bevel colours (the border the game draws around the Single Player
-    menu's buttons) set to shades a little darker than the plates, in every archive that has it."""
+def menu_palette(game: Game, old: np.ndarray) -> np.ndarray:
+    """The main menu's new palette, written into every archive that has it: from the new menu picture and the other
+    pictures shown with it (its dialogue, as the build redraws it, and its checkboxes and arrows)."""
+    extra = []
+    icons = game.original(MENU_PICTURES[2])
+    if icons is not None:
+        used = sorted({int(i) for f in slp.decode(icons) for i in np.unique(f.pixels[(f.pixels >= 0) & (f.pixels < 256)])})
+        extra.append(np.repeat(old[used, :3] / 255, 40, 0))
+    dialogue = game.original(MENU_PICTURES[1])
+    if dialogue is not None and screens.fits(MENU_PICTURES[1], dialogue):
+        px = slp.decode(dialogue)[0].pixels
+        opaque = (px >= 0) & (px < 256)
+        rgb = screens.hall(np.asarray(old, np.float64)[np.clip(px, 0, 255), :3] / 255, opaque, MENU_PICTURES[1])
+        extra.append(rgb[opaque])
+    new = menu.palette(old, np.concatenate(extra) if extra else None)
+    for _, drs in game._searched():
+        if menu.PALETTE in drs.ids("bina"):
+            drs.put(menu.PALETTE, loadscreen.jasc(new), "bina")
+    return new
+
+
+def menu_settings(game: Game, screen_files, palette: np.ndarray, log) -> None:
+    """The main menu's screen files (the menu, its dialogue) with Minecraft's buttons: the game fills the Single
+    Player menu's buttons in Minecraft's grey with its light and dark edges, and writes the names in white, the one
+    the mouse is on in yellow. Written into every archive that has them."""
+    conf = menu.settings(palette)
     for sc in screen_files:
-        if menu.MENU not in sc.backgrounds or len(sc.fields.get("bevel_colors", [])) != 6:
+        if sc.palette != menu.PALETTE:
             continue
-        new = screens.with_field(game.data_file(sc.id), "bevel_colors", [str(i) for i in menu.border(palette)])
+        new = game.data_file(sc.id)
+        for key, words in conf.items():
+            if key in sc.fields:
+                new = screens.with_field(new, key, words)
         for _, drs in game._searched():
             if sc.id in drs.ids("bina"):
                 drs.put(sc.id, new, "bina")
-        log(f"main menu: a dark border instead of a light one on its buttons (screen file {sc.id})")
+        log(f"main menu: Minecraft buttons and white names (screen file {sc.id}), its own palette {menu.PALETTE}")
 
 
 def draw_loading(game: Game, data: bytes, pal_id: int, palette: np.ndarray, log) -> bytes:

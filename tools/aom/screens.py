@@ -459,25 +459,27 @@ def intended(px: np.ndarray, opaque: np.ndarray, palettes: list[np.ndarray]) -> 
     return [palettes[best]] + alike
 
 
-def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0) -> slp.SlpFrame:
+def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0,
+           out: Optional[list[np.ndarray]] = None) -> slp.SlpFrame:
     """Picture k of a screen SLP redrawn, in the colours of the palette it was made for, and quantised for it and
-    those like it."""
+    those like it, or for `out` (the build gives the main menu's palette a new set of colours)."""
     px = frame.pixels
     opaque = (px >= 0) & (px < 256)
     palettes = intended(px, opaque, palettes)
+    target = out or palettes
     if sid in (FLAGS, TABS, TEAMS):
         rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
         new, drawn = (banner(rgb, opaque) if sid == FLAGS else tab(rgb, opaque) if sid == TABS
                       else team_mark(k, rgb, opaque))
-        out = np.full(drawn.shape, slp.TRANSPARENT, np.int16)
-        out[drawn] = quantise(new, palettes)[drawn]
+        codes = np.full(drawn.shape, slp.TRANSPARENT, np.int16)
+        codes[drawn] = quantise(new, target)[drawn]
         hx, hy = frame.hotspot
-        return slp.SlpFrame(out, (hx, hy + (BANNER_GROW[0] if sid == FLAGS else 0)))
+        return slp.SlpFrame(codes, (hx, hy + (BANNER_GROW[0] if sid == FLAGS else 0)))
     rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
     new = hall(rgb, opaque, sid)
-    out = px.copy()
-    out[opaque] = quantise(new, palettes)[opaque]
-    return slp.SlpFrame(out.astype(np.int16), frame.hotspot)
+    codes = px.copy()
+    codes[opaque] = quantise(new, target)[opaque]
+    return slp.SlpFrame(codes.astype(np.int16), frame.hotspot)
 
 
 def copies(marks: list[slp.SlpFrame], frames: list[slp.SlpFrame], alike: float = 0.85) -> list[tuple[int, int]]:
@@ -517,6 +519,7 @@ def fits(sid: int, data: bytes) -> bool:
     return sid in RESTYLED and len(sizes) == 1 and sizes[0][:2] == RESTYLED[sid]
 
 
-def encode(sid: int, original: bytes, palettes: list[np.ndarray]) -> bytes:
+def encode(sid: int, original: bytes, palettes: list[np.ndarray], out: Optional[list[np.ndarray]] = None) -> bytes:
     frames = slp.decode(original)
-    return slp.encode([redraw(sid, f, palettes, k) for k, f in enumerate(frames)], props=slp.frame_props(original))
+    return slp.encode([redraw(sid, f, palettes, k, out) for k, f in enumerate(frames)],
+                      props=slp.frame_props(original))

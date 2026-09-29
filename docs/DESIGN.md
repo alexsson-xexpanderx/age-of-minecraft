@@ -174,33 +174,34 @@ The main menu is one 800x600 picture (`interfac.drs` 50189) with, for every
 button, pictures drawn over it at its place: the object cut out, with a yellow
 glow (the mouse is on it), with a white glow (pressed), and plain. The game
 writes the button names and the Single Player menu over the picture. Age of
-Minecraft's menu is a snowy block village at night with a blacksmith on the
-right, and each button a Minecraft thing in the original's exact place. The
-game draws only the edges and names of the Single Player menu's buttons, so the
-menu has a solid dark plate behind each of them: nothing shows through. The
-game shows the same picture whether that menu is open or not, so the plates
-are always there. Their
-light border is drawn in shades a little darker than the plates instead, a soft
-shadow around each button. When
-Single Player is chosen, its shield and sign turn darker instead of glowing
-yellow.
+Minecraft's menu is a Minecraft world on a clear day: a village house with a
+lectern on its roof, a stone brick tower, green hills and snowy mountains, and
+the block logo floating in the sky, with each button a Minecraft thing in the
+original's exact place. Every button name is on a Minecraft menu button (stone
+grey, a light top edge, a dark bottom edge, a black outline), as wide as the name
+really is in the game, and written in white. While the mouse is on a button,
+its thing turns darker and its name yellow; there is no glow.
+
+The right side, where the Single Player menu opens, is Minecraft's own menu
+background, dark dirt, and the game draws that menu's buttons as Minecraft
+buttons. The description of a button is in a Minecraft tooltip, near black
+with a purple edge. The menu has colours of its own: the original ones were
+made for a night in the snow and had no greens.
 
 | Button | Minecraft |
 |---|---|
-| Learn to Play | a banner with a villager and a book |
-| Single Player | a shield with a gold cross |
-| History | an open book |
+| Learn to Play | a banner with a villager and a book, on an oak pole |
+| Single Player | a shield with a gold cross, hanging on the tower |
+| History | an open book on a lectern |
 | Multiplayer | two diamond swords crossed over a shield |
-| Map Editor | a map in an item frame |
-| Options | an anvil |
+| Map Editor | a map in an item frame, on a fence post |
+| Options | an anvil on a stone block |
 | Zone | a compass in an item frame |
-| Exit | an arrow-shaped dark oak sign |
-| the title | "AGE OF MINECRAFT" in blocks (gold, and grass on cobblestone) |
+| Exit | an arrow-shaped Minecraft button |
+| the title | "AGE OF MINECRAFT" in blocks (gold, and grass on cobblestone), floating in the sky |
 
-A dark sign sits wherever the game writes, so its texts stay readable. The
-button pictures are cut from the new picture at the same places, with the
-original's glow colour around the new object. The build only replaces a menu
-whose pictures have the sizes it was designed for.
+The button pictures are cut from the new picture at the same places. The build
+only replaces a menu whose pictures have the sizes it was designed for.
 
 ### The other screens and the window
 

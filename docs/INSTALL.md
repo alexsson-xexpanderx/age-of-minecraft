@@ -108,9 +108,11 @@ each one backed up first, and **`restore_original.bat`** puts them back.
   wheat sprouts and grows. A finished farm is ripe golden wheat, and an
   exhausted farm is dry farmland. The edges blend into the
   grass as the original farms do.
-* The main menu is a snowy Minecraft village at night: the buttons are a
-  shield, an open book, crossed diamond swords, a map, an anvil and more, in
-  the same places as before, under an "AGE OF MINECRAFT" block title.
+* The main menu is a Minecraft world on a clear day: the buttons are a
+  shield, a book on a lectern, crossed diamond swords, a map, an anvil and
+  more, in the same places as before, each name on a Minecraft button, under
+  an "AGE OF MINECRAFT" block title. The Single Player menu opens on
+  Minecraft's dark dirt background, with Minecraft buttons.
 * The panels at the top and bottom of the screen are Minecraft style. The
   parchment is the grey of Minecraft's inventory, the dark area behind the
   minimap is an inventory slot, and the carved frames are planks. The

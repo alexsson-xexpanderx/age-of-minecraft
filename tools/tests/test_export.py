@@ -239,7 +239,9 @@ def fake_game(root: Path) -> Path:
     interfac.put(50054, b"background2_files scr2B none 50101 -1\r\npalette_file scr3 50533\r\n", "bina")
     interfac.put(50063, b"background1_files scrstart none 50163 -1\r\npalette_file scrstart 50563\r\n", "bina")
     interfac.put(50089, b"background1_files      xmain none 50189 -1\r\npalette_file           xmain 50589\r\n"
-                        b"bevel_colors           242 232 165 196 168 138\r\n", "bina")
+                        b"background_color      0\r\nbevel_colors           242 232 165 196 168 138\r\n"
+                        b"text_color1           217  208  176\r\ntext_color2           0    0    0\r\n"
+                        b"focus_color1          202  207  1\r\nfocus_color2          0    0    0\r\n", "bina")
     interfac.put(50061, b"background1_files scr10B none 50149 -1\r\npalette_file scr_ach 50531\r\n", "bina")
     flags = []  # the achievements' flags, one per player colour: a pennant with a shadow under it
     for k in range(8):
@@ -623,11 +625,19 @@ def test_full_build(tmp: Path):
     menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu
     assert len(menu_after) == 53 and not np.array_equal(menu_after[0].pixels, menu_before[0].pixels)
     assert all(a.pixels.shape == b.pixels.shape and a.hotspot == b.hotspot for a, b in zip(menu_after, menu_before))
-    shades = menu.border(parse_jasc(fake_palette()))  # the buttons' border: a little darker than the plates
-    pal = parse_jasc(fake_palette())
-    assert len(shades) == 6 and all(pal[i].sum() < 3 * 30 for i in shades)
-    assert ui.get(50089, "bina") == (b"background1_files      xmain none 50189 -1\r\npalette_file           xmain 50589\r\n"
-                                     b"bevel_colors           " + " ".join(map(str, shades)).encode() + b"\r\n")
+    # the menu's own palette (the first had no greens), Windows colours kept; the game's buttons Minecraft grey
+    new_pal, old_pal = parse_jasc(ui.get(50589, "bina")), parse_jasc(fake_palette())
+    assert not np.array_equal(new_pal, old_pal)
+    assert np.array_equal(new_pal[:10], old_pal[:10]) and np.array_equal(new_pal[246:], old_pal[246:])
+    assert (np.abs(new_pal - [111, 163, 71]).sum(1) < 40).any()  # a grass green
+    from aom import screens
+    conf = screens.parse(ui.get(50089, "bina"))
+    fill = int(conf["background_color"][0])
+    assert 10 <= fill < 246 and np.abs(new_pal[fill] - [94, 94, 94]).sum() < 30
+    assert len(conf["bevel_colors"]) == 6 and new_pal[int(conf["bevel_colors"][0])].sum() < 40
+    assert conf["text_color1"] == ["255", "255", "255"] and conf["focus_color1"] == ["255", "255", "160"]
+    frame0 = menu_after[0].pixels  # drawn in the new palette: the sky is blue
+    assert new_pal[frame0[5, 200]][2] > new_pal[frame0[5, 200]][0] + 60
     assert (menu_after[10].pixels < 0).mean() > 0.1 and (menu_after[11].pixels >= 0).all()
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 

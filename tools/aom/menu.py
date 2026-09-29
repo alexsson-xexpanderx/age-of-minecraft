@@ -1,17 +1,24 @@
-"""The main menu, Minecraft style: a snowy village street at night, built from blocks.
+"""The main menu, Minecraft style: a Minecraft world on a clear day, and Minecraft's own menu background.
 
 The Conquerors' main menu (interfac.drs 50189) is one 800x600 picture (frame 0) and, for every button, pictures
 drawn over it at the button's place: the object cut out, with a yellow glow (the mouse is on it), with a white glow
-(pressed), and plain. The game writes the button names on the dark signs above the objects, and the Single Player
-menu (title, buttons, description) on the right, over the picture.
+(pressed), and plain. The game writes the button names above the objects, and the Single Player menu (title,
+buttons, description) on the right, over the picture.
 
-`scene()` draws the new picture with a Minecraft object in each button's place and a dark sign wherever the game
-writes. `pictures()` cuts every button picture out of it at the same place, with the glow around the new object;
-every picture keeps its size and hotspot. The places were found by matching the original button pictures against
-the original picture; the build leaves a menu whose picture sizes differ from these alone.
+`scene()` draws the new picture: a Minecraft thing in each button's place, and a Minecraft menu button wherever the
+game writes a name (`SIGNS`, measured on a screenshot of the game), on the left a village on a clear day, on the
+right dark dirt, Minecraft's menu background. `pictures()` cuts every button picture out of it at the same place,
+the thing darker while the mouse is on it (`DARKER`, the player asked; no glow); every picture keeps its size and
+hotspot. The places were found by matching the original button pictures against the original picture; the build
+leaves a menu whose picture sizes differ from these alone.
+
+The menu's palette (50589) was made for the original night in the snow and has no greens, so the menu gets its own
+(`palette`), and its screen files (`settings`) have the game draw the Single Player menu's buttons as Minecraft's
+(grey, light and dark edges, a black outline) with white names, yellow under the mouse.
 """
 from __future__ import annotations
 
+import zlib
 from functools import lru_cache
 from typing import Optional
 
@@ -41,40 +48,82 @@ BUTTONS = {
 SIZES = {0: (800, 600), 10: (109, 184), 11: (120, 189), 14: (88, 124), 15: (97, 131), 18: (61, 56), 19: (67, 64),
          22: (121, 179), 23: (125, 187), 26: (63, 60), 27: (70, 67), 30: (94, 89), 31: (102, 97), 34: (87, 91),
          35: (95, 100), 46: (154, 60), 47: (153, 65), 49: (211, 111), 50: (427, 170)}
-# where the game writes: a dark sign under each button name, the Single Player title and its description
-SIGNS = {"learn": (5, 7, 117, 32), "single": (308, 8, 428, 40), "history": (110, 166, 198, 186),
-         "multi": (259, 218, 360, 239), "map": (199, 276, 256, 291), "options": (106, 349, 186, 368),
-         "zone": (274, 369, 333, 383)}
+# where the game writes each button's name (measured on a screenshot of the game), with a Minecraft menu button
+# behind it: all of the name on it, with room around
+SIGNS = {"learn": (8, 9, 116, 31), "single": (313, 13, 423, 37), "history": (121, 166, 188, 188),
+         "multi": (263, 218, 360, 241), "map": (181, 273, 276, 296), "options": (112, 348, 182, 371),
+         "zone": (279, 367, 327, 388)}
 TITLE_SIGN = (453, 3, 775, 53)
-# buttons shown darker instead of with a glow around them (the player asked): the mouse on it, pressed
-DARKER = {"single": (0.6, 0.45)}
 DESCRIPTION = (380, 490, 790, 597)
-# the Single Player menu's six buttons (measured on photos of the game): the game draws only their edges and names,
-# so the picture gets a solid plate behind each (as wide as the button, a little taller), and nothing shows through.
-# They are always there: making Single Player's highlighted picture bigger to hold them, so they would only show
-# while its menu is open, did not work in the game (its buttons were see-through again)
+# the Single Player menu's six buttons (measured on photos of the game): the game draws them, its way
 SUBMENU = [(462, y, 759, y + 39) for y in (90, 155, 221, 286, 351, 417)]
-PLATE = "#1e1e1e"
-BORDER = ("#0a0a0a", "#101010", "#161616")  # the game's border around those buttons: a little darker, a shadow
+# the buttons darker while the mouse is on them and when pressed, instead of a glow (the player asked); only the
+# thing, not the button its name is on
+DARKER = {name: (0.72, 0.55) for name in ("single", "multi", "zone", "learn", "map", "history", "options", "exit")}
+SKY = ("#6e9ff2", "#bcd5fa")
+GRASS = "#6fa347"
+BUTTON = {"fill": "#5e5e5e", "light": "#a4a4a4", "shade": "#383838", "edge": "#000000"}  # Minecraft's, darker
+TOOLTIP = ("#100010", "#5000ff", "#28007f")  # Minecraft's tooltip: near black, a purple edge
+# the menu's screen file: the game fills the Single Player menu's buttons with Minecraft's button grey, with its
+# light and dark edges (outside in, top and left then bottom and right) and a black outline; names in white,
+# the one the mouse is on in Minecraft's yellow
+SCREEN = {"background_color": "#5e5e5e", "bevel_colors": ("#000000", "#a4a4a4", "#8a8a8a", "#484848", "#383838",
+                                                          "#000000"),
+          "text_color1": "255 255 255", "text_color2": "0 0 0", "focus_color1": "255 255 160",
+          "focus_color2": "0 0 0"}
 
 
-def border(palette: np.ndarray) -> list[int]:
-    """The six palette indices (bevel colours) the game draws the buttons' border in: shades a little darker than
-    the plates (the player asked for no white border, but some shadow), from the outside in, on both sides. Never
-    the plates' own colour, nor the Windows colours at 0-9 and 246-255."""
+class Nearest:
+    """Nearest-colour quantiser over a whole palette (the menu's own: no player colours to keep free)."""
+
+    def __init__(self, palette: np.ndarray):
+        from .palette import _lab
+        self.palette = np.asarray(palette)
+        self._lab = _lab
+        self.lab = _lab(self.palette[:, :3].astype(np.float64))
+
+    def indices(self, rgb: np.ndarray) -> np.ndarray:
+        keys = (rgb[:, 0].astype(np.int64) << 16) | (rgb[:, 1].astype(np.int64) << 8) | rgb[:, 2].astype(np.int64)
+        uniq, inverse = np.unique(keys, return_inverse=True)
+        cols = np.stack([(uniq >> 16) & 255, (uniq >> 8) & 255, uniq & 255], -1).astype(np.float64)
+        best = np.empty(len(uniq), np.int64)
+        for a in range(0, len(uniq), 4096):
+            d = ((self._lab(cols[a:a + 4096])[:, None] - self.lab[None]) ** 2).sum(-1)
+            best[a:a + 4096] = d.argmin(1)
+        return best[inverse]
+
+
+def palette(original: np.ndarray, extra: Optional[np.ndarray] = None) -> np.ndarray:
+    """The menu's own palette: the menu's first one has no greens and few sky blues (it was made for a night in the
+    snow). Made from the new picture and `extra` colours (other pictures shown with it), keeping the twenty
+    Windows colours at 0-9 and 246-255 where they are."""
+    from .loadscreen import palette as median_cut
+    img, _ = scene()
+    swatches = [parse(c)[:3] for c in (BUTTON["fill"], BUTTON["light"], BUTTON["shade"], "#8a8a8a", "#484848",
+                                       "#ffffff", "#ffffa0", *TOOLTIP)]
+    rows = [img.reshape(-1, 3), np.repeat(np.array(swatches), 400, 0)]
+    if extra is not None:
+        rows.append(np.asarray(extra, float).reshape(-1, 3))
+    return median_cut(original, np.concatenate(rows)[:, None, :])
+
+
+def settings(palette: np.ndarray) -> dict[str, list[str]]:
+    """The menu screen file's settings for these colours, the palette ones as indices into `palette` (never the
+    Windows colours at 0-9 and 246-255: 0 would mean no fill)."""
     pal = np.asarray(palette, float)[:, :3]
     free = np.arange(10, 246)
 
-    def nearest(colour: str, among: np.ndarray) -> int:
-        return int(among[np.abs(pal[among] - parse(colour)[:3] * 255).sum(1).argmin()])
+    def index(colour: str) -> str:
+        return str(int(free[np.abs(pal[free] - parse(colour)[:3] * 255).sum(1).argmin()]))
 
-    plate = nearest(PLATE, free)
-    darker = free[pal[free].sum(1) < pal[plate].sum()]
-    shades = [nearest(c, darker) if len(darker) else plate for c in BORDER]
-    return shades + shades
+    out = {k: v.split() for k, v in SCREEN.items() if isinstance(v, str) and not v.startswith("#")}
+    out["background_color"] = [index(SCREEN["background_color"])]
+    out["bevel_colors"] = [index(c) for c in SCREEN["bevel_colors"]]
+    return out
 
 
 # --------------------------------------------------------------------------- drawing helpers
+
 
 def _tex(name: str, face: str = "front") -> np.ndarray:
     return V.all_blocks()[name].faces[face][..., :3].astype(np.float64)
@@ -112,14 +161,22 @@ def _sprite(rows: list[str], legend: dict) -> np.ndarray:
     return out
 
 
-def _blit(img, masks, name, spr: np.ndarray, x: int, y: int, k: int = 1) -> None:
-    """Paste a sprite scaled k times (nearest) with its top left at (x, y); its pixels join the object's mask."""
+def _blit(img, masks, name, spr: np.ndarray, x: int, y: int, k: int = 1, outline: bool = False) -> None:
+    """Paste a sprite scaled k times (nearest) with its top left at (x, y), with a dark one-pixel outline like a
+    Minecraft item if asked; its pixels join the object's mask."""
     s = np.repeat(np.repeat(spr, k, 0), k, 1)
     h, w = s.shape[:2]
-    solid = s[..., 3] > 0.5
-    img[y:y + h, x:x + w][solid] = s[..., :3][solid]
+    solid = np.zeros((H, W), bool)
+    solid[y:y + h, x:x + w] = (s[..., 3] > 0.5)[:max(0, min(h, H - y)), :max(0, min(w, W - x))]
+    if outline:
+        ring = _outline(solid, 1)
+        img[ring] = parse("#141414")[:3]
+        solid |= ring
+    region = img[y:y + h, x:x + w]
+    inside = (s[..., 3] > 0.5)[:region.shape[0], :region.shape[1]]
+    region[inside] = s[:region.shape[0], :region.shape[1], :3][inside]
     if name:
-        masks.setdefault(name, np.zeros((H, W), bool))[y:y + h, x:x + w] |= solid
+        masks.setdefault(name, np.zeros((H, W), bool))[solid] = True
 
 
 def _mark(masks, name, box) -> None:
@@ -127,19 +184,8 @@ def _mark(masks, name, box) -> None:
     masks.setdefault(name, np.zeros((H, W), bool))[y0:y1, x0:x1] = True
 
 
-def _line(grid: np.ndarray, p0, p1, colour, width: float = 1.0) -> None:
-    """A line on a small sprite grid (RGBA), sampled densely."""
-    (x0, y0), (x1, y1) = p0, p1
-    n = int(max(abs(x1 - x0), abs(y1 - y0)) * 4) + 1
-    for t in np.linspace(0, 1, n):
-        x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
-        for dx in np.arange(-width / 2 + 0.5, width / 2, 1.0) if width > 1 else (0,):
-            xi, yi = int(round(x + dx * 0.7)), int(round(y + dx * 0.7))
-            if 0 <= yi < grid.shape[0] and 0 <= xi < grid.shape[1]:
-                grid[yi, xi, :3], grid[yi, xi, 3] = parse(colour)[:3], 1
-
-
 # --------------------------------------------------------------------------- the objects
+
 
 def villager_face() -> np.ndarray:
     return _sprite(["ssssssss", "ssssssss", "ssssssss", "sbbbbbbs", "swgssgws", "sssnnsss", "sssnnsss",
@@ -223,6 +269,8 @@ LOGO = (("AGE OF", "gold_block", None, 2), ("MINECRAFT", "cobblestone", "grass_b
 
 
 @lru_cache(maxsize=None)
+
+
 def logo(width: int, blocks: tuple = LOGO) -> np.ndarray:
     """ "AGE OF MINECRAFT" in blocks, like Minecraft's own title: RGBA 0..1, `width` pixels wide."""
     from .render import Camera, fit_camera, render
@@ -277,169 +325,203 @@ GLYPHS = {  # a bold pixel font: strokes two blocks wide
 
 # --------------------------------------------------------------------------- the picture
 
-def _window(img, box, lit: float = 1.0) -> None:
+
+def _button(img, masks, name, box) -> None:
+    """A Minecraft menu button (stone grey, a light top and left edge, a dark bottom and right, a black outline),
+    where the game writes a button's name."""
     x0, y0, x1, y1 = box
-    _rect(img, box, "#2a1a0e")
-    glow = np.array([0.98, 0.82, 0.42]) * lit
-    img[y0 + 3:y1 - 3, x0 + 3:x1 - 3] = glow
-    img[y0 + 3:y1 - 3, (x0 + x1) // 2 - 1:(x0 + x1) // 2 + 1] = parse("#2a1a0e")[:3]
-    img[(y0 + y1) // 2 - 1:(y0 + y1) // 2 + 1, x0 + 3:x1 - 3] = parse("#2a1a0e")[:3]
+    rng = np.random.default_rng(zlib.crc32(f"button {name}".encode()))
+    img[y0:y1, x0:x1] = np.clip(parse(BUTTON["fill"])[:3] + rng.normal(0, 0.012, (y1 - y0, x1 - x0, 1)), 0, 1)
+    img[y0 + 1:y0 + 2, x0 + 1:x1 - 1] = parse(BUTTON["light"])[:3]
+    img[y0 + 1:y1 - 1, x0 + 1:x0 + 2] = parse(BUTTON["light"])[:3]
+    img[y1 - 3:y1 - 1, x0 + 1:x1 - 1] = parse(BUTTON["shade"])[:3]
+    img[y0 + 1:y1 - 1, x1 - 2:x1 - 1] = parse(BUTTON["shade"])[:3]
+    edge = parse(BUTTON["edge"])[:3]
+    img[y0, x0:x1] = img[y1 - 1, x0:x1] = edge
+    img[y0:y1, x0] = img[y0:y1, x1 - 1] = edge
+    if masks is not None:
+        _mark(masks, name, box)
 
 
-def _roof(img, x0, x1, base, px, block="spruce_planks", dark=0.5) -> None:
-    """A stepped gable roof from x0 to x1 standing on `base`, with snow on every step."""
-    step = 8 * px
-    cx = (x0 + x1) / 2
-    t = np.repeat(np.repeat(_tex(block), px, 0), px, 1) * dark
-    snow = np.array([0.86, 0.9, 0.96])
-    for k in range(0, int((x1 - x0) / 2 / step) + 1):
-        a, b = int(x0 + k * step), int(x1 - k * step)
-        top = base - (k + 1) * step
-        if a >= b or top < 0:
-            break
-        ys, xs = np.mgrid[top:top + step, a:b]
-        img[top:top + step, a:b] = t[ys % t.shape[0], xs % t.shape[1]]
-        img[top:top + 1, a:b] = snow * 0.8
+def _cloud(img, x: int, y: int, blocks: list[str]) -> None:
+    """A flat, blocky Minecraft cloud: 8-pixel blocks, white, a little grey underneath."""
+    for r, row in enumerate(blocks):
+        for c, ch in enumerate(row):
+            if ch == "#":
+                a, b = x + c * 8, y + r * 8
+                img[max(0, b):max(0, b + 8), max(0, a):max(0, a + 8)] = parse("#ffffff" if r < len(blocks) - 1
+                                                                              else "#e2eaf7")[:3]
 
 
-def _sign(img, masks, name, box) -> None:
-    """A dark oak sign, where the game writes a name."""
-    _tile(img, box, _tex("dark_oak_planks"), px=1, dark=0.42)
-    _frame(img, box)
-    _mark(masks, name, box)
+def _hills(img, heights: list[int], colour: str, top: str, step: int = 16, dark: float = 0.0) -> None:
+    """A blocky skyline across the picture: one height per `step` columns, a `top` colour on its first block."""
+    for k, h in enumerate(heights):
+        a, b = k * step, (k + 1) * step
+        img[h:470, a:b] = parse(colour)[:3] * (1 - dark)
+        img[h:h + 8, a:b] = parse(top)[:3]
 
 
-def plates() -> np.ndarray:
-    """Where the plates behind the Single Player menu's buttons are, on the 800x600 picture."""
-    m = np.zeros((H, W), bool)
-    for x0, y0, x1, y1 in SUBMENU:
-        m[y0 - 2:y1 + 3, x0:x1] = True
-    return m
+def _tree(img, x: int, ground: int, height: int = 3) -> None:
+    """A small oak: a log trunk and a blocky crown of leaves (16-pixel blocks)."""
+    _tile(img, (x + 16, ground - 16 * height, x + 32, ground), _tex("oak_log"), px=1, dark=0.9)
+    for dx, dy in ((0, 1), (1, 1), (2, 1), (0, 2), (1, 2), (2, 2), (1, 3)):
+        top = ground - 16 * (height + dy) + 16
+        _tile(img, (x + dx * 16, top, x + dx * 16 + 16, top + 16), _tex("oak_leaves"), px=1, dark=0.85)
+
+
+def _fence(img, x: int, y0: int, y1: int) -> None:
+    """An oak fence post, 6 pixels wide."""
+    _tile(img, (x, y0, x + 6, y1), _tex("oak_planks"), px=1, dark=0.8)
+    img[y0:y1, x] = img[y0:y1, x + 5] = parse("#3a2a16")[:3]
 
 
 def scene() -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    """The 800x600 menu picture (RGB 0..1) and each button object's mask."""
+    """The 800x600 menu picture (RGB 0..1) and each button's mask (its object and the button its name is on).
+
+    A Minecraft world on a clear day on the left, where the buttons are: a house with a lectern on its roof, a
+    stone brick tower, green hills and snowy mountains, the block logo floating in the sky; every button name on
+    a Minecraft menu button. On the right, where the game opens the Single Player menu, Minecraft's own menu
+    background, dark dirt, and the game's description of a button in a Minecraft tooltip."""
     img = np.zeros((H, W, 3))
     masks: dict[str, np.ndarray] = {}
-    yy = np.linspace(0, 1, H)[:, None, None]
-    img[:] = np.array([0.03, 0.05, 0.15]) * (1 - yy) + np.array([0.09, 0.12, 0.26]) * yy  # the night sky
-    rng = np.random.default_rng(11)
-    for _ in range(110):
-        x, y = int(rng.integers(0, W - 2)), int(rng.integers(0, 330))
-        img[y:y + 2, x:x + 2] = np.array([0.85, 0.88, 1.0]) * rng.uniform(0.45, 1.0)
-    img[150:174, 206:230] = parse("#e6e2c6")[:3]  # the square moon
-    img[155:161, 211:217] = parse("#c8c4a6")[:3]
-    img[165:169, 222:226] = parse("#c8c4a6")[:3]
+    yy = np.clip(np.linspace(0, 1, H) / 0.55, 0, 1)[:, None, None]
+    img[:] = parse(SKY[0])[:3] * (1 - yy) + parse(SKY[1])[:3] * yy
+    img[4:36, 262:294] = parse("#fff2a8")[:3]  # the square sun
+    img[8:32, 266:290] = parse("#fffbe2")[:3]
+    for x, y, blocks in ((136, 10, ["..####...", "#########"]), (-12, 196, [".#####", "########"]),
+                         (200, 156, ["...###", "########"]), (150, 118, ["###.", "#####"])):
+        _cloud(img, x, y, blocks)
+    # far away: snowy mountains, then green hills with trees
+    _hills(img, [262, 246, 230, 214, 222, 238, 254, 238, 222, 206, 214, 230, 246, 262, 254, 246, 238, 246, 254,
+                 262, 270, 262, 254, 246, 254, 262, 270], "#9aaed3", "#f2f6ff")
+    _hills(img, [310, 302, 294, 302, 310, 318, 310, 302, 294, 286, 294, 302, 310, 318, 326, 318, 310, 302, 310,
+                 318, 326, 318, 310, 302, 310, 318, 326], "#5f9e45", "#79bf55")
+    for x, ground, h in ((196, 318, 3), (236, 310, 2)):
+        _tree(img, x, ground, h)
 
-    # the street: houses further back, small blocks
-    for (x0, x1, base, wall, top, lit) in ((150, 290, 470, "spruce_planks", 215, ((175, 250, 205, 290),
-                                                                                    (240, 330, 270, 372))),
-                                           (285, 440, 470, "stone_bricks", 190, ((310, 230, 345, 272),
-                                                                                  (380, 300, 415, 342)))):
-        _tile(img, (x0, top, x1, base), _tex(wall), px=1, dark=0.42)
-        _tile(img, (x0, top, x0 + 8, base), _tex("dark_oak_log"), px=1, dark=0.45)
-        _tile(img, (x1 - 8, top, x1, base), _tex("dark_oak_log"), px=1, dark=0.45)
-        _roof(img, x0 - 8, x1 + 8, top, 1, dark=0.3)
-        for box in lit:
-            _window(img, box, 0.85)
-    # the house on the left: stone below, planks above, a striped awning and a lit window
-    _tile(img, (0, 180, 200, 470), _tex("oak_planks"), px=2, dark=0.5)
-    _tile(img, (0, 180, 200, 196), _tex("spruce_log"), px=2, dark=0.5, turn=True)
-    _tile(img, (184, 180, 200, 470), _tex("spruce_log"), px=2, dark=0.5)
-    for k, x in enumerate(range(0, 200, 16)):  # the market awning, red and white wool
-        _rect(img, (x, 300, x + 16, 330), "#b83a32" if k % 2 == 0 else "#e8e2d8")
-    img[300:302, 0:200] = parse("#e8eef6")[:3]
-    _tile(img, (0, 330, 184, 470), _tex("stone_bricks"), px=2, dark=0.45)
-    _window(img, (24, 372, 96, 446))
-    _tile(img, (0, 440, 150, 470), _tex("oak_planks"), px=2, dark=0.6)  # the stall's counter, with fruit
-    for k, x in enumerate(range(4, 146, 24)):
-        _tile(img, (x, 424, x + 20, 444), _tex("melon" if k % 2 else "pumpkin"), px=1, dark=0.75)
+    # the house on the left: a flat roof with a fence and a lectern, oak planks above, spruce below
+    _tile(img, (0, 258, 196, 266), _tex("stone_bricks"), px=1, dark=0.95)
+    for x in range(0, 196, 24):
+        _fence(img, x + 2, 238, 258)
+    _tile(img, (0, 244, 196, 248), _tex("oak_planks"), px=1, dark=0.8)
+    _tile(img, (0, 266, 196, 340), _tex("oak_planks"), px=1, dark=0.95)
+    _tile(img, (0, 340, 196, 470), _tex("spruce_planks"), px=1, dark=0.9)
+    for a in (0, 180):
+        _tile(img, (a, 266, a + 16, 470), _tex("oak_log"), px=1, dark=0.85)
+    _tile(img, (0, 332, 196, 348), _tex("oak_log"), px=1, dark=0.8, turn=True)
+    _tile(img, (40, 280, 104, 324), _tex("glass"), px=1, dark=1.0)  # a window
+    img[280:324, 40:104] = img[280:324, 40:104] * 0.4 + parse("#a9d3f5")[:3] * 0.6
+    _frame(img, (38, 278, 106, 326), "#3a2a16", "#8a6a3a")
+    _tile(img, (32, 406, 64, 470), _tex("door_spruce_lower"), px=2, dark=0.95)  # the door
+    # the tower on the right of the buttons: stone bricks, with oak log corners and battlements
+    _tile(img, (296, 60, 430, 470), _tex("stone_bricks"), px=1, dark=0.92)
+    for k, x in enumerate(range(296, 430, 16)):
+        if k % 2 == 0:
+            _tile(img, (x, 44, x + 16, 60), _tex("stone_bricks"), px=1, dark=0.92)
+    for a in (296, 414):
+        _tile(img, (a, 60, a + 16, 470), _tex("oak_log"), px=1, dark=0.8)
+    for x, y in ((372, 224), (372, 336)):  # arrow slits
+        _rect(img, (x, y, x + 8, y + 24), "#1e1e22")
 
-    # the blacksmith on the right
-    _tile(img, (430, 0, 800, 272), _tex("spruce_planks"), px=2, dark=0.45)
-    _tile(img, (430, 0, 462, 600), _tex("dark_oak_log"), px=2, dark=0.5)
-    _tile(img, (768, 0, 800, 600), _tex("dark_oak_log"), px=2, dark=0.5)
-    _tile(img, (462, 240, 768, 272), _tex("dark_oak_log"), px=2, dark=0.5, turn=True)
-    _window(img, (528, 62, 610, 128))
-    _window(img, (658, 62, 740, 128))
-    _tile(img, (462, 272, 768, 490), _tex("dark_oak_planks"), px=2, dark=0.3)  # inside: dark, with a forge
-    _tile(img, (700, 400, 764, 490), _tex("lava"), px=2, dark=0.6)
-    _tile(img, (692, 392, 772, 402), _tex("stone_bricks"), px=1, dark=0.5)
-    for x in range(482, 690, 44):  # a rack of diamond swords on the wall
-        _blit(img, masks, None, sword(), x, 296, 2)
-    img[plates()] = parse(PLATE)[:3]  # solid behind the Single Player menu's buttons
-    _sign(img, masks, "title", TITLE_SIGN)
+    # the ground: grass, a path, flowers
+    grass = _tex("grass_block", "top") @ np.array([0.299, 0.587, 0.114])
+    grass = parse(GRASS)[:3] * (grass / max(1e-3, float(grass.mean())))[..., None]  # Minecraft's plains green
+    _tile(img, (0, 470, 430, 600), np.clip(grass, 0, 1), px=2)
+    img[470:474, 0:430] = parse("#4f8a33")[:3]
+    for y in range(474, 600, 2):
+        half = 26 + (y - 474) * 0.55
+        a, b = int(250 - half), int(250 + half)
+        _tile(img, (max(0, a), y, min(430, b), y + 2), _tex("dirt_path", "top"), px=2, dark=0.95)
+    from .nature import flower_sprite
+    for name, x, y in (("poppy", 150, 500), ("dandelion", 186, 530), ("cornflower", 20, 512), ("poppy", 348, 516),
+                       ("dandelion", 330, 560), ("oxeye", 110, 560), ("tulip", 60, 486)):
+        f = flower_sprite(name)
+        spr = np.concatenate([f[..., :3], (f[..., 3:4] > 0).astype(float)], -1)
+        _blit(img, None, None, spr, x, y, 2)
 
-    # the ground: snow, and a cobblestone path
-    _tile(img, (0, 470, 430, 600), _tex("snow"), px=2, dark=0.82)
-    img[470:600, 0:430] *= np.array([0.86, 0.92, 1.05])
-    for _ in range(160):  # it glitters
-        x, y = int(rng.integers(0, 428)), int(rng.integers(472, 598))
-        img[y:y + 2, x:x + 2] = (0.97, 0.98, 1.0)
-    for y in range(470, 600, 2):
-        half = 40 + (y - 470) * 0.9
-        a, b = int(290 - half), int(290 + half)
-        _tile(img, (max(0, a), y, min(430, b), y + 2), _tex("cobblestone"), px=2, dark=0.55)
-    _tile(img, (8, 470, 40, 534), _tex("barrel", "right"), px=2, dark=0.55)
-    _tile(img, (380, 440, 428, 488), _tex("hay"), px=2, dark=0.55)
-    _tile(img, DESCRIPTION, _tex("deepslate_tiles"), px=2, dark=0.55)  # where the game describes a button
-    _frame(img, DESCRIPTION, "#101014", "#4a4a52")
-    _tile(img, (156, 446, 188, 478), _tex("barrel", "right"), px=2, dark=0.5)
+    # the right: Minecraft's menu background, dark dirt, and the description in a Minecraft tooltip
+    _tile(img, (430, 0, 800, 600), _tex("dirt"), px=2, dark=0.38)
+    _tile(img, (430, 0, 800, 58), _tex("dirt"), px=2, dark=0.24)
+    img[58:60, 430:800] = parse("#000000")[:3]
+    img[60:61, 430:800] = parse("#4a4a4a")[:3]
+    img[:, 430:432] = parse("#000000")[:3]
+    x0, y0, x1, y1 = DESCRIPTION
+    _rect(img, DESCRIPTION, TOOLTIP[0])
+    for t, row in enumerate(range(y0 + 1, y1 - 1)):
+        img[row, x0 + 1] = img[row, x1 - 2] = (parse(TOOLTIP[1])[:3] * (1 - t / (y1 - y0))
+                                                 + parse(TOOLTIP[2])[:3] * t / (y1 - y0))
+    img[y0 + 1, x0 + 1:x1 - 1] = parse(TOOLTIP[1])[:3]
+    img[y1 - 2, x0 + 1:x1 - 1] = parse(TOOLTIP[2])[:3]
 
-    # the buttons: a sign for each name, and a Minecraft thing under it
-    for name, box in SIGNS.items():
-        _sign(img, masks, name, box)
-    # Learn to Play: a banner with a villager and a book
-    _rect(img, (6, 32, 116, 36), "#5a3a1e")
-    _mark(masks, "learn", (6, 32, 116, 36))
-    _tile(img, (14, 36, 108, 186), _tex("white_wool"), px=2, dark=0.55)
-    img[36:186, 14:108] *= np.array([0.55, 0.8, 1.35])
-    _mark(masks, "learn", (14, 36, 108, 186))
-    _blit(img, masks, "learn", villager_face(), 33, 48, 7)
-    book = open_book()
-    _blit(img, masks, "learn", book, 39, 132, 2)
-    # Single Player: a shield on an iron post
-    _rect(img, (364, 40, 370, 58), "#4a4a4a")
-    _mark(masks, "single", (364, 40, 370, 58))
-    _blit(img, masks, "single", shield(), 331, 58, 6)
-    # History: an open book
-    _blit(img, masks, "history", open_book(), 110, 194, 4)
-    # Multiplayer: crossed diamond swords over a shield
-    _rect(img, (308, 238, 311, 246), "#6a6a6a")
-    _blit(img, masks, "multi", crossed_swords(), 271, 246, 5)
-    # Map Editor: a map in an item frame
-    _blit(img, masks, "map", item_frame(map_item()), 206, 294, 3)
-    # Options: an anvil
-    _blit(img, masks, "options", anvil(), 106, 378, 5)
-    # Zone: a compass in an item frame
-    _blit(img, masks, "zone", item_frame(compass()), 283, 386, 3)
-    # Exit: an arrow-shaped sign pointing left
+    # the buttons: a Minecraft thing, and a Minecraft menu button where the game writes its name
+    # Learn to Play: a banner with a villager and a book, on an oak pole
+    _fence(img, 110, 36, 238)
+    _rect(img, (6, 32, 116, 37), "#5a3a1e")
+    _mark(masks, "learn", (6, 32, 116, 37))
+    _tile(img, (14, 37, 108, 186), _tex("white_wool"), px=2, dark=0.55)
+    img[37:186, 14:108] *= np.array([0.55, 0.8, 1.35])
+    img[37:186, 14:108] = np.clip(img[37:186, 14:108], 0, 1)
+    _mark(masks, "learn", (14, 37, 108, 186))
+    _blit(img, masks, "learn", villager_face(), 33, 50, 7, outline=True)
+    _blit(img, masks, "learn", open_book(), 39, 134, 2, outline=True)
+    # Single Player: a shield hanging from its button on a chain
+    _rect(img, (364, 37, 370, 58), "#4a4a4a")
+    _mark(masks, "single", (364, 37, 370, 58))
+    _blit(img, masks, "single", shield(), 331, 58, 6, outline=True)
+    # History: an open book on a lectern, on the house's roof
+    _tile(img, (150, 228, 176, 252), _tex("spruce_planks"), px=1, dark=0.75)
+    _tile(img, (134, 252, 192, 258), _tex("spruce_planks"), px=1, dark=0.6)
+    _mark(masks, "history", (134, 228, 192, 258))
+    _blit(img, masks, "history", open_book(), 130, 196, 3, outline=True)
+    # Multiplayer: crossed diamond swords over a shield, on the tower
+    _rect(img, (308, 241, 311, 247), "#6a6a6a")
+    _blit(img, masks, "multi", crossed_swords(), 271, 247, 5, outline=True)
+    # Map Editor: a map in an item frame, on a fence post
+    _fence(img, 224, 340, 470)
+    _blit(img, masks, "map", item_frame(map_item()), 206, 298, 3, outline=True)
+    # Options: an anvil on a smooth stone block
+    _tile(img, (118, 433, 174, 470), _tex("smooth_stone"), px=1, dark=0.9)
+    _frame(img, (118, 433, 174, 470), "#2a2a2a", "#bdbdbd")
+    _blit(img, masks, "options", anvil(), 106, 378, 5, outline=True)
+    # Zone: a compass in an item frame, on the tower
+    _blit(img, masks, "zone", item_frame(compass()), 283, 389, 3, outline=True)
+    # Exit: an arrow-shaped Minecraft button pointing left, on a post
+    _fence(img, 94, 594, 600)
     arrow = np.zeros((H, W), bool)
     ys, xs = np.mgrid[0:H, 0:W]
     arrow |= (xs >= 46) & (xs < 156) & (ys >= 552) & (ys < 594)
     arrow |= (xs >= 10) & (xs < 46) & (np.abs(ys - 573) <= (xs - 10) * 0.9)
-    planks = np.zeros_like(img)
-    _tile(planks, (0, 530, 170, 600), _tex("dark_oak_planks"), px=2, dark=0.55)
-    img[arrow] = planks[arrow]
-    edge = arrow & ~(np.roll(arrow, 1, 0) & np.roll(arrow, -1, 0) & np.roll(arrow, 1, 1) & np.roll(arrow, -1, 1))
-    img[edge] = parse("#140c06")[:3]
+    stone = np.zeros_like(img)
+    _button(stone, None, "exit", (0, 540, 170, 600))
+    img[arrow] = stone[arrow]
+    rim = arrow & _outline(~arrow, 1)  # its black outline, and inside it a light top and a dark bottom edge
+    bevel = arrow & ~rim & _outline(rim | ~arrow, 1)
+    img[bevel & (ys < 573)] = parse(BUTTON["light"])[:3]
+    img[bevel & (ys >= 573)] = parse(BUTTON["shade"])[:3]
+    img[rim] = parse(BUTTON["edge"])[:3]
     masks["exit"] = arrow
-    # the title banner: white wool with the block logo
-    _rect(img, (116, 40, 120, 146), "#5a3a1e")
-    _rect(img, (306, 40, 310, 146), "#5a3a1e")
-    wool = _tex("white_wool")
-    _tile(img, (120, 44, 306, 142), wool.mean((0, 1)) + (wool - wool.mean((0, 1))) * 0.3, px=2, dark=0.95)
-    _mark(masks, "logo", (116, 40, 310, 146))
-    title = logo(180)
-    ty = 44 + (98 - title.shape[0]) // 2
-    a = title[..., 3:4]
-    region = img[ty:ty + title.shape[0], 123:123 + title.shape[1]]
-    region[...] = title[..., :3] * a + region * (1 - a)
+    # the names, each on a Minecraft menu button
+    for name, box in SIGNS.items():
+        _button(img, masks, name, box)
+    # the title: the block logo, floating in the sky with its shadow
+    title = logo(206)
+    tx, ty = 110, 36 + (111 - title.shape[0]) // 2
+    shadow = title.copy()
+    shadow[..., :3] = 0.08
+    shadow[..., 3] *= 0.45
+    for layer, (dx, dy) in ((shadow, (3, 4)), (title, (0, 0))):
+        a = layer[..., 3:4]
+        region = img[ty + dy:ty + dy + layer.shape[0], tx + dx:tx + dx + layer.shape[1]]
+        region[...] = layer[:region.shape[0], :region.shape[1], :3] * a[:region.shape[0], :region.shape[1]] \
+            + region * (1 - a[:region.shape[0], :region.shape[1]])
+    masks["logo"] = np.zeros((H, W), bool)
+    masks["logo"][ty:ty + title.shape[0], tx:tx + title.shape[1]] = title[..., 3] > 0.5
     masks["banner"] = masks["logo"] | masks["learn"] | masks["single"]
     return np.clip(img, 0, 1), masks
 
 
 # --------------------------------------------------------------------------- the pictures the game uses
+
 
 def _outline(mask: np.ndarray, width: int = 2) -> np.ndarray:
     grown = mask.copy()
@@ -508,8 +590,12 @@ def pictures(original: list[slp.SlpFrame], palette: np.ndarray, quant: Quantiser
             colour = None if plain else glow_colour(f, original[0], (x, y), palette, inside)
             if colour is not None:
                 picture[_outline(shape)] = colour
-            if name in DARKER and not cut and k in frames[1:3]:
-                picture[shape] *= DARKER[name][frames.index(k) - 1]
+            if name in DARKER and not cut and k in frames[1:3]:  # the thing darker, its name's button as it is
+                thing = shape.copy()
+                if name in SIGNS:
+                    bx0, by0, bx1, by1 = SIGNS[name]
+                    thing[max(0, by0 - y):max(0, by1 - y), max(0, bx0 - x):max(0, bx1 - x)] = False
+                picture[thing] *= DARKER[name][frames.index(k) - 1]
             px = quant.indices(np.clip(picture * 255 + 0.5, 0, 255).astype(np.int64).reshape(-1, 3)).reshape(h, w)
             px = px.astype(np.int16)
             px[(~shape) if cut else (f.pixels < 0)] = slp.TRANSPARENT

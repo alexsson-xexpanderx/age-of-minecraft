@@ -64,10 +64,12 @@ putting `tools/` on `sys.path`.
      (`BOX`, 20-68 from the icon) holds the amount.
    - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
      pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
-     with exactly the known picture sizes (`menu.known`) is replaced. The Single Player menu's buttons get solid plates in the picture
-     (`menu.SUBMENU`, measured on photos; putting them in Single Player's
-     enlarged highlighted pictures instead, to show them only while that menu is open, didn't work in the game), and `menu_border` sets the menu screen file's `bevel_colors` to shades a
-     little darker than the plates (`menu.BORDER`), instead of the game's light border; `DARKER` buttons darken instead of glowing.
+     with exactly the known picture sizes (`menu.known`) is replaced. Names sit on Minecraft buttons drawn where a
+     screenshot showed the game writes them (`menu.SIGNS`); hovered things darken (`DARKER`, no glow). The menu
+     palette 50589 (used by 50089/50090 only) is replaced (`menu.palette`, `build_mod.menu_palette`); the menu, its
+     dialogue 50190 (`screens.encode(..., out=)`) and its icons 50688 (a "recolour" job) are drawn for it, and
+     `menu_settings` gives the screen files Minecraft buttons (`menu.settings`: `background_color` is the fill of
+     the game's own buttons, 0 = none; bevel colours, white/yellow text).
    - The other screens (`screens.RESTYLED`: setup screens, dialogues, history, achievements, loading screen 50163) are
      found through the screen files (`screens.read`, `Game.screens`) and redrawn by `screens.hall`: parchment
      (`screens.sheets`) becomes a window in a middle grey (`screens.WINDOWS`: white, cream, black and player colours

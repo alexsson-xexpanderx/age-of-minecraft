@@ -571,27 +571,40 @@ def interface_sheet(out: Path) -> None:
 
 
 def menu_sheet(out: Path) -> None:
-    """The Minecraft main menu at its size, with what the game writes over it: the button names on the signs, and
-    the Single Player menu on the right (its buttons are the game's own)."""
+    """The Minecraft main menu at its size, with what the game draws over it (where a screenshot of the game shows
+    it): the button names in white on their buttons, and the Single Player menu open on the right, its buttons the
+    game's own in the colours the build gives them."""
     img, _ = menu.scene()
     canvas = Image.fromarray((img * 255 + 0.5).astype(np.uint8))
     d = ImageDraw.Draw(canvas)
-    for name, text in (("learn", "Learn to Play"), ("single", "Single Player"), ("history", "History"),
-                       ("multi", "Multiplayer"), ("map", "Map Editor"), ("options", "Options"), ("zone", "Zone")):
-        x0, y0, x1, y1 = menu.SIGNS[name]
-        d.text(((x0 + x1 - d.textlength(text, font=font(13))) / 2, (y0 + y1) / 2 - 8), text, fill=(236, 226, 190),
-               font=font(13))
-    d.text((66, 568), "Exit", fill=(236, 226, 190), font=font(14))
-    d.text((560, 12), "Single Player", fill=(236, 230, 210), font=font(18))
-    for k, label in enumerate(("The Conquerors Campaigns", "Standard Game", "Age of Kings Campaigns",
-                               "Custom Campaign", "Watching Player", "Saved and Recorded Games")):
-        y = 90 + k * 66
-        d.rectangle((472, y, 767, y + 38), fill=(22, 20, 18), outline=(200, 170, 90), width=2)
-        d.text(((1239 - d.textlength(label, font=font(17))) / 2, y + 9), label,
-               fill=(240, 200, 90) if k == 0 else (230, 225, 210), font=font(17))
+
+    def say(xy, text, size, colour=(255, 255, 255)):
+        w = d.textlength(text, font=font(size))
+        d.text((xy[0] - w / 2 + 1, xy[1] - size / 2 - 1), text, fill=(0, 0, 0), font=font(size))
+        d.text((xy[0] - w / 2, xy[1] - size / 2 - 2), text, fill=colour, font=font(size))
+
+    for text, xy in (("Learn to Play", (61, 20)), ("Single Player", (368, 25)), ("History", (154, 177)),
+                     ("Multiplayer", (311, 229)), ("Map Editor", (228, 284)), ("Options", (147, 359)),
+                     ("Zone", (303, 377)), ("Exit", (82, 577))):
+        say(xy, text, 13)
+    say((614, 22), "Single Player", 18)
+    fill = tuple(int(v * 255) for v in texture_colour(menu.SCREEN["background_color"]))
+    light, shade = texture_colour(menu.BUTTON["light"]), texture_colour(menu.BUTTON["shade"])
+    for k, (label, (x0, y0, x1, y1)) in enumerate(zip(("The Conquerors Campaigns", "Standard Game",
+                                                        "Age of Kings Campaigns", "Custom Campaign", "Watching Player",
+                                                        "Saved and Recorded Games"), menu.SUBMENU)):
+        d.rectangle((x0, y0, x1, y1), fill=fill, outline=(0, 0, 0))
+        d.line((x0 + 1, y0 + 1, x1 - 1, y0 + 1), fill=tuple(int(v * 255) for v in light))
+        d.line((x0 + 1, y1 - 1, x1 - 1, y1 - 1), fill=tuple(int(v * 255) for v in shade))
+        say(((x0 + x1) / 2, (y0 + y1) / 2), label, 16, (255, 255, 160) if k == 1 else (255, 255, 255))
     d.text((396, 505), "Play with or against computer players, or play one of nine\nhistorical campaigns.",
-           fill=(236, 226, 190), font=font(12))
+           fill=(255, 255, 255), font=font(12))
     canvas.save(out, optimize=True)
+
+
+def texture_colour(colour: str) -> tuple[float, float, float]:
+    from aom.textures import parse
+    return tuple(float(v) for v in parse(colour)[:3])
 
 
 def stand_in_screen(w: int, h: int, dialogue: bool) -> tuple[np.ndarray, np.ndarray]:
