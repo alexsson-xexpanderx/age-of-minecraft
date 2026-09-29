@@ -54,6 +54,13 @@ putting `tools/` on `sys.path`.
    - Units use fixed SLP ids from `slpmap.TARGETS`, plus `Game.name_targets` (graphic name prefixes).
    - Buildings, walls, trees and decorations are never listed by id. `spritemap.plan()` finds them by parsing the
      `.dat`'s systematic graphic names (e.g. `BRKS3NNM` = barracks, Castle Age, main sprite, Middle Eastern).
+   - Farms are terrain, not sprites. `datfile.read_terrains` reads the `.dat`'s terrain table, and
+     `farmland.farm_slps` picks terrains 7, 8 and 29–31. If the table can't be read, it falls back to the original
+     ids. Their textures in `terrain.drs` are redrawn one diamond tile per frame.
+   - The screen panels are full-screen pictures in `interfac.drs` (51101–51160, one per civ and screen size).
+     `interface.py` repaints them by brightness class and puts item icons over the resource icons.
+   - `terrain.drs` and `interfac.drs` are searched by `Game.original`/`holders` (`Game._searched`) but kept out of
+     `Game.archives`, so Pac-Man's icon and sound code sees exactly the archives it always did.
 3. `Game.layout()` takes each sprite's frames per angle, angle count and mirroring from the `.dat`, falling back
    to the SLP header. Rendering must match the original layout exactly. After rendering, the build refuses to
    write any SLP whose frame count differs from the original.
@@ -81,6 +88,11 @@ putting `tools/` on `sys.path`.
 - **Take counts from the game.** Frame and angle counts always come from the player's files, never from code.
   With mirroring, `a // 2 + 1` angles are stored (S, SW, W, NW, N) and the game mirrors the rest.
 - **Wall frames have a fixed meaning:** 0 `/`, 1 `\`, 2 the post (at ends and corners), 3 `--`, 4 `|`.
+- **Terrain tiles must fit together.** The game picks a terrain frame by map position, so a farm texture repeats
+  every tile (3 blocks to a tile, camera scale √2). Each new frame fills exactly the original frame's pixels.
+- **Don't change Pac-Man without asking.** His `.dat` patch, icon, sounds and name took many rounds of testing in
+  the player's game.
+- **Keep the `.bat` files' Windows line endings (CRLF).** Editing them with a tool that writes `\n` converts them.
 - **Windows players come first.** Look files up with the case-insensitive `pick()`. Never write into the player's
   `Data/` without a `.aom-backup`, and make sure `--restore` can undo every file the build touches.
 - **Textures are original pixel art made in code** (`textures.py` ASCII-art grids, noise and team-colour specs).

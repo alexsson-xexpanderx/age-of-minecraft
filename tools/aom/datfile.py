@@ -1,10 +1,11 @@
-"""Read the graphics table from AoE2: The Conquerors' empires2_x1_p1.dat.
+"""Read the graphics and terrain tables from AoE2: The Conquerors' empires2_x1_p1.dat.
 
 Only the start of the file is parsed: terrain restrictions, player colours,
 sounds and then the graphics, which tell us for every sprite its SLP id,
-frames per angle, angle count, mirroring and layered "delta" sprites. Layout
-follows openage's datfile readers (doc/gamedata); the file is raw-deflate
-compressed.
+frames per angle, angle count, mirroring and layered "delta" sprites. The
+terrains come right after the graphics: their textures are SLPs in
+terrain.drs (farms are terrain too). Layout follows openage's datfile
+readers (doc/gamedata); the file is raw-deflate compressed.
 """
 from __future__ import annotations
 
@@ -112,9 +113,16 @@ def sound_entry(sid: int, files: list[tuple[str, int, int]]) -> bytes:
     return out
 
 
+def _raw(raw_or_path) -> bytes:
+    return Path(raw_or_path).read_bytes() if not isinstance(raw_or_path, (bytes, bytearray)) else raw_or_path
+
+
 def read_graphics(raw_or_path) -> dict[int, Graphic]:
-    raw = Path(raw_or_path).read_bytes() if not isinstance(raw_or_path, (bytes, bytearray)) else raw_or_path
-    data = decompress(raw)
+    return _graphics(decompress(_raw(raw_or_path)))[0]
+
+
+def _graphics(data: bytes) -> tuple[dict[int, Graphic], int]:
+    """The graphics, and the offset just past them (where the terrain block begins)."""
     r = Reader(data)
     r.p = sound_table(data).end
     count = r.one("H")
@@ -142,7 +150,7 @@ def read_graphics(raw_or_path) -> dict[int, Graphic]:
                     rate, seq, mirror, deltas, sound, sound_at, angle_sounds_at)
         _check(g)
         graphics[gid] = g
-    return graphics
+    return graphics, r.p
 
 
 def _check(g: Graphic) -> None:
@@ -150,3 +158,42 @@ def _check(g: Graphic) -> None:
     printable = all(32 <= ord(c) < 127 for c in g.name + g.filename)
     if not printable or not (-1 <= g.slp < 70000) or not (0 <= g.frame_count < 5000) or not (0 <= g.angle_count <= 720):
         raise ValueError(f"graphics table looks wrong at graphic {g.id}: {g}")
+
+
+# The terrain block: map pointers and sizes (6 int32), 19 tile sizes (width, height, delta z), padding, then a
+# fixed number of terrain records, used or not (openage datfile/empiresdat.py and terrain.py, game "AOC").
+TERRAIN_HEAD = 6 * 4 + 19 * 3 * 2 + 2
+TERRAIN_SLOTS = 42
+TERRAIN_SIZE = 436  # enabled, random, 2 names, SLP, ..., 19 frame data, 42 borders, 30 terrain units, phantom
+
+
+@dataclass
+class Terrain:
+    id: int
+    enabled: bool
+    name: str
+    filename: str
+    slp: int  # the texture in terrain.drs: one diamond-shaped frame per tile
+    rows: int
+    cols: int
+
+
+def read_terrains(raw_or_path) -> list[Terrain]:
+    data = decompress(_raw(raw_or_path))
+    at = _graphics(data)[1]
+    sizes = struct.unpack_from("<57h", data, at + 24)
+    if not all(0 <= v <= 512 for v in sizes[0::3] + sizes[1::3]):
+        raise ValueError(f"terrain block looks wrong: tile sizes {sizes[:6]}...")
+    terrains = []
+    for i in range(TERRAIN_SLOTS):
+        base = at + TERRAIN_HEAD + i * TERRAIN_SIZE
+        enabled, _random, name, filename, slp_id = struct.unpack_from("<bb13s13si", data, base)
+        _to_draw, rows, cols = struct.unpack_from("<hhh", data, base + 192)
+        t = Terrain(i, bool(enabled), _cstr(name), _cstr(filename), slp_id, rows, cols)
+        printable = all(32 <= ord(c) < 127 for c in t.name + t.filename)
+        if not printable or not (-1 <= t.slp < 100000) or not (-1 <= rows <= 100 and -1 <= cols <= 100):
+            raise ValueError(f"terrain table looks wrong at terrain {i}: {t}")
+        terrains.append(t)
+    if not any(t.name for t in terrains):
+        raise ValueError("terrain table looks wrong: no terrain has a name")
+    return terrains

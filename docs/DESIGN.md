@@ -68,14 +68,15 @@ units: a unit is 2 blocks tall, as in Minecraft. One AoE2 tile comes to about
 |---|---|---|
 | 1×1 tile | 3×3 | towers, wall pieces, gate towers |
 | 2×2 tiles | 5×5 | House, Mill, Lumber / Mining Camp |
-| 3×3 tiles | 8×8 | Barracks, Archery Range, Stable, Blacksmith, Monastery, University, Dock, Farm |
+| 3×3 tiles | 8×8 | Barracks, Archery Range, Stable, Blacksmith, Monastery, University, Dock |
 | 4×4 tiles | 11×11 | Town Center, Castle, Market, Siege Workshop |
 | 5×5 tiles | 14×14 | Wonder |
 
 Buildings are drawn from a single angle (their south-west and south-east
 walls face the camera). Team colour shows on banners, flags and the bell
 tower's wool cap. All sheets: `previews/buildings.png`,
-`previews/fortifications.png`, `previews/wonders.png`, `previews/nature.png`.
+`previews/fortifications.png`, `previews/wonders.png`, `previews/nature.png`,
+`previews/farms.png`.
 
 ### Five village styles, four ages
 
@@ -101,7 +102,7 @@ stone with gold trim (and corner towers on the Town Center).
 | House | a cottage (three variants, like the game's three house frames) |
 | Town Center | village hall with a bell tower; domed in the desert, stepped in the jungle |
 | Mill | windmill with turning wool sails (Dark Age: a grinding hut with a grindstone) |
-| Farm | farmland around a water channel; the wheat shrinks as the farm runs out |
+| Farm | Minecraft farmland with wheat (see *Farms* below) |
 | Lumber / Mining Camp | an open shed with log piles and a chopping block / a minecart on rails with ore |
 | Barracks | a hall with a fenced training yard and armour stands |
 | Archery Range | target blocks on hay bales and a fletching table |
@@ -121,6 +122,46 @@ stone with gold trim (and corner towers on the Town Center).
 | Castle | curtain walls, four corner towers, a gatehouse and a keep, in the civilisation's style |
 | Wonders | one per civilisation: Westminster, Chartres, Hagia Sophia, the Temple of Heaven, Templo Mayor, Tikal, Hwangnyongsa and the rest |
 | Building sites, rubble | scaffolding on a foundation; scattered cobblestone and gravel |
+
+### Farms
+
+![farms](../previews/farms.png)
+
+In The Conquerors a farm is not a sprite: it is part of the ground. A farm
+changes the terrain under it, and the farm's look is a terrain texture in
+`terrain.drs`. There are five of them: three stages while a villager builds
+the farm, the finished farm, and the exhausted farm. Each becomes Minecraft
+farmland, 3 blocks to a tile:
+
+| AoE2 | Minecraft |
+|---|---|
+| Farm being built (three stages) | freshly tilled farmland, then sprouting wheat, then half-grown green wheat |
+| Farm | ripe golden wheat |
+| Exhausted farm | dry farmland with nothing on it |
+
+The game picks one texture tile per map tile, so the pattern repeats every
+tile and the tiles always join up. Each tile keeps the original tile's exact
+shape, so a farm's edges still blend into the grass as before.
+
+### The panels
+
+![interface](../previews/interface.png)
+
+The resource bar at the top of the screen and the panel at the bottom (commands, the selected unit's details,
+the minimap) are one picture per civilisation and screen size in `interfac.drs`. UserPatch builds its
+widescreen panels from the same pictures. The build repaints each one, every pixel keeping its place:
+
+| AoE2 | Minecraft |
+|---|---|
+| Parchment (where the game writes the unit's details) | the grey of Minecraft's inventory, with a black edge, a white bevel at the top left and a dark one at the bottom right |
+| Dark areas (behind the minimap) | an inventory slot, sunk in |
+| Carved frames | planks, as dark or light as the original frame, so the game's text stays readable |
+| Resource icons: wood, food, gold, stone, population | an oak log, bread, a gold ingot, cobblestone, a villager's head |
+| Where a panel meets the game view | a black edge, like every Minecraft window |
+
+The icons sit at fixed places in the 1280x1024 pictures. In the 800x600 and 1024x768 pictures they are found
+by matching the same civilisation's 1280x1024 icons; a picture whose icons aren't found keeps its original
+look, so no resource loses its icon.
 
 ### Nature and decorations
 
@@ -210,7 +251,7 @@ puff of smoke, like mob deaths in Minecraft.
 ```
 box model + pixel textures  ──render──▶  frames (colour + team-colour mask + shadow)
         ──quantise──▶  AoE2 palette indices  ──encode──▶  .slp files
-        ──import──▶  Data/graphics.drs  (on the player's PC)
+        ──import──▶  Data/graphics.drs, farms into Data/terrain.drs  (on the player's PC)
 ```
 
 1. **Render** (`tools/aom`). A small ray-caster draws the models from the
@@ -232,11 +273,14 @@ box model + pixel textures  ──render──▶  frames (colour + team-colour 
    shadows, roof pieces, flags) are blanked. Each wall frame gets the piece
    the game draws in it (frame 0 "/", 1 "\\", 2 the post at ends and
    corners, 3 "--", 4 "|"), and forest trees are grown to the height of the
-   tree they replace.
+   tree they replace. The farm textures are found in the `.dat`'s terrain
+   table (terrains 7, 8, 29, 30 and 31), and each of their tiles is redrawn
+   in exactly the pixels of the original tile.
 5. **Install** as a UserPatch 1.5 data mod: `Games\AgeOfMinecraft.xml`,
-   `Games\AgeOfMinecraft\Data\graphics.drs`, and
+   `Games\AgeOfMinecraft\Data\graphics.drs`, `terrain.drs` and `interfac.drs`, and
    `age2_x1\AgeOfMinecraft.exe` made by `SetupAoC.exe -g:AgeOfMinecraft`.
-   A `--mode direct` fallback patches `Data\graphics.drs` with a backup.
+   A `--mode direct` fallback patches `Data\graphics.drs`,
+   `Data\terrain.drs` and `Data\interfac.drs` with backups.
 
 See [INSTALL.md](INSTALL.md) for how to run it.
 

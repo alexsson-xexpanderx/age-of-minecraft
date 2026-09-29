@@ -30,8 +30,8 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from aom import slp  # noqa: E402
-from aom.datfile import Graphic, read_graphics  # noqa: E402
+from aom import farmland, interface, slp  # noqa: E402
+from aom.datfile import Graphic, Terrain, read_graphics, read_terrains  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import blank, render_frames  # noqa: E402
 from aom.palette import Quantiser, parse_jasc  # noqa: E402
@@ -40,7 +40,7 @@ from aom.slpmap import BLANK, NAME_PREFIXES, SHARED, SUFFIX_ACTIONS, TARGETS, Ta
 from aom import spritemap  # noqa: E402
 
 # --only also accepts these groups of buildings and scenery
-STATIC_GROUPS = {"buildings", "walls", "wonders", "nature", "decorations", "projectiles"}
+STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface"}
 
 
 def static_group(spec: dict) -> str:
@@ -132,6 +132,7 @@ class Game:
             if drs is not None:
                 self.archives.append((name, drs))
         self.archives.append((self.graphics_path.name, self.graphics))
+        self.terrain = self._drs("terrain.drs")  # the ground's textures, farms among them
         interfac = self._drs("interfac.drs")
         self.interfac = interfac
         if interfac is None or interfac.get(50500, "bina") is None:
@@ -150,6 +151,12 @@ class Game:
         self.by_slp: dict[int, list[Graphic]] = {}
         for g in self.graphics_table.values():
             self.by_slp.setdefault(g.slp, []).append(g)
+        self.terrains: list[Terrain] = []
+        try:
+            self.terrains = read_terrains(dat) if dat and self.graphics_table else []
+            log(f"terrain table: {sum(t.enabled for t in self.terrains)} terrains in use")
+        except Exception as exc:  # farms then fall back to the original game's texture ids
+            log(f"terrain table: could not read ({exc}); farms use the original game's texture ids")
 
     def language_files(self) -> dict[str, Path]:
         """The game's language files (unit names and help texts), read from their originals if backed up."""
@@ -169,15 +176,20 @@ class Game:
         backup = p.with_name(p.name + BACKUP)
         return Drs(backup if backup.exists() else p)
 
+    def _searched(self) -> list[tuple[str, Drs]]:
+        """The sprite archives, then terrain.drs (farms) and interfac.drs (the screen panels)."""
+        more = [("terrain.drs", self.terrain)] if self.terrain is not None else []
+        return self.archives + more + [("interfac.drs", self.interfac)]
+
     def original(self, slp_id: int) -> Optional[bytes]:
-        for _, drs in self.archives:
+        for _, drs in self._searched():
             if slp_id in drs.ids():
                 return drs.get(slp_id)
         return None
 
     def holders(self, slp_id: int) -> list[tuple[str, Drs]]:
         """Every archive that has this sprite (all of them get our version, so load order cannot matter)."""
-        return [(name, drs) for name, drs in self.archives if slp_id in drs.ids()]
+        return [(name, drs) for name, drs in self._searched() if slp_id in drs.ids()]
 
     def layout(self, slp_id: int, num_frames: int) -> tuple[int, int, bool, int, str]:
         """(frames per angle, angle count, mirrored, extra frames, source) matching the original sprite.
@@ -302,7 +314,29 @@ def _init(palette) -> None:
     _STATE["units"] = {}
 
 
+def _cost(job) -> int:
+    """Roughly how long a job takes to render."""
+    if job[0] == "unit":
+        return job[4] * (job[5] // 2 + 1)
+    if job[0] == "static":
+        return job[3] * 4
+    if job[0] == "interface":
+        return 30
+    return 20  # a farm texture: one render, cut into tiles
+
+
 def _render(job) -> tuple[int, bytes, int]:
+    if job[0] == "interface":
+        _, slp_id, original, big = job
+        try:
+            data = interface.encode(original, big, _STATE["quant"].palette, _STATE["quant"])
+        except ValueError as exc:  # its resource icons weren't found: it keeps its look
+            return slp_id, None, str(exc)
+        return slp_id, data, slp.info(data).num_frames
+    if job[0] == "terrain":
+        _, slp_id, stage, original = job
+        data = farmland.encode(stage, original, _STATE["quant"])
+        return slp_id, data, slp.info(data).num_frames
     if job[0] == "static":
         _, slp_id, spec, num_frames, frames, angles, mirrored, original = job
         from aom.props import render_static
@@ -416,6 +450,29 @@ def main(argv=None) -> int:
         static_blanks = {s: why for s, why in sprite_plan.blanks.items()
                          if only is None or blank_group(why) in only}
 
+    # farms are terrain: their textures in terrain.drs become Minecraft farmland
+    farms: list[tuple[int, str, str, int]] = []
+    if only is None or only & {"farms", "buildings"}:
+        for slp_id, stage, source in farmland.farm_slps(game.terrains):
+            data = game.original(slp_id)
+            if data is None:
+                skipped.append((Target(slp_id, "farm", stage), f"farm texture ({source}) not in your game files"))
+                continue
+            try:
+                n = slp.info(data).num_frames
+            except ValueError as exc:
+                skipped.append((Target(slp_id, "farm", stage), str(exc)))
+                continue
+            jobs.append(("terrain", slp_id, stage, data))
+            farms.append((slp_id, stage, source, n))
+
+    # the panels at the top and bottom of the screen, one picture per civilisation and screen size
+    panels: list[tuple[int, tuple[int, int]]] = []
+    if only is None or "interface" in only:
+        for slp_id, size, data, big in interface.panels(game.original):
+            jobs.append(("interface", slp_id, data, big))
+            panels.append((slp_id, size))
+
     target_slps = {j[1] for j in jobs}
     blanks = {} if only else {s: why for s, why in BLANK}
     if not only:
@@ -423,16 +480,17 @@ def main(argv=None) -> int:
     blanks.update(static_blanks)
     blanks = {s: why for s, why in blanks.items() if s not in target_slps and game.original(s) is not None}
 
-    log(f"plan: {len(jobs) - len(statics)} unit sprites and {len(statics)} building/scenery sprites to render, "
-        f"{len(blanks)} layers to blank, {len(skipped)} skipped")
+    log(f"plan: {len(jobs) - len(statics) - len(farms) - len(panels)} unit sprites, {len(statics)} building/scenery "
+        f"sprites, {len(farms)} farm textures and {len(panels)} interface panels to render, {len(blanks)} layers to "
+        f"blank, {len(skipped)} skipped")
     if args.dry_run:
-        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics)
+        write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics, farms, panels)
         return 0
 
     started = time.time()
     rendered: dict[int, bytes] = {}
     failed: list[tuple[int, str]] = []
-    jobs.sort(key=lambda j: -(j[4] * (j[5] // 2 + 1) if j[0] == "unit" else j[3] * 4))  # big ones first
+    jobs.sort(key=_cost, reverse=True)  # big ones first
     with mp.Pool(args.jobs, initializer=_init, initargs=(game.palette,)) as pool:
         for n, (slp_id, data, count) in enumerate(pool.imap_unordered(_safe_render, jobs), 1):
             if data is None:  # one broken sprite must not stop the whole build: keep the original
@@ -462,7 +520,8 @@ def main(argv=None) -> int:
     if not args.no_dat and (pacman or javelina):
         apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina)
     exe_ok = args.mode == "upmod" and not args.no_exe and make_exe(game.root, log)
-    write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics)
+    write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics, farms, panels,
+                 dict(failed))
     log(f"done in {time.time() - started:.0f}s")
     log("")
     log("RESULT")
@@ -698,7 +757,8 @@ def restore(root: Path) -> int:
     return 0
 
 
-def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=()) -> None:
+def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=(),
+                 farms=(), panels=(), failed=None) -> None:
     lines = ["Age of Minecraft build report", "=" * 30, *header, "", "REPLACED (slp, unit, action, frames x angles)"]
     for t, n, frames, angles, mirrored, source in sorted(planned, key=lambda p: p[0].slp):
         m = " mirrored" if mirrored else ""
@@ -711,6 +771,13 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
                                                                      "letter", "name", "direction", "open",
                                                                      "part", "anchor_offset", "half") if k in spec)
         lines.append(f"  {sp.slp:6d}  {sp.source:14s} {what:60s} {n:3d} frames [{spec.get('mode')}] {sp.note}")
+    lines += ["", "FARMS (terrain texture slp, stage, found by, tiles)"]
+    lines += [f"  {s:6d}  {stage:8s} {farmland.STAGES[stage]:32s} {source:28s} {n:3d} tiles"
+              for s, stage, source, n in farms]
+    lines += ["", "INTERFACE PANELS (slp, screen size, result)"]
+    for s, (w, h) in panels:
+        result = "planned" if failed is None else ("Minecraft style" if s not in failed else failed[s])
+        lines.append(f"  {s:6d}  {w}x{h:<5d} {result}")
     lines += ["", "BLANKED LAYERS"] + [f"  {s:6d}  {why}" for s, why in sorted(blanks.items())]
     lines += ["", "SKIPPED"] + [f"  {t.slp:6d}  {t.unit:24s} {t.action:7s} {why}" for t, why in skipped]
     covered = {p[0].unit for p in planned}
@@ -723,6 +790,10 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
                               for d in g.deltas)
             lines.append(f"  {gid:5d} {g.name:22s} {g.slp:6d} {g.frame_count:4d} {g.angle_count:3d} {g.mirroring:2d}"
                          f"  {deltas}")
+    if game.terrains:
+        lines += ["", "TERRAIN TABLE (id, enabled, name, file, slp, rows x cols)"]
+        lines += [f"  {t.id:3d} {int(t.enabled):2d} {t.name:14s} {t.filename:14s} {t.slp:6d} {t.rows} x {t.cols}"
+                  for t in game.terrains]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"report: {path}")
 
