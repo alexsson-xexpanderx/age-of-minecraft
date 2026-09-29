@@ -2,8 +2,7 @@
 
 A blue sky with Minecraft's flat blocky clouds and square sun, a floating island of blocks (grass, a pond, oak
 trees, flowers and a small house) rendered with the mod's own block renderer, the gold and grass block logo from
-the main menu, and a tilted yellow splash text like Minecraft's. The logo and the splash have dark shadows so they
-stand out from the sky.
+the main menu, with a dark shadow so it stands out from the sky.
 
 Only this screen uses its palette (50563), and the original is mostly greys: the mod gives it a palette of its own,
 made from the new picture (`palette`), keeping the twenty Windows colours at 0-9 and 246-255 where they are.
@@ -21,26 +20,6 @@ from .palette import _lab
 W, H = 800, 600
 RESERVED = list(range(10)) + list(range(246, 256))  # the Windows colours: kept as they are
 SKY_TOP, SKY_LOW = np.array([0x6f, 0x9b, 0xf7]) / 255, np.array([0xc0, 0xd8, 0xff]) / 255
-SPLASH = "ALSO TRY AGE OF EMPIRES!"
-FONT = {  # 5x7 capitals for the splash text
-    "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
-    "E": ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
-    "F": ["#####", "#....", "#....", "####.", "#....", "#....", "#...."],
-    "G": [".####", "#....", "#....", "#.###", "#...#", "#...#", ".###."],
-    "I": ["###", ".#.", ".#.", ".#.", ".#.", ".#.", "###"],
-    "L": ["#....", "#....", "#....", "#....", "#....", "#....", "#####"],
-    "M": ["#...#", "##.##", "#.#.#", "#...#", "#...#", "#...#", "#...#"],
-    "O": [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
-    "P": ["####.", "#...#", "#...#", "####.", "#....", "#....", "#...."],
-    "R": ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"],
-    "S": [".####", "#....", "#....", ".###.", "....#", "....#", "####."],
-    "T": ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."],
-    "Y": ["#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."],
-    "!": ["#", "#", "#", "#", "#", ".", "#"],
-    " ": ["...", "...", "...", "...", "...", "...", "..."],
-}
-
-
 def island() -> V.Structure:
     """A floating island: grass on dirt, stone and ores under it, a pond, oak trees, flowers and a small house."""
     from .nature import flower_sprite, grass_sprite, tree
@@ -82,29 +61,6 @@ def island() -> V.Structure:
     return s
 
 
-def _font_mask(text: str, k: int) -> np.ndarray:
-    cols = []
-    for ch in text:
-        g = np.array([[c == "#" for c in row] for row in FONT[ch]])
-        cols += [g, np.zeros((7, 1), bool)]
-    mask = np.concatenate(cols, 1)
-    return mask.repeat(k, 0).repeat(k, 1)
-
-
-def _rotate(mask: np.ndarray, degrees: float) -> np.ndarray:
-    """A mask turned about its middle, counter-clockwise (nearest pixel), on a canvas big enough for it."""
-    h, w = mask.shape
-    a = np.radians(degrees)
-    size = int(np.ceil(np.hypot(h, w))) + 2
-    ys, xs = np.mgrid[0:size, 0:size] - size / 2
-    sx = np.cos(a) * xs - np.sin(a) * ys + w / 2
-    sy = np.sin(a) * xs + np.cos(a) * ys + h / 2
-    inside = (sx >= 0) & (sx < w) & (sy >= 0) & (sy < h)
-    out = np.zeros((size, size), bool)
-    out[inside] = mask[sy[inside].astype(int), sx[inside].astype(int)]
-    return out
-
-
 def _over(img: np.ndarray, rgba: np.ndarray, x: int, y: int) -> None:
     h, w = rgba.shape[:2]
     region = img[y:y + h, x:x + w]
@@ -123,7 +79,7 @@ def picture() -> np.ndarray:
     img[52:88, 646:682] = (1.0, 1.0, 0.92)
     rng = np.random.default_rng(7)
     for _ in range(9):  # flat, blocky clouds
-        cx, cy = int(rng.integers(0, W)), int(rng.integers(262, 350))  # low, behind the island: not under the text
+        cx, cy = int(rng.integers(0, W)), int(rng.integers(262, 350))  # low, partly behind the island
         for _ in range(4):
             bw, bh = int(rng.integers(3, 8)) * 16, int(rng.integers(1, 3)) * 12
             x, y = cx + int(rng.integers(-3, 4)) * 16, cy + int(rng.integers(-1, 2)) * 12
@@ -140,15 +96,6 @@ def picture() -> np.ndarray:
     lx, ly = (W - mark.shape[1]) // 2, 30
     _over(img, shadow, lx + 5, ly + 6)
     _over(img, mark, lx, ly)
-    big = _rotate(_font_mask(SPLASH, 10), 20)  # 2.5 pixels a dot, turned at 4 times the size: clean strokes
-    n = big.shape[0] // 4 * 4
-    turned = big[:n, :n].reshape(n // 4, 4, n // 4, 4).mean((1, 3)) > 0.4
-    cx, cy = lx + mark.shape[1] - 90, ly + mark.shape[0] + 30  # its middle, at the logo's lower right corner
-    sx, sy = min(W - 8, cx + turned.shape[1] // 2) - turned.shape[1], cy - turned.shape[0] // 2
-    for (dx, dy), col in (((2, 2), (0.25, 0.25, 0.0)), ((0, 0), (1.0, 1.0, 0.0))):
-        m = turned
-        region = img[sy + dy:sy + dy + m.shape[0], sx + dx:sx + dx + m.shape[1]]
-        region[m[:region.shape[0], :region.shape[1]]] = col
     return np.clip(img, 0, 1)
 
 

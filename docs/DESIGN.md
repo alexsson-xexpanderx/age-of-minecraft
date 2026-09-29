@@ -212,8 +212,8 @@ deepslate tiles, or dark oak planks for the campaigns' dialogues and the
 achievements (their dark tabs would be lost on deepslate). The history book gets two grey pages, with its list of topics sunk in.
 The loading screen is a Minecraft title screen: a blue sky with blocky clouds
 and a square sun, a floating island of blocks with a pond, oak trees, flowers
-and a little house, the gold and grass block logo with a dark shadow, and a
-tilted yellow splash, "Also try Age of Empires!". Only this screen uses its
+and a little house, and the gold and grass block logo with a dark shadow.
+Only this screen uses its
 palette, which was nearly all greys, so it gets a palette of its own made from
 the new picture (the Windows colours stay where they were).
 
