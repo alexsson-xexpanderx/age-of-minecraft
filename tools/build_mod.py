@@ -685,15 +685,15 @@ def loading_plan(game: Game, screen_files, log) -> Optional[tuple[bytes, int, np
 
 def menu_border(game: Game, screen_files, palette: np.ndarray, log) -> None:
     """The main menu's screen file with its bevel colours (the border the game draws around the Single Player
-    menu's buttons) set to the plates' colour, in every archive that has it."""
+    menu's buttons) set to shades a little darker than the plates, in every archive that has it."""
     for sc in screen_files:
         if menu.MENU not in sc.backgrounds or len(sc.fields.get("bevel_colors", [])) != 6:
             continue
-        new = screens.with_field(game.data_file(sc.id), "bevel_colors", [str(menu.border(palette))] * 6)
+        new = screens.with_field(game.data_file(sc.id), "bevel_colors", [str(i) for i in menu.border(palette)])
         for _, drs in game._searched():
             if sc.id in drs.ids("bina"):
                 drs.put(sc.id, new, "bina")
-        log(f"main menu: no light border on its buttons (screen file {sc.id})")
+        log(f"main menu: a dark border instead of a light one on its buttons (screen file {sc.id})")
 
 
 def draw_loading(game: Game, data: bytes, pal_id: int, palette: np.ndarray, log) -> bytes:

@@ -53,13 +53,23 @@ DESCRIPTION = (380, 490, 790, 597)
 # so the picture gets a solid plate behind each (as wide as the button, a little taller), and nothing shows through
 SUBMENU = [(462, y, 759, y + 39) for y in (90, 155, 221, 286, 351, 417)]
 PLATE = "#1e1e1e"
+BORDER = ("#0a0a0a", "#101010", "#161616")  # the game's border around those buttons: a little darker, a shadow
 
 
-def border(palette: np.ndarray) -> int:
-    """The palette index the game should draw the buttons' border in: the plates' colour, so it doesn't show (the
-    player asked for no white border). Not the Windows colours at 0-9 and 246-255."""
+def border(palette: np.ndarray) -> list[int]:
+    """The six palette indices (bevel colours) the game draws the buttons' border in: shades a little darker than
+    the plates (the player asked for no white border, but some shadow), from the outside in, on both sides. Never
+    the plates' own colour, nor the Windows colours at 0-9 and 246-255."""
+    pal = np.asarray(palette, float)[:, :3]
     free = np.arange(10, 246)
-    return int(free[np.abs(np.asarray(palette, float)[free, :3] - parse(PLATE)[:3] * 255).sum(1).argmin()])
+
+    def nearest(colour: str, among: np.ndarray) -> int:
+        return int(among[np.abs(pal[among] - parse(colour)[:3] * 255).sum(1).argmin()])
+
+    plate = nearest(PLATE, free)
+    darker = free[pal[free].sum(1) < pal[plate].sum()]
+    shades = [nearest(c, darker) if len(darker) else plate for c in BORDER]
+    return shades + shades
 
 
 # --------------------------------------------------------------------------- drawing helpers
@@ -346,9 +356,9 @@ def scene() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     _tile(img, (700, 400, 764, 490), _tex("lava"), px=2, dark=0.6)
     _tile(img, (692, 392, 772, 402), _tex("stone_bricks"), px=1, dark=0.5)
     for x in range(482, 690, 44):  # a rack of diamond swords on the wall
-        _blit(img, masks, None, sword(), x, 300, 2)
+        _blit(img, masks, None, sword(), x, 296, 2)
     for x0, y0, x1, y1 in SUBMENU:  # solid behind the Single Player menu's buttons
-        _rect(img, (x0, y0 - 5, x1, y1 + 5), PLATE)
+        _rect(img, (x0, y0 - 2, x1, y1 + 3), PLATE)
     _sign(img, masks, "title", TITLE_SIGN)
 
     # the ground: snow, and a cobblestone path

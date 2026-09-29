@@ -618,9 +618,11 @@ def test_full_build(tmp: Path):
     menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu
     assert len(menu_after) == 53 and not np.array_equal(menu_after[0].pixels, menu_before[0].pixels)
     assert all(a.pixels.shape == b.pixels.shape and a.hotspot == b.hotspot for a, b in zip(menu_after, menu_before))
-    dark = str(menu.border(parse_jasc(fake_palette())))  # the buttons' border: the plates' colour, not light
+    shades = menu.border(parse_jasc(fake_palette()))  # the buttons' border: a little darker than the plates
+    pal = parse_jasc(fake_palette())
+    assert len(shades) == 6 and all(pal[i].sum() < 3 * 30 for i in shades)
     assert ui.get(50089, "bina") == (b"background1_files      xmain none 50189 -1\r\npalette_file           xmain 50589\r\n"
-                                     b"bevel_colors           " + " ".join([dark] * 6).encode() + b"\r\n")
+                                     b"bevel_colors           " + " ".join(map(str, shades)).encode() + b"\r\n")
     assert (menu_after[10].pixels < 0).mean() > 0.1 and (menu_after[11].pixels >= 0).all()
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
