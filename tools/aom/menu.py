@@ -47,6 +47,7 @@ SIGNS = {"learn": (5, 7, 117, 32), "single": (312, 8, 397, 40), "history": (110,
          "zone": (274, 369, 333, 383)}
 TITLE_SIGN = (453, 3, 775, 53)
 DESCRIPTION = (380, 490, 790, 597)
+BOARD = (462, 56, 768, 490)  # the Single Player buttons: the game draws only their edges and names, so one flat colour
 
 
 # --------------------------------------------------------------------------- drawing helpers
@@ -322,18 +323,12 @@ def scene() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     for k, x in enumerate(range(4, 146, 24)):
         _tile(img, (x, 424, x + 20, 444), _tex("melon" if k % 2 else "pumpkin"), px=1, dark=0.75)
 
-    # the blacksmith on the right
-    _tile(img, (430, 0, 800, 272), _tex("spruce_planks"), px=2, dark=0.45)
+    # the building on the right: the Single Player menu's board between dark oak logs, the title sign above
+    _tile(img, (430, 0, 800, 600), _tex("spruce_planks"), px=2, dark=0.45)
     _tile(img, (430, 0, 462, 600), _tex("dark_oak_log"), px=2, dark=0.5)
     _tile(img, (768, 0, 800, 600), _tex("dark_oak_log"), px=2, dark=0.5)
-    _tile(img, (462, 240, 768, 272), _tex("dark_oak_log"), px=2, dark=0.5, turn=True)
-    _window(img, (528, 62, 610, 128))
-    _window(img, (658, 62, 740, 128))
-    _tile(img, (462, 272, 768, 490), _tex("dark_oak_planks"), px=2, dark=0.3)  # inside: dark, with a forge
-    _tile(img, (700, 400, 764, 490), _tex("lava"), px=2, dark=0.6)
-    _tile(img, (692, 392, 772, 402), _tex("stone_bricks"), px=1, dark=0.5)
-    for x in range(482, 690, 44):  # a rack of diamond swords on the wall
-        _blit(img, masks, None, sword(), x, 300, 2)
+    _rect(img, BOARD, "#1e1e1e")  # nothing shows through the game's buttons
+    _frame(img, BOARD, "#101014", "#4a4a52")
     _sign(img, masks, "title", TITLE_SIGN)
 
     # the ground: snow, and a cobblestone path

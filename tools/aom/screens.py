@@ -446,13 +446,13 @@ def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0
     return slp.SlpFrame(out.astype(np.int16), frame.hotspot)
 
 
-def copies(marks: list[slp.SlpFrame], frames: list[slp.SlpFrame]) -> list[tuple[int, int]]:
-    """(picture k, team mark j) for every picture of an SLP that is exactly one of the team marks: a copy the game
-    may draw instead of TEAMS' own."""
+def copies(marks: list[slp.SlpFrame], frames: list[slp.SlpFrame], alike: float = 0.85) -> list[tuple[int, int]]:
+    """(picture k, team mark j) for every picture of an SLP that is one of the team marks, or nearly (at least
+    `alike` of its pixels the same): a copy the game may draw instead of TEAMS' own."""
     found = []
     for k, f in enumerate(frames):
         for j, m in enumerate(marks):
-            if f.pixels.shape == m.pixels.shape and np.array_equal(f.pixels, m.pixels):
+            if f.pixels.shape == m.pixels.shape and float((f.pixels == m.pixels).mean()) >= alike:
                 found.append((k, j))
                 break
     return found

@@ -1,9 +1,10 @@
 """The loading screen (interfac.drs 50163), as a Minecraft title screen.
 
-A blue sky with Minecraft's flat blocky clouds and square sun, a floating island of blocks (grass, a pond, oak
-trees, flowers and a small house) rendered with the mod's own block renderer, the gold and grass block logo from
-the main menu, with a dark shadow so it stands out from the sky. The bottom of the screen is light sky only: the
-game writes its loading text there, in black.
+A light blue sky with Minecraft's flat blocky clouds and square sun, the gold and grass block logo from the main
+menu at the top (with a dark shadow, so it stands out from the sky), and a floating island of blocks (grass, a
+pond, oak trees, flowers and a small house, rendered with the mod's own block renderer) at the bottom. Between them
+is light sky only: the game writes its loading text there, in black (a light band at the very bottom did not help,
+so the text is higher up, where the island was).
 
 Only this screen uses its palette (50563), and the original is mostly greys: the mod gives it a palette of its own,
 made from the new picture (`palette`), keeping the twenty Windows colours at 0-9 and 246-255 where they are.
@@ -20,8 +21,9 @@ from .palette import _lab
 
 W, H = 800, 600
 RESERVED = list(range(10)) + list(range(246, 256))  # the Windows colours: kept as they are
-SKY_TOP, SKY_LOW = np.array([0x6f, 0x9b, 0xf7]) / 255, np.array([0xdc, 0xea, 0xff]) / 255
-TEXT_BAND = 128  # the bottom of the screen is light sky only: the game writes its loading text there, in black
+SKY_TOP, SKY_LOW = np.array([0x8c, 0xb4, 0xfa]) / 255, np.array([0xe2, 0xee, 0xff]) / 255
+LOGO_W, LOGO_Y = 460, 14  # the logo, at the top
+ISLAND = (380, 160)  # at most this big, at the bottom: the middle of the screen is for the game's black text
 def island() -> V.Structure:
     """A floating island: grass on dirt, stone and ores under it, a pond, oak trees, flowers and a small house."""
     from .nature import flower_sprite, grass_sprite, tree
@@ -77,25 +79,25 @@ def picture() -> np.ndarray:
     from .render import fit_camera, render
     yy = np.linspace(0, 1, H)[:, None, None]
     img = np.broadcast_to(SKY_TOP * (1 - yy) + SKY_LOW * yy, (H, W, 3)).copy()
-    img[46:94, 640:688] = (1.0, 0.98, 0.8)  # the square sun
-    img[52:88, 646:682] = (1.0, 1.0, 0.92)
+    img[22:58, 700:736] = (1.0, 0.98, 0.8)  # the square sun
+    img[27:53, 705:731] = (1.0, 1.0, 0.92)
     rng = np.random.default_rng(7)
-    for _ in range(9):  # flat, blocky clouds
-        cx, cy = int(rng.integers(0, W)), int(rng.integers(240, 330))  # partly behind the island, above the text
+    for _ in range(9):  # flat, blocky clouds: white, so black text shows on them too
+        cx, cy = int(rng.integers(0, W)), int(rng.integers(150, 440))
         for _ in range(4):
             bw, bh = int(rng.integers(3, 8)) * 16, int(rng.integers(1, 3)) * 12
             x, y = cx + int(rng.integers(-3, 4)) * 16, cy + int(rng.integers(-1, 2)) * 12
             img[max(0, y):y + bh, max(0, x):x + bw] = img[max(0, y):y + bh, max(0, x):x + bw] * 0.2 + 0.8
     root, heading = island().part(V.all_blocks()), V.BUILDING_HEADING
     cam = fit_camera(root, heading, scale=1.0, pad=0)
-    cam = fit_camera(root, heading, scale=min(480 / cam.width, 270 / cam.height), pad=2)
+    cam = fit_camera(root, heading, scale=min(ISLAND[0] / cam.width, ISLAND[1] / cam.height), pad=2)
     rgba = render(root, heading, camera=cam, shadow=False).to_rgba(1).astype(np.float64) / 255
-    _over(img, rgba, (W - rgba.shape[1]) // 2, H - TEXT_BAND - rgba.shape[0])
-    mark = logo(560)
+    _over(img, rgba, (W - rgba.shape[1]) // 2, H - 6 - rgba.shape[0])
+    mark = logo(LOGO_W)
     shadow = mark.copy()
     shadow[..., :3] = 0.05
     shadow[..., 3] *= 0.6
-    lx, ly = (W - mark.shape[1]) // 2, 30
+    lx, ly = (W - mark.shape[1]) // 2, LOGO_Y
     _over(img, shadow, lx + 5, ly + 6)
     _over(img, mark, lx, ly)
     return np.clip(img, 0, 1)

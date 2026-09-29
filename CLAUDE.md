@@ -59,6 +59,8 @@ putting `tools/` on `sys.path`.
      ids. Their textures in `terrain.drs` are redrawn one diamond tile per frame.
    - The screen panels are full-screen pictures in `interfac.drs` (51101–51160, one per civ and screen size).
      `interface.py` repaints them by brightness class and puts item icons over the resource icons.
+     The boxes the game writes the amounts in are dark in the real game (`_count_boxes`: right of each icon) and
+     become flat near-black, no bevel (the player asked).
    - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
      pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
      with exactly the known picture sizes (`menu.known`) is replaced.
@@ -73,7 +75,8 @@ putting `tools/` on `sys.path`.
      become banners coloured from each flag's own pixels, as that palette lacks Minecraft's wool colours. Its tabs
      (`TABS`, 12 pictures: each tab not chosen / chosen, told apart by the dark edge at their top) lose their top
      rows, which ran under the Play Again and Main Menu buttons; the team marks (`TEAMS`) become numbered shields,
-     and `team_copies` redraws exact copies of them anywhere in interfac/gamedata_x1_p1 (the game didn't show ours).
+     and `team_copies` redraws copies and near copies (85% of pixels) of them in any archive (the game still showed
+     the original; the report's TEAM MARKS section lists every archive holding them).
      The game writes names in white, black or the player's colour, so the banners' stripe is a middle grey; the
      scores are in player colours, so they sit on a light panel (`LAYOUTS` "panels") in the dark window.
    - A picture listed by screens with very different palettes only looks right in one: `screens.intended` picks

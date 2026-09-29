@@ -7,7 +7,8 @@ widescreen panels from the same pictures.
 
 Each picture is repainted in the Minecraft style, every pixel keeping its place:
 
-* the boxes in the resource bar, where the game writes the amounts in white, become dark sunk-in slots;
+* the boxes in the resource bar, where the game writes the amounts in white, become flat and nearly black (the
+  game's own are dark; the player asked for no shading, and darker, so the white stands out);
 * the parchment the game writes on (large light areas, with their shaded border) becomes the grey of Minecraft's
   inventory, with a straight top edge, its black edge, white bevel at the top left and dark bevel at the bottom
   right;
@@ -43,7 +44,7 @@ ICON_W, ICON_H = 26, 17
 RESOURCES = ("wood", "food", "gold", "stone", "population")
 GUI = {"panel": "#c6c6c6", "light": "#ffffff", "shade": "#555555", "edge": "#000000",
        "slot": "#8b8b8b", "slot_light": "#ffffff", "slot_shade": "#373737",
-       "count": "#2b2b2b", "count_light": "#6b6b6b", "count_shade": "#111111"}  # where the bar's numbers are
+       "count": "#1e1e1e"}  # where the bar's numbers are: flat
 PLANKS = ("birch_planks", "oak_planks", "jungle_planks", "acacia_planks", "spruce_planks", "dark_oak_planks")
 LUMA = np.array([0.299, 0.587, 0.114])
 PIXEL = 2  # screen pixels per Minecraft pixel, like Minecraft's GUI scale 2
@@ -147,18 +148,6 @@ def _label(m: np.ndarray) -> tuple[np.ndarray, int]:
     return lab, len(ids)
 
 
-def _rectangles(m: np.ndarray, min_area: int = 40) -> np.ndarray:
-    """Each part of m as its bounding rectangle (the small bits dropped)."""
-    lab, n = _label(m)
-    out = np.zeros_like(m)
-    sizes = np.bincount(lab.ravel(), minlength=n + 1)
-    for k in range(1, n + 1):
-        if sizes[k] >= min_area:
-            ys, xs = np.nonzero(lab == k)
-            out[ys.min():ys.max() + 1, xs.min():xs.max() + 1] = True
-    return out
-
-
 def _widen(boxes: np.ndarray, icons: Optional[list[tuple[int, int]]], more: int = 10, gap: int = 2) -> np.ndarray:
     """Each box as wide as it can be: `gap` pixels from the icon before it and from the next icon or box, at most
     `more` pixels wider on each side. Room for the game's numbers."""
@@ -178,12 +167,42 @@ def _widen(boxes: np.ndarray, icons: Optional[list[tuple[int, int]]], more: int 
     return out
 
 
-def _top_bar(opaque: np.ndarray) -> np.ndarray:
-    """The resource bar: the rows at the top that are drawn all the way across."""
-    full = opaque.mean(1) > 0.9
-    rows = len(full) if full.all() else int(np.argmin(full))
+def _count_boxes(lum: np.ndarray, opaque: np.ndarray, bar: np.ndarray,
+                 icons: Optional[list[tuple[int, int]]]) -> np.ndarray:
+    """The boxes the game writes the amounts in: in the resource bar, right after each icon (up to the next one),
+    each on its own. The game's own are dark; a light one counts too."""
     out = np.zeros_like(opaque)
-    out[:rows] = True
+    icons = sorted(icons or [])
+    if not icons:
+        return out
+    step = (icons[-1][0] - icons[0][0]) / max(1, len(icons) - 1) or 80
+    for tone in (opaque & bar & (lum < 0.14), opaque & bar & (lum > 0.5)):
+        for x, y in icons:  # the icons themselves (gold is bright) are not boxes
+            tone[max(0, y - 2):y + ICON_H + 2, max(0, x - 2):x + ICON_W + 2] = False
+        lab, n = _label(_grow(_shrink(tone, 2), 2))
+        for k in range(1, n + 1):
+            ys, xs = np.nonzero(lab == k)
+            if len(ys) < 40:
+                continue
+            y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+            for i, (x, y) in enumerate(icons):
+                after = x + ICON_W
+                end = icons[i + 1][0] + 2 if i + 1 < len(icons) else x + step * 1.2
+                if y0 < y + ICON_H and y1 > y and x0 <= after + 24 and after + 12 <= x1 <= end:
+                    out[y0:y1, max(x0, after + 2):x1] = True
+    return out
+
+
+def _top_bar(opaque: np.ndarray) -> np.ndarray:
+    """The resource bar: the rows at the top that are drawn (nearly) all the way across, down to the first that
+    is not (a few rows at the very top may have clear bits)."""
+    full = opaque.mean(1) > 0.9
+    out = np.zeros_like(opaque)
+    if not full[:16].any():
+        return out
+    first = int(np.argmax(full))
+    rest = full[first:]
+    out[:first + (len(rest) if rest.all() else int(np.argmin(rest)))] = True
     return out
 
 
@@ -230,12 +249,7 @@ def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int,
     lum = rgb @ LUMA
     bar = _top_bar(opaque)
     paper = _paper(lum, opaque) & ~bar  # the parchment below the resource bar (its tears are filled)
-    # the resource bar's boxes, each on its own (the game writes the amounts in them, in white)
-    light = opaque & bar & (lum > 0.5)
-    for x, y in icons or []:  # the icons themselves (gold is bright) are not boxes
-        light[max(0, y - 2):y + ICON_H + 2, max(0, x - 2):x + ICON_W + 2] = False
-    counts = _rectangles(_grow(_shrink(light, 2), 2)) & bar & opaque
-    counts = _widen(counts, icons) & bar & opaque
+    counts = _widen(_count_boxes(lum, opaque, bar, icons), icons) & bar & opaque  # the game writes amounts there
     slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper & ~counts
     frame = opaque & ~paper & ~slots & ~counts
     out = np.zeros_like(rgb)
@@ -243,7 +257,7 @@ def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int,
         out[frame] = _tile(_planks(float(lum[frame].mean())), opaque.shape)[frame]
     _bevel(out, slots, GUI["slot"], GUI["slot_shade"], GUI["slot_light"], None)
     _bevel(out, paper, GUI["panel"], GUI["light"], GUI["shade"], GUI["edge"])
-    _bevel(out, counts, GUI["count"], GUI["count_shade"], GUI["count_light"], None)  # a dark slot, sunk in
+    out[counts] = parse(GUI["count"])[:3]  # flat, no shading
     out[opaque & ~_shrink(opaque, PIXEL)] = parse(GUI["edge"])[:3]  # a black edge along the game view
     for (x, y), what in zip(icons or [], RESOURCES):
         icon = item(what)

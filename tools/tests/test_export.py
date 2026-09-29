@@ -175,7 +175,7 @@ def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
     rng = np.random.default_rng(4)
     for k, (x, y) in enumerate(icons):
         px[y:y + 17, x:x + 26] = rng.choice(allowed[100:140], (17, 26))
-        px[y - 4:y + 20, x + 30:x + 70] = light  # the light box the game writes the amount in, in white
+        px[y - 4:y + 20, x + 30:x + 70] = dark  # the dark box the game writes the amount in, in white
     top = h - 218
     px[top:] = frame
     px[top + 16:h - 8, w // 4 - 6:w * 2 // 3 + 6] = shaded  # the parchment's shaded border: the name is on it
@@ -329,6 +329,9 @@ def fake_game(root: Path) -> Path:
     patch = Drs()  # UserPatch's own archive, already holding a sound, and a copy of the "no team" mark
     patch.put(15500, b"RIFF a sound", "wav")
     patch.put(53300, slp.encode([marks[0], slp.SlpFrame(np.full((10, 10), 5, np.int16), (0, 0))]))
+    near = marks[1].pixels.copy()
+    near[:3] = 7  # a near copy of team 1's mark
+    patch.put(53301, slp.encode([slp.SlpFrame(near, marks[1].hotspot)]))
     patch.write(data / "gamedata_x1_p1.drs")
     boar = len(table)
     table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
@@ -545,6 +548,8 @@ def test_full_build(tmp: Path):
     assert np.array_equal(copy_after[0].pixels, marks[0].pixels)  # its copy of the "no team" mark: redrawn the same
     assert np.array_equal(copy_after[1].pixels, copy_before[1].pixels)  # its other picture: kept
     assert "picture 0 of 53300 is a copy of the team marks (50769): redrawn too" in report
+    assert np.array_equal(slp.decode(out.get(53301))[0].pixels, marks[1].pixels)  # a near copy: redrawn too
+    assert "TEAM MARKS" in report and "50769  interfac.drs" in report and "53301  gamedata_x1_p1.drs" in report
     # the mod's exe: our icon, and the window says Age of Minecraft; the game's name is gone from it
     from aom import pe
     exe = (game / "age2_x1" / "age_of_minecraft.exe").read_bytes()
@@ -602,7 +607,8 @@ def test_full_build(tmp: Path):
     assert new[806 + 21, 400] == grey and new[806 + 30, 650] == grey  # its shaded border and the tear, too
     assert new[900, 1100] == quant.indices(np.array([[139, 139, 139]]))[0]  # the minimap's dark -> a slot
     assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
-    assert new[16, 8 + 50] == quant.indices(np.array([[43, 43, 43]]))[0]  # the amounts' box: a dark slot
+    box = quant.indices(np.array([[30, 30, 30]]))[0]
+    assert (new[6:30, 8 + 30:8 + 70] == box).all()  # the amounts' box: flat, nearly black, no shading
     new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels
     assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[6:23, 11:37], old[6:23, 11:37])
     assert ui.get(51101) is None  # no icons found: it keeps its look

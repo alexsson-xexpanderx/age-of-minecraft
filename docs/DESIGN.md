@@ -156,7 +156,7 @@ widescreen panels from the same pictures. The build repaints each one, every pix
 | AoE2 | Minecraft |
 |---|---|
 | Parchment (where the game writes the unit's details) | the grey of Minecraft's inventory, with a black edge, a white bevel at the top left and a dark one at the bottom right |
-| The resource bar's boxes (the game writes the amounts in white) | a dark slot, sunk in, so the white numbers read |
+| The resource bar's boxes (the game writes the amounts in white) | flat and nearly black, no shading, so the white numbers stand out |
 | Dark areas (behind the minimap) | an inventory slot, sunk in |
 | Carved frames | planks, as dark or light as the original frame, so the game's text stays readable |
 | Resource icons: wood, food, gold, stone, population | an oak log, bread, a gold ingot, cobblestone, a villager's head |
@@ -174,8 +174,11 @@ The main menu is one 800x600 picture (`interfac.drs` 50189) with, for every
 button, pictures drawn over it at its place: the object cut out, with a yellow
 glow (the mouse is on it), with a white glow (pressed), and plain. The game
 writes the button names and the Single Player menu over the picture. Age of
-Minecraft's menu is a snowy block village at night with a blacksmith on the
-right, and each button a Minecraft thing in the original's exact place:
+Minecraft's menu is a snowy block village at night, and each button a
+Minecraft thing in the original's exact place. On the right, where the Single
+Player menu opens, is one flat dark board between two dark oak logs: the game
+draws only the edges and names of those buttons, so nothing may show through
+them.
 
 | Button | Minecraft |
 |---|---|
@@ -212,10 +215,10 @@ Everything around the windows of one picture is one material, never a mix:
 deepslate tiles, or dark oak planks for the campaigns' dialogues and the
 achievements (their dark tabs would be lost on deepslate). The history book gets two grey pages, with its list of topics sunk in.
 The loading screen is a Minecraft title screen: a blue sky with blocky clouds
-and a square sun, a floating island of blocks with a pond, oak trees, flowers
-and a little house, and the gold and grass block logo with a dark shadow.
-The bottom of the screen is light sky only, where the game writes its loading
-text in black.
+and a square sun, the gold and grass block logo with a dark shadow at the top,
+and a floating island of blocks with a pond, oak trees, flowers and a little
+house at the bottom. The middle of the screen is light sky only, where the
+game writes its loading text in black.
 Only this screen uses its
 palette, which was nearly all greys, so it gets a palette of its own made from
 the new picture (the Windows colours stay where they were).
@@ -233,7 +236,8 @@ pole, a little taller and wider than the flags, with a grey stripe across
 them that holds a long name on two lines. The game writes the name in white,
 in black or in the player's colour, and all three show on a middle grey. The team
 marks are Minecraft shields with the team's number, and a dash for no team;
-any exact copy of them in the game's files is redrawn too.
+any copy of them in the game's files, or near copy, is redrawn too, and the
+build report lists where they are (TEAM MARKS).
 
 Each picture is drawn in the palette of every screen that shows it, keeps its
 size and its see-through parts, and only the pictures the build knows, at

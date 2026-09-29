@@ -508,7 +508,7 @@ def main(argv=None) -> int:
     # the panels at the top and bottom of the screen, one picture per civilisation and screen size
     screen_files, screen_pictures = game.screens()
     panels: list[tuple[int, tuple[int, int]]] = []
-    loading = None
+    loading, teams = None, []
     if only is None or "interface" in only:
         for slp_id, size, data, big in interface.panels(game.original):
             jobs.append(("interface", slp_id, data, big))
@@ -533,7 +533,11 @@ def main(argv=None) -> int:
             if palettes:
                 jobs.append(("screen", sid, data, palettes))
                 panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
-        for sid, data, found in team_copies(game):
+        copied = team_copies(game)
+        teams = team_places(game, [screens.TEAMS] + [sid for sid, _, _ in copied])
+        teams += [f"  {sid:6d}  pictures {', '.join(str(k) for k, _ in found)} are the team marks (or nearly): "
+                  "redrawn too" for sid, _, found in copied]
+        for sid, data, found in copied:
             raws = [game.data_file(p) for p in screens.palette_ids(screens.TEAMS, screen_files)]
             jobs.append(("team copies", sid, data, [parse_jasc(raw) for raw in raws if raw], found))
             panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
@@ -555,7 +559,7 @@ def main(argv=None) -> int:
         f"blank, {len(skipped)} skipped")
     if args.dry_run:
         write_report(game, planned, skipped, blanks, report, Path.cwd() / "aom_report.txt", statics, farms, panels,
-                     screen_files=screen_files, screen_pictures=screen_pictures)
+                     screen_files=screen_files, screen_pictures=screen_pictures, teams=teams)
         return 0
 
     started = time.time()
@@ -606,7 +610,7 @@ def main(argv=None) -> int:
         save_menu_pictures(game, out_dir, log)
         save_screen_pictures(game, screen_pictures, out_dir, log)
     write_report(game, planned, skipped, blanks, report, out_dir / "aom_report.txt", statics, farms, panels,
-                 dict(failed), screen_files, screen_pictures)
+                 dict(failed), screen_files, screen_pictures, teams)
     log(f"done in {time.time() - started:.0f}s")
     log("")
     log("RESULT")
@@ -624,7 +628,7 @@ def main(argv=None) -> int:
 
 
 def team_copies(game: Game) -> list[tuple[int, bytes, list[tuple[int, int]]]]:
-    """Every other picture in the interface and patch archives that is exactly one of the team marks (the game, or
+    """Every other interface picture, in any archive, that is one of the team marks or nearly (the game, or
     UserPatch, may draw one of those): (id, file, [(picture, mark)])."""
     data = game.original(screens.TEAMS)
     if data is None or not screens.fits(screens.TEAMS, data):
@@ -632,9 +636,8 @@ def team_copies(game: Game) -> list[tuple[int, bytes, list[tuple[int, int]]]]:
     marks = slp.decode(data)
     shapes = {m.pixels.shape for m in marks}
     ids = set()
-    for name, drs in game._searched():
-        if name.lower().startswith(("interfac", "gamedata_x1_p1")):
-            ids |= drs.ids()
+    for _, drs in game._searched():
+        ids |= {s for s in drs.ids() if s in screens.INTERFACE}
     out = []
     for sid in sorted(ids - {screens.TEAMS}):
         other = game.original(sid)
@@ -647,6 +650,19 @@ def team_copies(game: Game) -> list[tuple[int, bytes, list[tuple[int, int]]]]:
         if found:
             out.append((sid, other, found))
     return out
+
+
+def team_places(game: Game, ids: list[int]) -> list[str]:
+    """Report lines: every archive of the game's that has these pictures, with their sizes (before the build)."""
+    lines = []
+    for sid in ids:
+        for name, drs in game.holders(sid):
+            try:
+                shapes = ", ".join(f"{w}x{h}" for w, h, _, _ in slp.info(drs.get(sid)).sizes)
+            except (ValueError, IndexError, struct.error):
+                shapes = "unreadable"
+            lines.append(f"  {sid:6d}  {name:20s} {shapes}")
+    return lines
 
 
 def loading_plan(game: Game, screen_files, log) -> Optional[tuple[bytes, int, np.ndarray]]:
@@ -1124,7 +1140,7 @@ def restore(root: Path) -> int:
 
 
 def write_report(game: Game, planned, skipped, blanks, header: list[str], path: Path, statics=(),
-                 farms=(), panels=(), failed=None, screen_files=(), screen_pictures=None) -> None:
+                 farms=(), panels=(), failed=None, screen_files=(), screen_pictures=None, teams=()) -> None:
     lines = ["Age of Minecraft build report", "=" * 30, *header, "", "REPLACED (slp, unit, action, frames x angles)"]
     for t, n, frames, angles, mirrored, source in sorted(planned, key=lambda p: p[0].slp):
         m = " mirrored" if mirrored else ""
@@ -1162,6 +1178,8 @@ def write_report(game: Game, planned, skipped, blanks, header: list[str], path: 
         pics = ", ".join(f"{b} ({sizes(b)})" for b in sc.backgrounds) or "no pictures of its own"
         lines.append(f"  {sc.id:6d}  {pics}; palette {sc.palette}")
         lines.append("          " + " | ".join(" ".join([k, *v]) for k, v in sc.fields.items()))
+    lines += ["", f"TEAM MARKS (the achievements' team column, {screens.TEAMS}, and its copies: in your game's "
+                  "archives, pictures)", *teams]
     lines += ["", "OTHER LARGE PICTURES (slp, size)"]
     lines += [f"  {s:6d}  {sizes(s)}" for s in sorted(screen_pictures or {}) if s not in named]
     lines += ["", "BLANKED LAYERS"] + [f"  {s:6d}  {why}" for s, why in sorted(blanks.items())]
