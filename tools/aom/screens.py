@@ -13,8 +13,7 @@ sticks out cut off; Minecraft's bevel) in a middle grey on which all of those ca
 everything around it one material: deepslate tiles, or dark oak planks for the pictures in WOODEN. The
 achievements are a dark window, their flags Minecraft banners with a black stripe for the names, their tabs
 Minecraft tabs and their team marks numbered shields. Pictures without parchment (the dark dialogue backgrounds)
-are one solid dark grey, a wooden board solid dark oak. The loading screen is Minecraft's dark dirt with the block
-logo in grey stone.
+are one solid dark grey, a wooden board solid dark oak. The loading screen is loadscreen.py's.
 
 Each picture is drawn in every palette the game shows it in (`quantise`), and only the pictures in RESTYLED, at
 those sizes, are changed.
@@ -39,7 +38,7 @@ INTERFACE = range(50000, 60000)  # the ids of interfac.drs's files (the sprites'
 PANELS = range(51101, 51161)  # the in-game panels: interface.py
 MIN_SIZE = (250, 130)  # smaller pictures are buttons and icons, not screens
 ALSO_SAVED = (50761, 50762, 50765, 50769)  # smaller pictures of the achievements: icons, flags, tabs, team shields
-LOADING = 50163  # the Conquerors' loading screen (screen file 50063)
+LOADING = 50163  # the Conquerors' loading screen (screen file 50063): loadscreen.py draws it
 FLAGS = 50762  # the achievements' flags, one picture per player colour: the game writes each player's name on one
 TABS = 50765  # the achievements' tabs (Score ... Timeline), each as it looks chosen and not chosen
 TEAMS = 50769  # the achievements' team marks: none, then teams 1 to 4
@@ -51,7 +50,7 @@ RESTYLED = {  # picture -> its size: the screens this module redraws
     50127: (273, 182), 50161: (800, 600), 50149: (800, 600), 50145: (800, 600), 50763: (268, 270),  # editor, history
     53161: (500, 408), 53162: (500, 408), 53163: (500, 408), 53164: (500, 408),  # the campaigns' dialogues
     53171: (500, 408), 53172: (500, 408), 53173: (500, 408), 53174: (500, 408),
-    LOADING: (800, 600), FLAGS: None, TABS: None, TEAMS: None,
+    FLAGS: None, TABS: None, TEAMS: None,
 }
 SHOWN_WITH = {FLAGS: 50061, TABS: 50061, TEAMS: 50061}  # no screen file names them: shown on the achievements
 LAYOUTS = {  # sheets that are given, not found: (x0, y0, x1, y1) on the picture
@@ -308,20 +307,6 @@ def hall(rgb: np.ndarray, opaque: np.ndarray, sid: int = 0) -> np.ndarray:
     return out
 
 
-def loading(shape: tuple[int, int]) -> np.ndarray:
-    """The loading screen: Minecraft's dark dirt, with the block logo in grey stone (its palette has greys, not
-    gold or green)."""
-    from .menu import STONE_LOGO, logo
-    out = _tiled("dirt", shape, 0.11)
-    h, w = shape
-    mark = logo(int(w * 0.65), STONE_LOGO)
-    y, x = int(h * 0.25), (w - mark.shape[1]) // 2
-    a = mark[..., 3:4]
-    region = out[y:y + mark.shape[0], x:x + mark.shape[1]]
-    region[...] = mark[..., :3] * a + region * (1 - a)
-    return out
-
-
 BANNER_GROW = (6, 6, 20)  # a banner is this much taller above and below, and wider, than the flag it replaces
 
 
@@ -476,7 +461,7 @@ def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0
         hx, hy = frame.hotspot
         return slp.SlpFrame(out, (hx, hy + (BANNER_GROW[0] if sid == FLAGS else 0)))
     rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
-    new = loading(px.shape) if sid == LOADING else hall(rgb, opaque, sid)
+    new = hall(rgb, opaque, sid)
     out = px.copy()
     out[opaque] = quantise(new, palettes)[opaque]
     return slp.SlpFrame(out.astype(np.int16), frame.hotspot)

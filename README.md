@@ -86,6 +86,7 @@ tools/aom/farmland.py    farms, which are terrain: Minecraft farmland and wheat 
 tools/aom/interface.py   the screen panels repainted: planks, inventory grey, slots and item icons
 tools/aom/menu.py        the main menu: a block village at night, every button a Minecraft thing in its place
 tools/aom/screens.py     the other screens: found by their screen files, redrawn as the deepslate hall
+tools/aom/loadscreen.py  the loading screen: a floating block island under the logo, in a palette of its own
 tools/aom/props.py       renders buildings and scenery in the original sprite's frame layout
 tools/aom/slp.py         SLP 2.0N sprite encoder/decoder
 tools/aom/drs.py         DRS archive reader/writer

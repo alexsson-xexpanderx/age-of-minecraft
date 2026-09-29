@@ -512,6 +512,14 @@ def test_full_build(tmp: Path):
     assert out.get(50149) is None and out.get(50700) is None  # a picture it doesn't know, and an icon
     assert "screen picture 50149 is not the one this build knows" in report
     assert "   50163  800x600   Minecraft style" in report
+    # the loading screen: a title screen in a palette of its own, the Windows colours kept where they were
+    from aom.palette import parse_jasc as read_palette
+    old_pal, new_pal = read_palette(fake_palette()), read_palette(out.get(50563, "bina"))
+    assert len(new_pal) == 256 and not np.array_equal(old_pal, new_pal)
+    assert np.array_equal(new_pal[:10], old_pal[:10]) and np.array_equal(new_pal[246:], old_pal[246:])
+    loading = slp.decode(out.get(50163))[0].pixels
+    assert loading.min() >= 10 and loading.max() <= 245 and len(np.unique(loading)) > 150
+    assert "loading screen: a Minecraft title screen, with its own palette 50563" in report
     banners = slp.decode(out.get(50762))  # the flags: banners a bit bigger, with a dark stripe for the name
     up, down, wider = screens.BANNER_GROW
     assert [f.pixels.shape for f in banners] == [(a + up + down, b + wider) for a, b in

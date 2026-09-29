@@ -34,7 +34,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from aom import farmland, interface, menu, screens, slp  # noqa: E402
+from aom import farmland, interface, loadscreen, menu, screens, slp  # noqa: E402
 from aom.datfile import Graphic, Terrain, read_graphics, read_terrains  # noqa: E402
 from aom.drs import Drs  # noqa: E402
 from aom.export import blank, render_frames  # noqa: E402
@@ -504,6 +504,7 @@ def main(argv=None) -> int:
     # the panels at the top and bottom of the screen, one picture per civilisation and screen size
     screen_files, screen_pictures = game.screens()
     panels: list[tuple[int, tuple[int, int]]] = []
+    loading = None
     if only is None or "interface" in only:
         for slp_id, size, data, big in interface.panels(game.original):
             jobs.append(("interface", slp_id, data, big))
@@ -528,6 +529,9 @@ def main(argv=None) -> int:
             if palettes:
                 jobs.append(("screen", sid, data, palettes))
                 panels.append((sid, tuple(slp.info(data).sizes[0][:2])))
+        loading = loading_plan(game, screen_files, log)
+        if loading:
+            panels.append((screens.LOADING, (loadscreen.W, loadscreen.H)))
 
     target_slps = {j[1] for j in jobs}
     blanks = {} if only else {s: why for s, why in BLANK}
@@ -559,6 +563,13 @@ def main(argv=None) -> int:
                 print(f"  rendered {n}/{len(jobs)} sprites ({time.time() - started:.0f}s)")
     for s in blanks:
         rendered[s] = blank(slp.info(game.original(s)).num_frames)
+    if only is None or "interface" in only:
+        if loading:
+            try:
+                rendered[screens.LOADING] = draw_loading(game, *loading, log)
+            except Exception:  # it keeps its look
+                failed.append((screens.LOADING, traceback.format_exc()))
+                log(f"  could not draw the loading screen; keeping the original. Details:\n{failed[-1][1]}")
 
     for slp_id, data in rendered.items():  # never ship a sprite whose frame count differs from the original
         want = created[slp_id] if slp_id in created else slp.info(game.original(slp_id)).num_frames
@@ -600,6 +611,33 @@ def main(argv=None) -> int:
             log(f"  {NAME}'s own exe needs UserPatch's SetupAoC.exe in your game folder; until it is there the")
             log(f"  shortcut starts it with age2_x1.exe GAME={MOD}. Your normal game is not changed.")
     return 0
+
+
+def loading_plan(game: Game, screen_files, log) -> Optional[tuple[bytes, int, np.ndarray]]:
+    """The loading screen's picture, palette id and palette, if they are the ones this build knows."""
+    data = game.original(screens.LOADING)
+    ids = screens.palette_ids(screens.LOADING, screen_files)
+    raw = game.data_file(ids[0]) if ids and ids[0] != screens.MAIN_PALETTE else None
+    try:
+        sizes = slp.info(data).sizes if data else []
+    except (ValueError, IndexError):
+        sizes = []
+    if data is None or raw is None:
+        return None
+    if [s[:2] for s in sizes] != [(loadscreen.W, loadscreen.H)]:
+        log(f"loading screen: picture {screens.LOADING} is not the one this build knows; it keeps its look")
+        return None
+    return data, ids[0], parse_jasc(raw)
+
+
+def draw_loading(game: Game, data: bytes, pal_id: int, palette: np.ndarray, log) -> bytes:
+    """The Minecraft loading screen, and its own palette (only this screen uses it) in every archive that has it."""
+    picture, pal = loadscreen.encode(data, palette)
+    for _, drs in game._searched():
+        if pal_id in drs.ids("bina"):
+            drs.put(pal_id, loadscreen.jasc(pal), "bina")
+    log(f"loading screen: a Minecraft title screen, with its own palette {pal_id}")
+    return picture
 
 
 def find_setup(root: Path) -> Optional[Path]:

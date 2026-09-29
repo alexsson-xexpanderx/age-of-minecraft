@@ -210,8 +210,12 @@ can be read, with straight edges and Minecraft's light and dark bevel.
 Everything around the windows of one picture is one material, never a mix:
 deepslate tiles, or dark oak planks for the campaigns' dialogues and the
 achievements (their dark tabs would be lost on deepslate). The history book gets two grey pages, with its list of topics sunk in.
-The loading screen is Minecraft's dark dirt with the block logo in grey stone
-(its palette has greys, not gold or green).
+The loading screen is a Minecraft title screen: a blue sky with blocky clouds
+and a square sun, a floating island of blocks with a pond, oak trees, flowers
+and a little house, the gold and grass block logo with a dark shadow, and a
+tilted yellow splash, "Also try Age of Empires!". Only this screen uses its
+palette, which was nearly all greys, so it gets a palette of its own made from
+the new picture (the Windows colours stay where they were).
 
 The achievements, where the game writes white titles and every player's scores
 in their colour, are a dark grey window (Minecraft's `#373737`), and so are the

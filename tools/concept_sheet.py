@@ -625,7 +625,8 @@ def screens_sheet(out: Path) -> None:
         return Image.fromarray(v)
 
     rows = [[view(rgb, drawn), view(screens.hall(rgb, drawn), drawn)] for rgb, drawn in pics]
-    rows.append([view(screens.loading((600, 800)), np.ones((600, 800), bool))])
+    from aom import loadscreen
+    rows.append([view(loadscreen.picture(), np.ones((loadscreen.H, loadscreen.W), bool))])
     width = max(sum(im.width for im in r) + pad * (len(r) - 1) for r in rows)
     canvas = Image.new("RGB", (width, head + sum(gap + r[0].height for r in rows)), PAPER)
     d = ImageDraw.Draw(canvas)

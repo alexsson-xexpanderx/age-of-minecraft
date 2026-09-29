@@ -76,6 +76,9 @@ putting `tools/` on `sys.path`.
    - A picture listed by screens with very different palettes only looks right in one: `screens.intended` picks
      it (neighbouring pixels most alike) and drops palettes too different to share colours with. The PNGs in
      `screen_originals/` use the first screen's palette, so some of them show scrambled colours.
+   - The loading screen (50163) is `loadscreen.py`'s title screen. Its palette (50563) is used by that screen alone,
+     so the build writes a new one made from the picture (`loadscreen.palette`, median cut; indices 0-9 and 246-255,
+     the Windows colours, kept) as a "bina" entry next to it (`draw_loading`, after the render pool).
    - `terrain.drs` and `interfac.drs` are searched by `Game.original`/`holders` (`Game._searched`) but kept out of
      `Game.archives`, so Pac-Man's icon and sound code sees exactly the archives it always did.
 3. `Game.layout()` takes each sprite's frames per angle, angle count and mirroring from the `.dat`, falling back

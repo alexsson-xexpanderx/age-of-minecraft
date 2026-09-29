@@ -195,7 +195,6 @@ def compass() -> np.ndarray:
 
 
 LOGO = (("AGE OF", "gold_block", None, 2), ("MINECRAFT", "cobblestone", "grass_block", 3))  # text, block, top, depth
-STONE_LOGO = (("AGE OF", "smooth_stone", None, 2), ("MINECRAFT", "cobblestone", "stone", 3))  # grey only
 
 
 @lru_cache(maxsize=None)
