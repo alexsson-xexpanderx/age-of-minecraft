@@ -525,7 +525,11 @@ def stand_in_panel(w: int = 1280, h: int = 1024) -> tuple[np.ndarray, np.ndarray
     rgb[top:], drawn[top:] = carved(h - top, w, (0.42, 0.28, 0.16)), True
     rgb[top:top + 12] = carved(12, w, (0.55, 0.38, 0.2))
     rgb[top + 24:h - 14, 15:330] = carved(h - 14 - top - 24, 315, (0.3, 0.2, 0.12))
+    rgb[top + 16:h - 8, 344:846] = (0.66, 0.55, 0.40)  # the parchment's shaded border, where the name is written
     rgb[top + 24:h - 14, 350:840] = np.clip(np.array((0.86, 0.78, 0.6)) + rng.normal(0, 0.03, (180, 490, 1)), 0, 1)
+    for x in range(420, 800, 130):
+        rgb[top + 16:top + 34, x:x + 14] = carved(18, 14, (0.3, 0.2, 0.12))  # tears in its top edge
+    rgb[top + 19:top + 25, 360:420] = (0.05, 0.05, 0.05)  # the unit's name, as the game writes it
     rgb[top + 24:h - 14, 880:w - 20] = (0.05, 0.05, 0.06)
     return rgb, drawn
 

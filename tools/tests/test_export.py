@@ -169,6 +169,7 @@ def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
     allowed = [i for i in range(256) if not (16 <= i < 144 and i % 16 < 8)]  # not the team colours
     light, dark = max(allowed, key=lambda i: lum[i]), min(allowed, key=lambda i: lum[i])
     frame = min(allowed, key=lambda i: abs(lum[i] - 0.35))
+    shaded = min(allowed, key=lambda i: abs(lum[i] - 0.55))
     px = np.full((h, w), slp.TRANSPARENT, np.int16)
     px[:32] = frame
     rng = np.random.default_rng(4)
@@ -176,7 +177,9 @@ def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
         px[y:y + 17, x:x + 26] = rng.choice(allowed[100:140], (17, 26))
     top = h - 218
     px[top:] = frame
+    px[top + 16:h - 8, w // 4 - 6:w * 2 // 3 + 6] = shaded  # the parchment's shaded border: the name is on it
     px[top + 24:h - 14, w // 4:w * 2 // 3] = light
+    px[top + 16:top + 36, w // 2:w // 2 + 20] = frame  # a tear in its top edge
     px[top + 24:h - 14, w * 2 // 3 + 30:w - 20] = dark
     return slp.encode([slp.SlpFrame(px, (0, 0))])
 
@@ -444,7 +447,9 @@ def test_full_build(tmp: Path):
     quant = Quantiser(parse_jasc(fake_palette()))
     new, old = slp.decode(ui.get(51141))[0].pixels, slp.decode(ui_before.get(51141))[0].pixels
     assert new.shape == old.shape and np.array_equal(new < 0, old < 0)
-    assert new[900, 600] == quant.indices(np.array([[198, 198, 198]]))[0]  # parchment -> inventory grey
+    grey = quant.indices(np.array([[198, 198, 198]]))[0]
+    assert new[900, 600] == grey  # parchment -> inventory grey
+    assert new[806 + 21, 400] == grey and new[806 + 30, 650] == grey  # its shaded border and the tear, too
     assert new[900, 1100] == quant.indices(np.array([[139, 139, 139]]))[0]  # the minimap's dark -> a slot
     assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
     new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels

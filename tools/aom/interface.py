@@ -7,8 +7,9 @@ widescreen panels from the same pictures.
 
 Each picture is repainted in the Minecraft style, every pixel keeping its place:
 
-* the parchment the game writes on (large light areas) becomes the grey of Minecraft's inventory, with its
-  black edge, white bevel at the top left and dark bevel at the bottom right;
+* the parchment the game writes on (large light areas, with their shaded border) becomes the grey of Minecraft's
+  inventory, with a straight top edge, its black edge, white bevel at the top left and dark bevel at the bottom
+  right;
 * large dark areas become inventory slots, sunk in;
 * everything else, the carved frames, becomes planks, as dark or light as the original frame was, so the
   game's white and black text stays readable on it;
@@ -91,6 +92,29 @@ def _shrink(m: np.ndarray, r: int) -> np.ndarray:
     return ~_grow(~m, r)
 
 
+def _grow_across(m: np.ndarray, r: int) -> np.ndarray:
+    out = m.copy()
+    for d in range(1, r + 1):
+        out |= _shift(m, 0, d) | _shift(m, 0, -d)
+    return out
+
+
+def _paper(lum: np.ndarray, opaque: np.ndarray) -> np.ndarray:
+    """The parchment the game writes on: its light middle, plus the shaded parchment around it (up to 12 px; the
+    unit's name is written on its top border), with the tears in its top edge filled so the panel is straight."""
+    paper = _grow(_shrink(opaque & (lum > 0.62), 3), 3)
+    shaded = opaque & (lum > 0.45)
+    for _ in range(12):
+        paper |= _grow(paper, 1) & shaded
+    paper = _grow(_shrink(paper, 2), 2)  # not the frame's highlights next to it
+    bridged = ~_grow_across(~_grow_across(paper, 48), 48)  # gaps up to 96 px wide...
+    above = np.zeros_like(paper)
+    for d in range(1, 41):
+        above |= _shift(paper, -d, 0)  # ...right above the parchment: tears, not the frame between two panels
+    paper |= bridged & above & opaque
+    return _shrink(_grow(paper, 6), 6) & opaque  # the game's letters and logo on it
+
+
 def _near_edge(m: np.ndarray, r: int, sides: str) -> np.ndarray:
     """Pixels of m within r pixels of m's top/left ("tl") or bottom/right ("br") edge."""
     s = 1 if sides == "tl" else -1
@@ -132,7 +156,7 @@ def _bevel(rgb: np.ndarray, m: np.ndarray, fill: str, tl: str, br: str, edge: Op
 def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int, int]]]) -> np.ndarray:
     """A panel picture (RGB 0..1) in the Minecraft style; `icons` are the top left corners of the resource icons."""
     lum = rgb @ LUMA
-    paper = _shrink(_grow(_grow(_shrink(opaque & (lum > 0.62), 3), 3), 6), 6) & opaque
+    paper = _paper(lum, opaque)
     slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper
     frame = opaque & ~paper & ~slots
     out = np.zeros_like(rgb)
