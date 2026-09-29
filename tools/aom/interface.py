@@ -7,8 +7,9 @@ widescreen panels from the same pictures.
 
 Each picture is repainted in the Minecraft style, every pixel keeping its place:
 
-* the boxes in the resource bar, where the game writes the amounts in white, become flat and nearly black (the
-  game's own are dark; the player asked for no shading, and darker, so the white stands out);
+* the resource bar gets one fixed layout: each resource's item in a 16x16 square, then 2 pixels on, the box the
+  game writes the amount in, flat and nearly black (the player asked for no shading, and darker, so the white
+  stands out), a five-digit amount in its middle; planks all around;
 * the parchment the game writes on (large light areas, with their shaded border) becomes the grey of Minecraft's
   inventory, with a straight top edge, its black edge, white bevel at the top left and dark bevel at the bottom
   right;
@@ -19,9 +20,12 @@ Each picture is repainted in the Minecraft style, every pixel keeping its place:
 * the five resource icons in the top bar (wood, food, gold, stone, population) become an oak log, a leg of meat, a
   gold ingot, cobblestone and a villager's face.
 
-The icons sit at fixed places in the 1280x1024 pictures (openage's hardcoded/interface.py). In the smaller
-pictures they are found by matching the same civilisation's 1280x1024 icons; a picture whose icons can't be
-found is left as it was, so no resource ever loses its icon.
+Every panel picture, at every size, has its five icons every 77 pixels from x 8, each followed by a dark box
+that ends 69 pixels after the icon's left edge; only the rows differ (4-21 at 800x600 and 1024x768, 10-27 at
+1280x1024). The build finds those dark boxes (`places`) and lays the bar out on them; a picture whose boxes are
+not there is left as it was, so no resource ever loses its icon. The game starts a five-digit amount about 23
+pixels after the icon and ends it about 65 after (measured on photos of the game): the box, 20 to 68, has it in
+its middle.
 """
 from __future__ import annotations
 
@@ -38,8 +42,9 @@ from .textures import Painter, parse
 
 BASE, STRIDE = 51100, 20
 SCREENS = ((800, 600), (1024, 768), (1280, 1024))
-ICON_BOXES = [(8, 10), (85, 10), (162, 10), (239, 10), (316, 10)]  # top left of each 26x17 icon, 1280x1024
-ICON_W, ICON_H = 26, 17
+FIRST, STEP = 8, 77  # the resource bar: an icon every 77 pixels from x 8, at every screen size
+CELL = 16  # each resource's item is drawn in a 16x16 square, 2 pixels from the icon's left edge
+BOX = (20, 68)  # the box the game writes the amount in, from the icon's left edge
 RESOURCES = ("wood", "food", "gold", "stone", "population")
 GUI = {"panel": "#c6c6c6", "light": "#ffffff", "shade": "#555555", "edge": "#000000",
        "slot": "#8b8b8b", "slot_light": "#ffffff", "slot_shade": "#373737",
@@ -49,8 +54,8 @@ LUMA = np.array([0.299, 0.587, 0.114])
 PIXEL = 2  # screen pixels per Minecraft pixel, like Minecraft's GUI scale 2
 
 
-def panels(get: Callable[[int], Optional[bytes]]) -> list[tuple[int, tuple[int, int], bytes, Optional[bytes]]]:
-    """(SLP id, screen size, picture, the same civilisation's 1280x1024 picture) of every panel picture."""
+def panels(get: Callable[[int], Optional[bytes]]) -> list[tuple[int, tuple[int, int], bytes]]:
+    """(SLP id, screen size, picture) of every panel picture."""
     found = {}
     for sid in range(BASE + 1, BASE + STRIDE * len(SCREENS) + 1):
         data = get(sid)
@@ -62,11 +67,7 @@ def panels(get: Callable[[int], Optional[bytes]]) -> list[tuple[int, tuple[int, 
             continue
         if (w, h) in SCREENS:
             found[sid] = ((w, h), data)
-    out = []
-    for sid, (size, data) in sorted(found.items()):
-        big = found.get(BASE + STRIDE * 2 + (sid - BASE - 1) % STRIDE + 1)
-        out.append((sid, size, data, big[1] if big and big[0] == SCREENS[-1] else None))
-    return out
+    return [(sid, size, data) for sid, (size, data) in sorted(found.items())]
 
 
 # --------------------------------------------------------------------------- masks
@@ -147,59 +148,31 @@ def _label(m: np.ndarray) -> tuple[np.ndarray, int]:
     return lab, len(ids)
 
 
-def _drawn(icons: Optional[list[tuple[int, int]]]) -> list[tuple[int, int]]:
-    """Where each resource icon's item is drawn, left and right: narrower than the original's icon box."""
-    out = []
-    for (x, _), what in zip(icons or [], RESOURCES):
-        iw = item(what).shape[1]
-        out.append((x + (ICON_W - iw) // 2, x + (ICON_W - iw) // 2 + iw))
-    return out
+def _longest_run(rows: np.ndarray) -> tuple[int, int]:
+    """The longest stretch of True in a column of flags: (first, last + 1), or (0, 0)."""
+    best, start = (0, 0), None
+    for i, on in enumerate(list(rows) + [False]):
+        if on and start is None:
+            start = i
+        elif not on and start is not None:
+            if i - start > best[1] - best[0]:
+                best = (start, i)
+            start = None
+    return best
 
 
-def _widen(boxes: np.ndarray, icons: Optional[list[tuple[int, int]]], more: int = 12, gap: int = 1) -> np.ndarray:
-    """Each box as wide as it can be: on the left up to `gap` pixels from the item drawn before it (the game starts
-    its numbers close to the icon), on the right at most `more` pixels wider and `gap` from the next item or box.
-    Room for the game's numbers."""
-    lab, n = _label(boxes)
-    spans = []
-    for k in range(1, n + 1):
-        ys, xs = np.nonzero(lab == k)
-        spans.append((xs.min(), xs.max() + 1, ys.min(), ys.max() + 1))
-    drawn = _drawn(icons)
-    starts = sorted([a for a, _ in drawn] + [x0 for x0, _, _, _ in spans])
-    ends = sorted([b for _, b in drawn] + [x1 for _, x1, _, _ in spans])
-    out = boxes.copy()
-    for x0, x1, y0, y1 in spans:
-        right = min([x1 + more] + [x - gap for x in starts if x >= x1])
-        left = max([x0 - 3 * more] + [x + gap for x in ends if x <= x0])
-        out[y0:y1, max(0, left):max(x1, right)] = True
-    return out
-
-
-def _count_boxes(lum: np.ndarray, opaque: np.ndarray, bar: np.ndarray,
-                 icons: Optional[list[tuple[int, int]]]) -> np.ndarray:
-    """The boxes the game writes the amounts in: in the resource bar, right after each icon (up to the next one),
-    each on its own. The game's own are dark; a light one counts too."""
-    out = np.zeros_like(opaque)
-    icons = sorted(icons or [])
-    if not icons:
-        return out
-    step = (icons[-1][0] - icons[0][0]) / max(1, len(icons) - 1) or 80
-    for tone in (opaque & bar & (lum < 0.14), opaque & bar & (lum > 0.5)):
-        for x, y in icons:  # the icons themselves (gold is bright) are not boxes
-            tone[max(0, y - 2):y + ICON_H + 2, max(0, x - 2):x + ICON_W + 2] = False
-        lab, n = _label(_grow(_shrink(tone, 2), 2))
-        for k in range(1, n + 1):
-            ys, xs = np.nonzero(lab == k)
-            if len(ys) < 40:
-                continue
-            y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-            for i, (x, y) in enumerate(icons):
-                after = x + ICON_W
-                end = icons[i + 1][0] + 2 if i + 1 < len(icons) else x + step * 1.2
-                if y0 < y + ICON_H and y1 > y and x0 <= after + 24 and after + 12 <= x1 <= end:
-                    out[y0:y1, max(x0, after + 2):x1] = True
-    return out
+def places(lum: np.ndarray, opaque: np.ndarray, bar: np.ndarray) -> Optional[tuple[list[int], int, int]]:
+    """The five icons' left edges and the rows of the game's dark boxes after them (where it writes the amounts),
+    or None if this picture's bar is not laid out like every known one."""
+    dark = opaque & bar & (lum < 0.14)
+    xs = [FIRST + STEP * k for k in range(5)]
+    if xs[-1] + 66 > dark.shape[1]:
+        return None
+    runs = [_longest_run(dark[:, x + 30:x + 66].mean(1) > 0.8) for x in xs]
+    top, bottom = (int(np.median([r[i] for r in runs])) for i in (0, 1))
+    if bottom - top < 12 or any(abs(a - top) > 2 or abs(b - bottom) > 2 for a, b in runs):
+        return None
+    return xs, top, bottom
 
 
 def _top_bar(opaque: np.ndarray) -> np.ndarray:
@@ -253,13 +226,22 @@ def _bevel(rgb: np.ndarray, m: np.ndarray, fill: str, tl: str, br: str, edge: Op
         rgb[ring] = parse(edge)[:3]
 
 
-def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int, int]]]) -> np.ndarray:
-    """A panel picture (RGB 0..1) in the Minecraft style; `icons` are the top left corners of the resource icons."""
+def restyle(rgb: np.ndarray, opaque: np.ndarray) -> np.ndarray:
+    """A panel picture (RGB 0..1) in the Minecraft style; raises ValueError if its resource bar is not laid out
+    like every known one (it then keeps its look)."""
     lum = rgb @ LUMA
     bar = _top_bar(opaque)
+    found = places(lum, opaque, bar)
+    if found is None:
+        raise ValueError(f"the resource bar of this {rgb.shape[1]}x{rgb.shape[0]} panel is not the one this build "
+                         "knows; it keeps its original look")
+    xs, top, bottom = found
     paper = _paper(lum, opaque) & ~bar  # the parchment below the resource bar (its tears are filled)
-    counts = _widen(_count_boxes(lum, opaque, bar, icons), icons) & bar & opaque  # the game writes amounts there
-    slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper & ~counts
+    counts = np.zeros_like(opaque)
+    for x in xs:  # the game writes the amounts there
+        counts[top:bottom, x + BOX[0]:x + BOX[1]] = True
+    counts &= opaque
+    slots = _shrink(_grow(_grow(_shrink(opaque & (lum < 0.14), 3), 3), 2), 2) & opaque & ~paper & ~bar
     frame = opaque & ~paper & ~slots & ~counts
     out = np.zeros_like(rgb)
     if frame.any():
@@ -268,58 +250,30 @@ def restyle(rgb: np.ndarray, opaque: np.ndarray, icons: Optional[list[tuple[int,
     _bevel(out, paper, GUI["panel"], GUI["light"], GUI["shade"], GUI["edge"])
     out[counts] = parse(GUI["count"])[:3]  # flat, no shading
     out[opaque & ~_shrink(opaque, PIXEL)] = parse(GUI["edge"])[:3]  # a black edge along the game view
-    for (x, y), what in zip(icons or [], RESOURCES):
+    for x, what in zip(xs, RESOURCES):  # each in the same square: all in line, all as far from their box
         icon = item(what)
         ih, iw = icon.shape[:2]
-        x0, y0 = x + (ICON_W - iw) // 2, y + (ICON_H - ih) // 2
+        x0 = x + BOX[0] - 2 - CELL + (CELL - iw) // 2
+        y0 = top + (bottom - top - CELL) // 2 + (CELL - ih) // 2
         region = out[y0:y0 + ih, x0:x0 + iw]
         solid = (icon[..., 3] > 0) & opaque[y0:y0 + ih, x0:x0 + iw]
         region[solid] = icon[..., :3][solid]
     return out
 
 
-def repaint(codes: np.ndarray, palette: np.ndarray, quant: Quantiser,
-            icons: Optional[list[tuple[int, int]]]) -> np.ndarray:
+def repaint(codes: np.ndarray, palette: np.ndarray, quant: Quantiser) -> np.ndarray:
     """`restyle` for SLP pixel codes: in and out in the game's palette."""
     opaque = (codes >= 0) & (codes < 256)
-    out = restyle(palette[np.clip(codes, 0, 255)].astype(np.float64) / 255, opaque, icons)
+    out = restyle(palette[np.clip(codes, 0, 255)].astype(np.float64) / 255, opaque)
     new = codes.copy()
     new[opaque] = quant.indices(np.clip(out[opaque] * 255 + 0.5, 0, 255).astype(np.int64))
     return new
 
 
-def find_icons(codes: np.ndarray, big: np.ndarray) -> Optional[list[tuple[int, int]]]:
-    """Where the 1280x1024 picture's resource icons are in a smaller picture (its top 64 rows)."""
-    from numpy.lib.stride_tricks import sliding_window_view
-    top = codes[:64]
-    if top.shape[0] < ICON_H or top.shape[1] < ICON_W:
-        return None
-    windows = sliding_window_view(top, (ICON_H, ICON_W))
-    found = []
-    for x, y in ICON_BOXES:
-        icon = big[y:y + ICON_H, x:x + ICON_W]
-        score = (windows == icon).mean(axis=(2, 3))
-        yy, xx = np.unravel_index(score.argmax(), score.shape)
-        if score[yy, xx] < 0.9:
-            return None
-        found.append((int(xx), int(yy)))
-    return found
-
-
-def encode(original: bytes, big: Optional[bytes], palette: np.ndarray, quant: Quantiser) -> bytes:
-    """The repainted picture, same frames and sizes; raises ValueError if its resource icons can't be found."""
+def encode(original: bytes, palette: np.ndarray, quant: Quantiser) -> bytes:
+    """The repainted picture, same frames and sizes; raises ValueError if its resource bar is not the known one."""
     frames = slp.decode(original)
-    out = []
-    for f in frames:
-        size = (f.pixels.shape[1], f.pixels.shape[0])
-        if size == SCREENS[-1]:
-            icons = ICON_BOXES
-        else:
-            icons = find_icons(f.pixels, slp.decode(big)[0].pixels) if big else None
-            if icons is None:
-                raise ValueError(f"the resource icons of this {size[0]}x{size[1]} panel were not found; "
-                                 "it keeps its original look")
-        out.append(slp.SlpFrame(repaint(f.pixels, palette, quant, icons), f.hotspot))
+    out = [slp.SlpFrame(repaint(f.pixels, palette, quant), f.hotspot) for f in frames]
     return slp.encode(out, props=slp.frame_props(original))
 
 
@@ -358,7 +312,7 @@ ART = {
 }
 
 
-VILLAGER = ["ssssssss", "ssssssss", "sbbbbbbs", "swgssgws", "sssnnsss", "sssnnsss", "ssmnnmss", "ssssssss"]
+VILLAGER = ["sssssss", "sbbbbbs", "swgsgws", "sssnsss", "sssnsss", "ssmnmss", "sssssss"]  # 16x16 doubled, edged
 
 
 def _doubled(rows: list[str]) -> list[str]:
@@ -384,7 +338,7 @@ def item(what: str) -> np.ndarray:
         return tex[..., :4]
     s = V.Structure(what, origin=(0.5, 0.5))
     s.set(0, 0, 0, "oak_log" if what == "wood" else "cobblestone")
-    root, scale = s.part(V.all_blocks()), 0.62
+    root, scale = s.part(V.all_blocks()), 0.58  # a block, no bigger than the 16x16 square
     cam = fit_camera(root, V.BUILDING_HEADING, scale=scale, pad=1)
     frame = render(root, V.BUILDING_HEADING, camera=cam, shadow=False)
     rgba = frame.to_rgba().astype(np.float64) / 255

@@ -59,8 +59,9 @@ putting `tools/` on `sys.path`.
      ids. Their textures in `terrain.drs` are redrawn one diamond tile per frame.
    - The screen panels are full-screen pictures in `interfac.drs` (51101–51160, one per civ and screen size).
      `interface.py` repaints them by brightness class and puts item icons over the resource icons.
-     The boxes the game writes the amounts in are dark in the real game (`_count_boxes`: right of each icon) and
-     become flat near-black, no bevel (the player asked).
+     The resource bar has one fixed layout in every picture (`interface.places`: an icon every 77 px from x 8, the
+     game's dark amount box ending 69 px after it); each item goes in a 16x16 square, and a flat near-black box
+     (`BOX`, 20-68 from the icon) holds the amount.
    - The main menu (`interfac.drs` 50189) is redrawn by `menu.py`: a new 800x600 picture, and each button's
      pictures cut from it at the original places (`menu.BUTTONS`), with the original's glow colour. Only a menu
      with exactly the known picture sizes (`menu.known`) is replaced. The Single Player menu's buttons get solid plates in the picture
@@ -77,9 +78,13 @@ putting `tools/` on `sys.path`.
      achievements' flags (`screens.FLAGS`, no screen file names them: `SHOWN_WITH` gives the achievements' palette)
      become banners coloured from each flag's own pixels, as that palette lacks Minecraft's wool colours. Its tabs
      (`TABS`, 12 pictures: each tab not chosen / chosen, told apart by the dark edge at their top) lose their top
-     rows, which ran under the Play Again and Main Menu buttons; the team marks (`TEAMS`) become numbered shields,
-     and `team_copies` redraws copies and near copies (85% of pixels) of them in any archive (the game still showed
-     the original; the report's TEAM MARKS section lists every archive holding them).
+     rows, which ran under the Play Again and Main Menu buttons; the team marks (`TEAMS`: teams 1-4, then the small
+     "no team" one; the game writes the number in each shield's dark middle) become Minecraft shields in each team's
+     pattern (`TEAM_PATTERNS`) with that middle kept dark, and `team_copies` redraws copies and near copies (85% of
+     pixels) in any archive (the report's TEAM MARKS section lists every archive holding them).
+   - The mod's XML points UserPatch at the game's own strings: `langId` 10230 (civ names, Britons 10231),
+     `descId` 20150, `aiNameOffset` 140 (the Conquerors civs' computer names at 4800); WololoKingdoms' values are
+     for its own language file and left those computer players nameless.
      The game writes names in white, black or the player's colour, so the banners' stripe is a middle grey; the
      scores are in player colours, so they sit on a light panel (`LAYOUTS` "panels") in the dark window.
    - A picture listed by screens with very different palettes only looks right in one: `screens.intended` picks

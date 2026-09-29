@@ -156,7 +156,7 @@ widescreen panels from the same pictures. The build repaints each one, every pix
 | AoE2 | Minecraft |
 |---|---|
 | Parchment (where the game writes the unit's details) | the grey of Minecraft's inventory, with a black edge, a white bevel at the top left and a dark one at the bottom right |
-| The resource bar's boxes (the game writes the amounts in white) | flat and nearly black, no shading, so the white numbers stand out; wide enough that the numbers stay inside, from right after the icon |
+| The resource bar (the game writes the amounts in white) | one layout in every picture: each item the same size, in line, and 2 pixels after it a flat, nearly black box with the amount in its middle |
 | Dark areas (behind the minimap) | an inventory slot, sunk in |
 | Carved frames | planks, as dark or light as the original frame, so the game's text stays readable |
 | Resource icons: wood, food, gold, stone, population | an oak log, a leg of meat, a gold ingot, cobblestone, a villager's face |
@@ -240,9 +240,13 @@ are written on become Minecraft banners in the flag's own colour, on a dark oak
 pole, a little taller and wider than the flags, with a grey stripe across
 them that holds a long name on two lines. The game writes the name in white,
 in black or in the player's colour, and all three show on a middle grey. The team
-marks are Minecraft shields with the team's number, and a dash for no team;
-any copy of them in the game's files, or near copy, is redrawn too, and the
-build report lists where they are (TEAM MARKS).
+marks are Minecraft shields in each team's pattern (white; white and red;
+red and black under white; quartered), with the dark middle the game writes
+the team's number in, and a dash for no team.
+
+The mod also tells UserPatch where the game's own texts are, so every
+civilisation keeps its name and every computer player gets a name (they used
+to come out blank for the Spanish, Aztecs, Mayans, Huns and Koreans).
 
 Each picture is drawn in the palette of every screen that shows it, keeps its
 size and its see-through parts, and only the pictures the build knows, at

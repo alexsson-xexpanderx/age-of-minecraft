@@ -173,9 +173,9 @@ def fake_panel(w: int, h: int, icons: list[tuple[int, int]]) -> bytes:
     px = np.full((h, w), slp.TRANSPARENT, np.int16)
     px[:32] = frame
     rng = np.random.default_rng(4)
-    for k, (x, y) in enumerate(icons):
+    for k, (x, y) in enumerate(icons):  # as in the game: the dark box the amount is written in, the icon over its start
+        px[y:y + 17, x + 22:x + 69] = dark
         px[y:y + 17, x:x + 26] = rng.choice(allowed[100:140], (17, 26))
-        px[y - 4:y + 20, x + 30:x + 70] = dark  # the dark box the game writes the amount in, in white
     top = h - 218
     px[top:] = frame
     px[top + 16:h - 8, w // 4 - 6:w * 2 // 3 + 6] = shaded  # the parchment's shaded border: the name is on it
@@ -221,14 +221,10 @@ def fake_game(root: Path) -> Path:
     data.mkdir(parents=True)
     interfac = Drs()
     interfac.put(50500, fake_palette(), "bina")
-    boxes = [(8, 10), (85, 10), (162, 10), (239, 10), (316, 10)]
-    interfac.put(51141, fake_panel(1280, 1024, boxes))  # a civilisation's panels at 1280x1024
-    big = slp.decode(interfac.get(51141))[0].pixels
-    mid = slp.decode(fake_panel(1024, 768, []))[0]
-    for x, y in boxes:  # at 1024x768 the same icons sit elsewhere
-        mid.pixels[y - 4:y + 13, x + 3:x + 29] = big[y:y + 17, x:x + 26]
-    interfac.put(51121, slp.encode([mid]))
-    interfac.put(51101, fake_panel(800, 600, []))  # its icons can't be found
+    icons = [8 + 77 * k for k in range(5)]  # every 77 pixels, each followed by the box the game writes in
+    interfac.put(51141, fake_panel(1280, 1024, [(x, 10) for x in icons]))  # a civilisation's panels at 1280x1024
+    interfac.put(51121, fake_panel(1024, 768, [(x, 4) for x in icons]))  # at 1024x768 six rows higher
+    interfac.put(51101, fake_panel(800, 600, []))  # a bar without the boxes: not one the build knows
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
     interfac.put(50189, fake_menu())  # the main menu, and its palette
@@ -256,8 +252,12 @@ def fake_game(root: Path) -> Path:
     for k in range(0, 12, 2):  # not chosen: a dark edge between the sheet above and the tab
         tabs[k].pixels[21:24] = 0
     interfac.put(50765, slp.encode(tabs))
-    marks = [slp.SlpFrame(np.full((21, 37), 70, np.int16), (0, 0))]  # no team, then teams 1 to 4
-    marks += [slp.SlpFrame(np.full((44, 36), 71 + k, np.int16), (0, 0)) for k in range(4)]
+    marks = []  # teams 1 to 4: shields with a dark middle the game writes the number in; then no team
+    for k in range(4):
+        px = np.full((44, 36), 71 + k, np.int16)
+        px[10:24, 11:25] = 0
+        marks.append(slp.SlpFrame(px, (0, 0)))
+    marks.append(slp.SlpFrame(np.full((21, 37), 70, np.int16), (0, -13)))
     interfac.put(50769, slp.encode(marks))
     for pal in (50531, 50532, 50533, 50563):
         interfac.put(pal, fake_palette(), "bina")
@@ -330,7 +330,7 @@ def fake_game(root: Path) -> Path:
     terrain.write(data / "terrain.drs")
     patch = Drs()  # UserPatch's own archive, already holding a sound, and a copy of the "no team" mark
     patch.put(15500, b"RIFF a sound", "wav")
-    patch.put(53300, slp.encode([marks[0], slp.SlpFrame(np.full((10, 10), 5, np.int16), (0, 0))]))
+    patch.put(53300, slp.encode([marks[4], slp.SlpFrame(np.full((10, 10), 5, np.int16), (0, 0))]))
     near = marks[1].pixels.copy()
     near[:3] = 7  # a near copy of team 1's mark
     patch.put(53301, slp.encode([slp.SlpFrame(near, marks[1].hotspot)]))
@@ -431,6 +431,8 @@ def test_full_build(tmp: Path):
     assert build_mod.main(["--game", str(game), "--jobs", "2"]) == 0
     mod = game / "Games" / "age_of_minecraft"
     xml = (game / "Games" / "age_of_minecraft.xml").read_bytes()
+    # the game's own language strings: civ names (Britons 10231), computer names (the Spanish ones at 4800)
+    assert b'langId="10230" descId="20150" aiNameOffset="140"' in xml
     assert xml.startswith(b"\xef\xbb\xbf") and b"<path>age_of_minecraft</path>" in xml and b'id="18" name="korean"' in xml
     assert b'<configuration game="age_of_minecraft">' in xml
     assert b"<name>Age of Minecraft</name>" in xml
@@ -544,10 +546,11 @@ def test_full_build(tmp: Path):
     assert all((tabs[k].pixels[17:20, 40] >= 0).all() for k in range(1, 12, 2))  # a chosen one opens upwards
     assert all((tabs[k].pixels[17:20, 40] == slp.TRANSPARENT).all() for k in range(0, 12, 2))
     marks = slp.decode(out.get(50769))
-    assert len(marks) == 5 and [f.pixels.shape for f in marks] == [(21, 37)] + [(44, 36)] * 4
-    assert len({f.pixels.tobytes() for f in marks[1:]}) == 4  # four numbered shields
+    assert len(marks) == 5 and [f.pixels.shape for f in marks] == [(44, 36)] * 4 + [(21, 37)]
+    assert len({f.pixels.tobytes() for f in marks[:4]}) == 4  # four shields, each in its team's pattern
+    assert all(f.pixels[16, 18] == marks[0].pixels[16, 18] for f in marks[:4])  # all dark in the middle
     copy_before, copy_after = slp.decode(Drs(game / "Data" / "gamedata_x1_p1.drs").get(53300)), slp.decode(out.get(53300))
-    assert np.array_equal(copy_after[0].pixels, marks[0].pixels)  # its copy of the "no team" mark: redrawn the same
+    assert np.array_equal(copy_after[0].pixels, marks[4].pixels)  # its copy of the "no team" mark: redrawn the same
     assert np.array_equal(copy_after[1].pixels, copy_before[1].pixels)  # its other picture: kept
     assert "picture 0 of 53300 is a copy of the team marks (50769): redrawn too" in report
     assert np.array_equal(slp.decode(out.get(53301))[0].pixels, marks[1].pixels)  # a near copy: redrawn too
@@ -610,11 +613,13 @@ def test_full_build(tmp: Path):
     assert new[900, 1100] == quant.indices(np.array([[139, 139, 139]]))[0]  # the minimap's dark -> a slot
     assert not np.array_equal(new[10:27, 8:34], old[10:27, 8:34])  # a Minecraft log for wood
     box = quant.indices(np.array([[30, 30, 30]]))[0]
-    assert (new[6:30, 8 + 30:8 + 70] == box).all()  # the amounts' box: flat, nearly black, no shading
+    for x in (8 + 77 * k for k in range(5)):  # each amount's box: flat, nearly black, no shading, all alike
+        assert (new[10:27, x + 20:x + 68] == box).all() and (new[10:27, x + 18:x + 20] != box).all()
     new, old = slp.decode(ui.get(51121))[0].pixels, slp.decode(ui_before.get(51121))[0].pixels
-    assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[6:23, 11:37], old[6:23, 11:37])
-    assert ui.get(51101) is None  # no icons found: it keeps its look
-    assert "INTERFACE PANELS" in report and "Minecraft style" in report and "were not found" in report
+    assert np.array_equal(new < 0, old < 0) and not np.array_equal(new[4:21, 8:26], old[4:21, 8:26])
+    assert (new[4:21, 28:76] == box).all()
+    assert ui.get(51101) is None  # its bar is not the known one: it keeps its look
+    assert "INTERFACE PANELS" in report and "Minecraft style" in report and "is not the one this build knows" in report
     menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu
     assert len(menu_after) == 53 and not np.array_equal(menu_after[0].pixels, menu_before[0].pixels)
     assert all(a.pixels.shape == b.pixels.shape and a.hotspot == b.hotspot for a, b in zip(menu_after, menu_before))

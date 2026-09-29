@@ -521,10 +521,10 @@ def stand_in_panel(w: int = 1280, h: int = 1024) -> tuple[np.ndarray, np.ndarray
     rgb, drawn = np.zeros((h, w, 3)), np.zeros((h, w), bool)
     top = h - 218
     rgb[:32], drawn[:32] = carved(32, w, (0.36, 0.24, 0.14)), True
-    for (x, y), col in zip(interface.ICON_BOXES, ((0.5, 0.3, 0.1), (0.8, 0.2, 0.2), (0.9, 0.75, 0.2),
-                                                  (0.6, 0.6, 0.6), (0.3, 0.4, 0.8))):
-        rgb[y + 3:y + 14, x + 6:x + 20] = col
-        rgb[y - 4:y + 20, x + 30:x + 72] = (0.08, 0.07, 0.06)  # the dark box the game writes the amount in
+    icons = [interface.FIRST + interface.STEP * k for k in range(5)]  # laid out as in the game's own
+    for x, col in zip(icons, ((0.5, 0.3, 0.1), (0.8, 0.2, 0.2), (0.9, 0.75, 0.2), (0.6, 0.6, 0.6), (0.3, 0.4, 0.8))):
+        rgb[10:27, x + 22:x + 69] = (0.03, 0.03, 0.03)  # the dark box the game writes the amount in
+        rgb[13:24, x + 6:x + 20] = col
     rgb[top:], drawn[top:] = carved(h - top, w, (0.42, 0.28, 0.16)), True
     rgb[top:top + 12] = carved(12, w, (0.55, 0.38, 0.2))
     rgb[top + 24:h - 14, 15:330] = carved(h - 14 - top - 24, 315, (0.3, 0.2, 0.12))
@@ -540,7 +540,7 @@ def stand_in_panel(w: int = 1280, h: int = 1024) -> tuple[np.ndarray, np.ndarray
 def interface_sheet(out: Path) -> None:
     """The resource bar and the bottom panel, before and after, on a stand-in for the game's own panel."""
     rgb, drawn = stand_in_panel()
-    after = interface.restyle(rgb, drawn, interface.ICON_BOXES)
+    after = interface.restyle(rgb, drawn)
     top = rgb.shape[0] - 218
 
     def strip(img: np.ndarray) -> np.ndarray:
@@ -553,8 +553,9 @@ def interface_sheet(out: Path) -> None:
     for img in (before_img, after_img):  # the amounts, as the game writes them: white with a black shadow
         pic = Image.fromarray(img)
         d = ImageDraw.Draw(pic)
-        for (x, y), amount in zip(interface.ICON_BOXES, ("40000", "40000", "20000", "10000", "4/5")):
-            d.text((x + 33, y), amount, fill=(255, 255, 255), font=font(12), stroke_width=1, stroke_fill=(0, 0, 0))
+        for k, amount in enumerate(("40000", "40000", "20000", "10000", "4/5")):  # where the game writes them
+            x = interface.FIRST + interface.STEP * k + 23
+            d.text((x, 12), amount, fill=(255, 255, 255), font=font(12), stroke_width=1, stroke_fill=(0, 0, 0))
         img[...] = np.asarray(pic)
     canvas = Image.new("RGB", (before_img.shape[1], head + 2 * (before_img.shape[0] + gap)), PAPER)
     d = ImageDraw.Draw(canvas)

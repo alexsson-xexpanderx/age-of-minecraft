@@ -365,43 +365,62 @@ def tab(rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return out, body
 
 
-DIGITS = {"1": ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
-          "2": [".###.", "#...#", "....#", "..##.", ".#...", "#....", "#####"],
-          "3": [".###.", "#...#", "....#", "..##.", "....#", "#...#", ".###."],
-          "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."]}
+# the teams' shields, as the game's own: white; white and red side by side; a white top over red and black; and
+# quartered white and red. W white, R red, B black wool
+TEAM_PATTERNS = ("W", "WR", "T", "Q")
+WOOL = {"W": "#e9ecec", "R": "#a02722", "B": "#1d1d21"}
 
 
-def team_mark(k: int, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Team mark k (RGB 0..1, and where it is drawn): 0 is no team, a stone dash; 1 to 4 a Minecraft shield (iron
-    rim, white face) with the team's number on it."""
+def _shield(w: int, h: int, x0: int, y0: int, x1: int, y1: int, straight: float = 0.45) -> np.ndarray:
+    """A shield shape in whole 2-pixel blocks: straight sides (the top `straight` of it), then narrowing to a point
+    at the bottom. Kept a pixel inside the picture, so its edge shows all round."""
+    x0, y0, x1, y1 = max(x0, 1), max(y0, 1), min(x1, w - 1), min(y1, h - 1)
+    ys, xs = np.mgrid[0:h, 0:w]
+    u, v = (xs - x0) // 2, (ys - y0) // 2
+    bw, bh = (x1 - x0) // 2, (y1 - y0) // 2
+    point = np.maximum(0, v - bh * straight) * (bw / 2) / max(1, bh * (1 - straight))
+    return (u >= 0) & (u < bw) & (v >= 0) & (v < bh) & (u >= point) & (u < bw - point)
+
+
+def team_mark(k: int, rgb: np.ndarray, opaque: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Team mark k (RGB 0..1, and where it is drawn): the small one (no team) a dark dash; the shields Minecraft
+    shields in their team's pattern (as the game's own, in flat wool colours) with an iron rim, and a dark middle
+    where the game's own is, as the game writes the team's number there in white."""
     h, w = opaque.shape
     out, drawn = np.zeros((h, w, 3)), np.zeros((h, w), bool)
-    if k == 0:  # dark, so it shows on the light panel
+    if h < 30:  # no team: a dash, dark so it shows on the light panel
         y0, x0 = h // 2 - 3, w // 2 - 9
         drawn[y0:y0 + 6, x0:x0 + 18] = True
         out[drawn] = 0.0
         out[y0 + 1:y0 + 5, x0 + 1:x0 + 17] = colour("#3a3a3a")[:3]
         out[y0 + 1:y0 + 2, x0 + 1:x0 + 17] = colour("#5c5c5c")[:3]
         return out, drawn
-    sw, sh = min(w, 32) // 2 * 2, min(h, 42) // 2 * 2  # the shield, whole 2-pixel blocks
-    x0, y0 = (w - sw) // 2, (h - sh) // 2
-    ys, xs = np.mgrid[0:h, 0:w]
-    u, v = (xs - x0) // 2, (ys - y0) // 2  # in blocks
-    bw, bh = sw // 2, sh // 2
-    point = np.maximum(0, v - (bh - 5)) * 1.2  # the shield narrows to a point at the bottom
-    shape = (u >= 0) & (u < bw) & (v >= 0) & (v < bh) & (u >= point) & (u < bw - point)
-    rim = shape & ~I._shrink(shape, 2)
-    out[shape] = colour("#e8e8e2")[:3]
-    out[shape & (u >= bw // 2)] = colour("#c8c8c2")[:3]  # its right half in shade
-    out[rim] = colour("#7c7c7c")[:3]
-    out[shape & ~I._shrink(shape, 1)] = colour("#2a2a2a")[:3]
-    glyph = DIGITS[str(min(k, 4))]
-    gy, gx = y0 + (sh - 7 * 3) // 2 - 2, x0 + (sw - 5 * 3) // 2
-    for r, row in enumerate(glyph):
-        for c, ch in enumerate(row):
-            if ch == "#":
-                out[gy + 3 * r:gy + 3 * r + 3, gx + 3 * c:gx + 3 * c + 3] = colour("#202020")[:3]
-    return out, shape
+    ys, xs = np.nonzero(I._shrink(opaque, 2))  # the glow around the game's shield is speckled: not this
+    shield = _shield(w, h, xs.min() - 1, ys.min() - 1, xs.max() + 2, ys.max() + 2)
+    ys, xs = np.nonzero(shield)
+    cx, top, bottom = (xs.min() + xs.max() + 1) / 2, ys.min(), ys.max() + 1
+    yy, xx = np.mgrid[0:h, 0:w]
+    left, upper = xx < cx, yy < top + (bottom - top) * 0.4
+    pattern = TEAM_PATTERNS[k % 4]
+    fill = np.full((h, w), "W", object)
+    if pattern == "WR":
+        fill[~left] = "R"
+    elif pattern == "T":
+        fill[:] = np.where(left, "R", "B")
+        fill[yy < top + (bottom - top) * 0.25] = "W"
+    elif pattern == "Q":
+        fill[left ^ upper] = "R"
+    for key, c in WOOL.items():
+        out[shield & (fill == key)] = colour(c)[:3]
+    out[shield & ~I._shrink(shield, 2)] = colour("#7c7c7c")[:3]  # the iron rim
+    out[shield & ~I._shrink(shield, 1)] = colour("#141414")[:3]
+    lab, n = I._label(opaque & (rgb @ I.LUMA < 0.15))
+    mid = lab[int(h * 0.4), w // 2]
+    if mid:  # the game's dark middle, as a small shield of its own
+        my, mx = np.nonzero(lab == mid)
+        inner = _shield(w, h, mx.min() - 1, my.min() - 1, mx.max() + 2, my.max() + 3, 0.7) & I._shrink(shield, 3)
+        out[inner] = colour("#141414")[:3]
+    return out, shield
 
 
 def quantise(rgb: np.ndarray, palettes: list[np.ndarray]) -> np.ndarray:
@@ -449,7 +468,7 @@ def redraw(sid: int, frame: slp.SlpFrame, palettes: list[np.ndarray], k: int = 0
     if sid in (FLAGS, TABS, TEAMS):
         rgb = np.asarray(palettes[0], np.float64)[np.clip(px, 0, 255)][..., :3] / 255
         new, drawn = (banner(rgb, opaque) if sid == FLAGS else tab(rgb, opaque) if sid == TABS
-                      else team_mark(k, opaque))
+                      else team_mark(k, rgb, opaque))
         out = np.full(drawn.shape, slp.TRANSPARENT, np.int16)
         out[drawn] = quantise(new, palettes)[drawn]
         hx, hy = frame.hotspot
@@ -491,9 +510,10 @@ def fits(sid: int, data: bytes) -> bool:
         return len(sizes) == 8 and all(140 <= w <= 165 and 36 <= h <= 56 for w, h, _, _ in sizes)
     if sid == TABS:  # six tabs, each chosen and not, about 107 by 78
         return len(sizes) == 12 and all(95 <= w <= 120 and 70 <= h <= 86 for w, h, _, _ in sizes)
-    if sid == TEAMS:  # no team, about 37 by 21, and four shields about 37 by 45
-        return (len(sizes) == 5 and 25 <= sizes[0][0] <= 50 and 12 <= sizes[0][1] <= 30
-                and all(28 <= w <= 48 and 36 <= h <= 56 for w, h, _, _ in sizes[1:]))
+    if sid == TEAMS:  # four shields about 37 by 45 (teams 1-4), and no team, about 37 by 21, in any order
+        small = [(w, h) for w, h, _, _ in sizes if h < 30]
+        return (len(sizes) == 5 and len(small) == 1 and 25 <= small[0][0] <= 50 and 12 <= small[0][1]
+                and all(28 <= w <= 48 and 36 <= h <= 56 for w, h, _, _ in sizes if h >= 30))
     return sid in RESTYLED and len(sizes) == 1 and sizes[0][:2] == RESTYLED[sid]
 
 

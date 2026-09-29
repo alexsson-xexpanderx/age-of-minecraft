@@ -100,7 +100,11 @@ def mod_xml() -> bytes:
              f'<configuration game="{MOD}">',
              f"  <name>{NAME}</name>",
              f"  <path>{MOD}</path>",
-             '  <civilizations langId="10270" descId="20150" aiNameOffset="6840" uiBaseId="51100" uiStride="20" '
+             # where the game's own language files have each civilisation's name (10230 + civ: Britons 10231),
+             # help text (20150 + civ - 1) and its computer players' names: the Conquerors civs' at 4660 +
+             # aiNameOffset + 20 per civ from the Spanish (4800). WololoKingdoms' 10270 and 6840 are for its own
+             # language file; here they left the Conquerors civs' computer players without a name.
+             '  <civilizations langId="10230" descId="20150" aiNameOffset="140" uiBaseId="51100" uiStride="20" '
              'uiOffset="0">',
              '    <civilization id="0" name="gaia" soundFile="stream\\random.mp3" scoutUnit="448" uniqueUnit="0" '
              'eliteUniqueUnit="0" uniqueUnitLine="0" uniqueUnitUpgrade="0" uniqueResearch="0" />']
@@ -366,10 +370,10 @@ def _render(job) -> tuple[int, bytes, int]:
         data = slp.encode(frames, props=slp.frame_props(original))
         return slp_id, data, len(frames)
     if job[0] == "interface":
-        _, slp_id, original, big = job
+        _, slp_id, original = job
         try:
-            data = interface.encode(original, big, _STATE["quant"].palette, _STATE["quant"])
-        except ValueError as exc:  # its resource icons weren't found: it keeps its look
+            data = interface.encode(original, _STATE["quant"].palette, _STATE["quant"])
+        except ValueError as exc:  # its resource bar is not the known one: it keeps its look
             return slp_id, None, str(exc)
         return slp_id, data, slp.info(data).num_frames
     if job[0] == "terrain":
@@ -510,8 +514,8 @@ def main(argv=None) -> int:
     panels: list[tuple[int, tuple[int, int]]] = []
     loading, teams = None, []
     if only is None or "interface" in only:
-        for slp_id, size, data, big in interface.panels(game.original):
-            jobs.append(("interface", slp_id, data, big))
+        for slp_id, size, data in interface.panels(game.original):
+            jobs.append(("interface", slp_id, data))
             panels.append((slp_id, size))
         data, raw = game.original(menu.MENU), game.interfac.get(menu.PALETTE, "bina")
         if data is not None and raw is not None:
