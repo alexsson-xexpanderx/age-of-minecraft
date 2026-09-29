@@ -131,7 +131,9 @@ In The Conquerors a farm is not a sprite: it is part of the ground. A farm
 changes the terrain under it, and the farm's look is a terrain texture in
 `terrain.drs`. There are five of them: three stages while a villager builds
 the farm, the finished farm, and the exhausted farm. Each becomes Minecraft
-farmland, 3 blocks to a tile:
+farmland, 2 blocks to a tile (a little bigger than the units' blocks, so the
+wheat is easy to see), with rows of wheat and rows of bare farmland between
+them. The wheat has thick stalks and big grain heads in flat colours:
 
 | AoE2 | Minecraft |
 |---|---|

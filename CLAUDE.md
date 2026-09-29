@@ -89,7 +89,7 @@ putting `tools/` on `sys.path`.
   With mirroring, `a // 2 + 1` angles are stored (S, SW, W, NW, N) and the game mirrors the rest.
 - **Wall frames have a fixed meaning:** 0 `/`, 1 `\`, 2 the post (at ends and corners), 3 `--`, 4 `|`.
 - **Terrain tiles must fit together.** The game picks a terrain frame by map position, so a farm texture repeats
-  every tile (3 blocks to a tile, camera scale √2). Each new frame fills exactly the original frame's pixels.
+  every tile (`farmland.PER_TILE` = 2 blocks to a tile, camera scale `farmland.scale`). Each new frame fills exactly the original frame's pixels.
 - **Don't change Pac-Man without asking.** His `.dat` patch, icon, sounds and name took many rounds of testing in
   the player's game.
 - **Seed randomness with `zlib.crc32`, never `hash()`.** Python's string hashes change every run, so the sprites and

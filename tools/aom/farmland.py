@@ -7,10 +7,12 @@ Their textures are SLPs in terrain.drs, with one diamond-shaped frame per
 tile (97x49), picked by the tile's map position: 6x6 frames for the farm and
 the dead farm, 3x3 for the stages.
 
-Each texture becomes Minecraft farmland, 3 blocks to a tile (a tile is really
-2.83 blocks), with wheat that grows through the stages. The pattern repeats
-every tile, so the tiles join up whichever frame the game picks. Wheat that
-stands up into the tile behind is drawn in that tile too. Each new frame
+Each texture becomes Minecraft farmland, 2 blocks to a tile (a little bigger
+than the units' blocks, a tile being 2.83 of those, so the wheat reads at game
+size), with a row of wheat on every other row of blocks and bare farmland
+between. The wheat has thick stalks and grows through the stages. The pattern
+repeats every tile, so the tiles join up whichever frame the game picks. Wheat
+that stands up into the tile behind is drawn in that tile too. Each new frame
 fills exactly the pixels of the original frame, so its diamond and the
 blending with the ground around the farm stay as they were.
 """
@@ -25,7 +27,7 @@ from . import voxel as V
 from .geometry import cuboid
 from .palette import Quantiser
 from .render import Frame, fit_camera, render
-from .textures import FACES, Painter, parse
+from .textures import FACES, parse
 
 # the farm terrains in the .dat, and what each becomes
 FARM_TERRAINS = {29: "tilled", 30: "sprouts", 31: "growing", 7: "ripe", 8: "dead"}
@@ -34,8 +36,12 @@ FARM_SLPS = {15021: "tilled", 15022: "sprouts", 15023: "growing", 15004: "ripe",
 STAGES = {"tilled": "farm being built, first third", "sprouts": "farm being built, second third",
           "growing": "farm being built, last third", "ripe": "farm", "dead": "exhausted farm"}
 WHEAT = {"sprouts": 1, "growing": 4, "ripe": 7}  # Minecraft's growth stages, 0..7
-PER_TILE = 3  # blocks along a tile's side
-SCALE = 2 ** 0.5  # screen pixels per Minecraft pixel that make PER_TILE blocks one 96x48 tile
+PER_TILE = 2  # blocks along a tile's side
+
+
+def scale(per_tile: int) -> float:
+    """Screen pixels per Minecraft pixel that make `per_tile` blocks one 96x48 tile."""
+    return 48 / (per_tile * V.BLOCK * 0.5 ** 0.5)
 
 
 def farm_slps(terrains) -> list[tuple[int, str, str]]:
@@ -50,25 +56,29 @@ def farm_slps(terrains) -> list[tuple[int, str, str]]:
 
 
 def wheat(level: int, variant: int = 0) -> np.ndarray:
-    """A 16x16 wheat crop texture at a growth stage (0 seedlings .. 7 ripe), like Minecraft's."""
-    p = Painter(f"farm_wheat{level}_{variant}")
+    """A 16x16 wheat crop texture at a growth stage (0 seedlings .. 7 ripe): three stalks two texels thick, with
+    leaves while young and big grain heads from stage 5, in flat colours so they stay clear at game size."""
     tex = np.zeros((16, 16, 5), np.float32)
     ripe = level >= 7
-    stem = ("#8a9a36", "#a89a44") if ripe else ("#3f7a1e", "#5a9a2a")
-    head = ("#d8b850", "#b08a30", "#7a5a1c") if ripe else ("#7aa83a", "#5f8f2a", "#46701e")
-    top = 16 - int(round(3 + level * 1.6))  # how far up the tallest stalks reach
-    for c in range(16):
-        if p.rng.random() < 0.3:
-            continue  # gaps between the stalks
-        t = min(15, top + int(p.rng.integers(0, 4)))
-        tex[t:, c] = parse(stem[int(p.rng.integers(0, 2))])
-        if level >= 5:  # the ears: grains in two shades with a dark husk line
-            ear = min(16 - t, 3 + level - 5)
-            for r in range(t, t + ear):
-                tex[r, c] = parse(head[(r + c) % 2])
-            tex[t + ear - 1, c] = parse(head[2])
-        elif level >= 1 and t + 2 < 16 and c + 1 < 16 and p.rng.random() < 0.5:
-            tex[t + 1, c + 1] = parse(stem[1])  # a leaf
+    stem = ("#7a7a2a", "#9a9a3a") if ripe else ("#3a7020", "#5c9a2c")
+    grain = ("#e8c860", "#b8902e", "#7a5a1a") if ripe else ("#9ccf48", "#6fa42e", "#3f6a1a")
+    tall = 3 + level * 1.6
+    for i, c0 in enumerate((1, 6, 11)):
+        c0 += variant % 2
+        t = int(min(14, max(0, round(16 - tall + (i + variant) % 3 - 1))))
+        tex[t:, c0], tex[t:, c0 + 1] = parse(stem[0]), parse(stem[1])
+        if level >= 5:  # the head: kernels alternating left and right, a dark tip
+            head = min(15 - t, 3 + level - 5)
+            for r in range(t, t + head):
+                tex[r, c0:c0 + 2] = parse(grain[0])
+                side = c0 - 1 if (r - t) % 2 == 0 else c0 + 2
+                if 0 <= side < 16:
+                    tex[r, side] = parse(grain[1])
+            tex[max(0, t - 1), c0:c0 + 2] = parse(grain[2])
+        elif level >= 1:  # two leaves
+            for r, c in ((t + 2, c0 + 2), (t + 1, c0 + 3), (t + 4, c0 - 1), (t + 3, c0 - 2)):
+                if 0 <= r < 16 and 0 <= c < 16:
+                    tex[r, c] = parse(stem[1])
     return tex
 
 
@@ -84,30 +94,25 @@ def crop(s: V.Structure, x: int, y: int, sprite: np.ndarray) -> None:
         s.extras.append(cuboid((x0, y0 + at - 0.25, 0), (B, 0.5, B), faces))
 
 
-def field(stage: str, reach: int = 2) -> V.Structure:
+def field(stage: str, reach: int = 2, per_tile: int = PER_TILE) -> V.Structure:
     """Farmland around one tile, `reach` tiles each way; the tile's centre is the origin."""
-    n = PER_TILE
+    n = per_tile
     s = V.Structure(f"farmland_{stage}", origin=(n / 2, n / 2))
     block = "dry_farmland" if stage == "dead" else "farmland"
     level = WHEAT.get(stage)
-    sprites = {}
     for x in range(-reach * n, (reach + 1) * n):
         for y in range(-reach * n, (reach + 1) * n):
             s.set(x, y, -1, block)  # the top is the ground
-            if level is not None:
-                k = (x % n) * n + y % n  # the same nine plants in every tile
-                grown = level - 1 if level < 7 and k % 4 == 1 else level  # two a stage behind
-                if (grown, k) not in sprites:
-                    sprites[grown, k] = wheat(grown, k)
-                crop(s, x, y, sprites[grown, k])
+            if level is not None and y % 2 == 0:  # a row of wheat, then a row of bare farmland
+                crop(s, x, y, wheat(level, (x % n) * n + y % n))  # the same plants in every tile
     return s
 
 
 @lru_cache(maxsize=None)
-def texture(stage: str) -> tuple[Frame, tuple[int, int]]:
+def texture(stage: str, per_tile: int = PER_TILE) -> tuple[Frame, tuple[int, int]]:
     """The farm rendered from the game's camera, and the screen position of the centre tile's centre."""
-    root = field(stage).part(V.all_blocks())
-    cam = fit_camera(root, V.BUILDING_HEADING, scale=SCALE, pad=2)
+    root = field(stage, per_tile=per_tile).part(V.all_blocks())
+    cam = fit_camera(root, V.BUILDING_HEADING, scale=scale(per_tile), pad=2)
     frame = render(root, V.BUILDING_HEADING, camera=cam, shadow=False, outline=False)
     return frame, (int(cam.origin[0]), int(cam.origin[1]))
 
@@ -135,9 +140,9 @@ def encode(stage: str, original: bytes, quant: Quantiser) -> bytes:
     return slp.encode(tiles(stage, original, quant), props=slp.frame_props(original))
 
 
-def preview(stage: str, size: int = 3) -> np.ndarray:
+def preview(stage: str, size: int = 3, per_tile: int = PER_TILE) -> np.ndarray:
     """RGBA of a size x size tile farm as it lies on the map, its centre in the middle of the image."""
-    frame, (ox, oy) = texture(stage)
+    frame, (ox, oy) = texture(stage, per_tile)
     rgba = frame.to_rgba()
     hw, hh = 48 * size, 24 * size
     yy, xx = np.mgrid[-hh:hh + 1, -hw:hw + 1]

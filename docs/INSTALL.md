@@ -89,9 +89,10 @@ next to `build_mod.bat`. You have two options:
   Central European, Middle Eastern, Asian, Meso-American) and every age, with
   walls, gates, towers, castles, docks and the eighteen wonders.
 * Farms are Minecraft farmland. A farm is part of the ground in this game,
-  so the build replaces its textures in `terrain.drs`. While a villager
-  builds a farm, the wheat sprouts and grows. A finished farm is ripe golden
-  wheat, and an exhausted farm is dry farmland. The edges blend into the
+  so the build replaces its textures in `terrain.drs`. The wheat grows in
+  rows with bare farmland between them. While a villager builds a farm, the
+  wheat sprouts and grows. A finished farm is ripe golden wheat, and an
+  exhausted farm is dry farmland. The edges blend into the
   grass as the original farms do.
 * The panels at the top and bottom of the screen are Minecraft style. The
   parchment is the grey of Minecraft's inventory, the dark area behind the
