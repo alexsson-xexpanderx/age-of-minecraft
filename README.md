@@ -87,8 +87,7 @@ tools/aom/drs.py         DRS archive reader/writer
 tools/aom/palette.py     game palette and colour matching
 tools/aom/datfile.py     graphics and terrain table reader for empires2_x1_p1.dat
 tools/aom/datunits.py    reads and patches the civilisations' unit tables in the .dat
-tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon, name and sounds
-tools/aom/langdll.py     reads and changes strings in the game's language DLLs
+tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon and sounds
 tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
 tools/aom/easter.py      Pac-Man and the ghost
 tools/aom/slpmap.py      which original sprite id each unit render replaces

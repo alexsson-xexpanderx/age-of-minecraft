@@ -68,6 +68,10 @@ def blank_group(why: str) -> str:
 
 MOD = "AgeOfMinecraft"
 BACKUP = ".aom-backup"
+# The game's language files. Earlier builds renamed Pac-Man in them, but Windows 11's Smart App Control refuses
+# to load a DLL that was changed ("Bad Image", error 0xc0e90002) and the game no longer starts. The build never
+# changes a DLL or an exe, and puts back the originals an earlier build changed.
+LANGUAGE_FILES = ("language_x1_p1.dll", "language_x1.dll", "language.dll")
 
 # The 18 Conquerors civilisations, in their standard ids (UserPatch data mod format).
 CIVS = [
@@ -160,17 +164,6 @@ class Game:
             log(f"terrain table: {sum(t.enabled for t in self.terrains)} terrains in use")
         except Exception as exc:  # farms then fall back to the original game's texture ids
             log(f"terrain table: could not read ({exc}); farms use the original game's texture ids")
-
-    def language_files(self) -> dict[str, Path]:
-        """The game's language files (unit names and help texts), read from their originals if backed up."""
-        from aom.langdll import FILES
-        found = {}
-        for name in FILES:
-            p = pick(self.root, name)
-            if p is not None:
-                backup = p.with_name(p.name + BACKUP)
-                found[p.name] = backup if backup.exists() else p
-        return found
 
     def _drs(self, name: str) -> Optional[Drs]:
         p = pick(self.data, name)
@@ -513,6 +506,7 @@ def main(argv=None) -> int:
         raise SystemExit(f"Windows would not let us write {exc.filename}.\n"
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
+    put_back_dlls(game, log)
     pacman = not args.no_wonder_pacman and (only is None or "pacman" in only)
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
     if not args.no_dat and (pacman or javelina):
@@ -687,7 +681,6 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         drs.write(tmp)
         write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
-    rename_pacman(game, mode, patch.pacman_strings, log)
 
 
 def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):
@@ -726,19 +719,22 @@ def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):
         yield rid
 
 
-def rename_pacman(game: Game, mode: str, strings: dict[str, int], log) -> None:
-    """Pac-Man's name in the language files. The mod exe reads language_x1_p1.dll from the mod's Data folder."""
-    from aom import gameplay
-    paths = game.language_files()
-    changed, notes = gameplay.rename_pacman({name: p.read_bytes() for name, p in paths.items()}, strings)
-    for note in notes:
-        log(note)
-    for name, data in changed.items():
-        if mode == "upmod" and name.lower() != "language_x1_p1.dll":
-            log(f"Pac-Man's name: {name} left alone (a UserPatch mod only has its own language_x1_p1.dll); "
-                "build_mod_direct.bat renames him in the game's files")
-            continue
-        write_game_file(game, mode, name, data, log, folder=game.root)
+def put_back_dlls(game: Game, log) -> None:
+    """Undo earlier builds' language file changes: the originals back from their backups, and no changed copy
+    left in the mod's Data folder (see LANGUAGE_FILES)."""
+    for name in LANGUAGE_FILES:
+        live = pick(game.root, name)
+        backup = live.with_name(live.name + BACKUP) if live is not None else None
+        if backup is not None and backup.exists():
+            shutil.copy2(backup, live)
+            backup.unlink()
+            log(f"put back your original {live.name}: an earlier build changed it, and Windows refuses changed DLLs")
+    mod_data = (pick(game.root, "Games") or game.root / "Games") / MOD / "Data"
+    for name in LANGUAGE_FILES:
+        copy = pick(mod_data, name)
+        if copy is not None:
+            copy.unlink()
+            log(f"removed {copy}: an earlier build's changed copy, and Windows refuses changed DLLs")
 
 
 def restore(root: Path) -> int:

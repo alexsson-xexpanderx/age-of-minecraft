@@ -76,8 +76,8 @@ next to `build_mod.bat`. You have two options:
 | `build_mod.bat "<game>" --only interface` | build only the Minecraft-style panels at the top and bottom of the screen |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs`, the farms into `Data\terrain.drs` and the panels into `Data\interfac.drs` (no mod exe needed); each file is backed up first as `<name>.aom-backup` |
-| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file, the icons and the language files) |
-| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder, and the cheat unit keeps its name and icon) |
+| `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file and the icons) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder, and the cheat unit keeps its icon) |
 | `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man at the Wonder, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
@@ -117,14 +117,15 @@ next to `build_mod.bat`. You have two options:
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.
 * Still original: cliffs, bridges, the rest of the terrain, fire and explosions, ships sinking,
-  and the menus and buttons. Unit names are unchanged, except Pac-Man's.
+  and the menus and buttons. Unit names are unchanged.
 
 ## Easter eggs
 
 **Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
 first button trains **Pac-Man** (500 food, 500 gold, 30 seconds, 250 hit
-points; he takes 1 population like any unit), with his own Pac-Man icon, and
-the game calls him **Pac-Man**. He is faster than any unit in the game, even
+points; he takes 1 population like any unit), with his own Pac-Man icon. On
+screen he keeps the cheat unit's name, "Furious the Monkey Boy" (see below).
+He is faster than any unit in the game, even
 the Cobra Car cheat: 5 tiles a second, more than three times a Hussar. This
 works for every civilisation. He is infantry, not a wild animal like the cheat
 unit: he boards Transport Ships (and gets off again on any shore), walks on
@@ -139,11 +140,11 @@ them in `previews/sounds/`. It is the only change the mod makes to the
 game's rules; `--no-wonder-pacman` leaves the rules alone.
 
 His name lives in the game's language files (`language_x1_p1.dll`,
-`language_x1.dll`, `language.dll`, in the game's main folder). `build_mod_direct.bat`
-renames him there, keeping a backup of each file it changes, and
-`restore_original.bat` puts them back. The UserPatch mod exe only reads its
-own `language_x1_p1.dll`; the report says whether his name could be changed
-there.
+`language_x1.dll`, `language.dll`), and those are DLLs. Windows 11's Smart App
+Control refuses to load a DLL that was changed, and then the game doesn't
+start ("Bad Image", error 0xc0e90002). So the mod never changes them, and he
+keeps the Monkey Boy's name. If an earlier build renamed him, the next build
+puts your original language files back by itself.
 
 > Multiplayer: because the rules change, every player needs the same build
 > of the mod, or the game goes out of sync.

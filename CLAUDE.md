@@ -48,7 +48,7 @@ putting `tools/` on `sys.path`.
 
 **Game files → mod (`build_mod.main`).**
 1. `Game` opens the player's DRS archives (the patch archives take precedence), the palette (`interfac.drs` 50500),
-   the `.dat` graphics table and the language DLLs. If a `*.aom-backup` exists, it always reads that instead, so
+   and the `.dat`'s graphics and terrain tables. If a `*.aom-backup` exists, it always reads that instead, so
    rebuilding after `--mode direct` starts from the originals.
 2. It chooses the targets:
    - Units use fixed SLP ids from `slpmap.TARGETS`, plus `Game.name_targets` (graphic name prefixes).
@@ -73,7 +73,6 @@ putting `tools/` on `sys.path`.
    - `gameplay.py` + `datunits.py` patch the `.dat` so the Wonder trains Pac-Man, and give the Javelina its own
      sprites.
    - `sounds.py` WAVs go into `gamedata_x1_p1.drs`.
-   - `langdll.py` renames the unit.
    Last, the build writes `aom_report.txt`.
 
 ## Invariants that are easy to break
@@ -90,6 +89,9 @@ putting `tools/` on `sys.path`.
 - **Wall frames have a fixed meaning:** 0 `/`, 1 `\`, 2 the post (at ends and corners), 3 `--`, 4 `|`.
 - **Terrain tiles must fit together.** The game picks a terrain frame by map position, so a farm texture repeats
   every tile (3 blocks to a tile, camera scale √2). Each new frame fills exactly the original frame's pixels.
+- **Never change a DLL or an exe.** Windows 11's Smart App Control refuses to load a changed DLL ("Bad Image",
+  0xc0e90002) and the game won't start. That's why Pac-Man keeps the Monkey Boy's name. `put_back_dlls` undoes the
+  language DLL edits that earlier builds made. Data files (`.drs`, `.dat`) are fine.
 - **Windows players come first.** Look files up with the case-insensitive `pick()`. Never write into the player's
   `Data/` without a `.aom-backup`, and make sure `--restore` can undo every file the build touches.
 - **Textures are original pixel art made in code** (`textures.py` ASCII-art grids, noise and team-colour specs).

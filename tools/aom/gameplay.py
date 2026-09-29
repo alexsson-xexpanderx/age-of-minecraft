@@ -4,7 +4,8 @@ The easter egg lives in Furious the Monkey Boy's slot (unit 860), so the
 chat cheat still spawns him. Here every civilisation also gets him enabled,
 trained at the Wonder (unit 276), which exists only once a Wonder stands.
 He gets his own icon, added at the end of the unit icon sheet (so no other
-unit's icon changes), and his name in the language files becomes "Pac-Man".
+unit's icon changes). His name stays the Monkey Boy's: it lives in the
+game's language DLLs, and Windows 11 refuses to load a DLL that was changed.
 
 The Monkey Boy is a "predator animal" (unit class 10), and Transport Ships
 do not take animals. Pac-Man becomes infantry (class 6, like the Militia),
@@ -28,7 +29,6 @@ import numpy as np
 
 from . import datfile
 from . import datunits as DU
-from . import langdll
 from . import slp
 
 PACMAN_UNIT = 860
@@ -44,7 +44,6 @@ INFANTRY = 6  # unit class: foot soldiers board ships, garrison, and get the Bla
 MILITIA = 74
 LAND = 7  # the Militia's terrain restriction: land, beaches and shallows (the Monkey Boy's 1 has no beaches)
 UNIT_ICONS = 50730  # the unit icon sheet in interfac.drs
-PACMAN_NAME = "Pac-Man"
 HELP_STRINGS = 79000  # the .dat stores help text ids 79000 above the string's id in the language files
 
 
@@ -345,40 +344,3 @@ def add_icon(data: bytes, index: int, quant) -> tuple[Optional[bytes], str]:
     blank = slp.SlpFrame(np.full((1, 1), slp.TRANSPARENT, np.int16), (0, 0))
     frames = [blank] * (index - info.num_frames) + [slp.SlpFrame(px, (0, 0))]
     return slp.append_frames(data, frames), f"Pac-Man is icon {index} ({w}x{h})"
-
-
-def rename_pacman(files: dict[str, bytes], strings: dict[str, int]) -> tuple[dict[str, bytes], list[str]]:
-    """Pac-Man's name in the language files: his name string becomes "Pac-Man", and the old name is replaced
-    in his button and help texts. `files` maps file name -> contents; returns the changed files and notes."""
-    order = [n for n in langdll.FILES if n in files] + [n for n in files if n not in langdll.FILES]
-    old = None
-    for name in order:  # the name the game shows comes from the first file that has it
-        try:
-            old = langdll.read_string(files[name], strings["name"])
-        except (langdll.DllError, struct.error):
-            continue
-        if old:
-            break
-    if not old:
-        return {}, [f"Pac-Man's name: not changed, string {strings['name']} is in none of the language files "
-                    f"({', '.join(order) or 'none found'})"]
-    changed, notes = {}, []
-    for name in order:
-        data = files[name]
-        try:
-            for key, sid in strings.items():
-                text = langdll.read_string(data, sid)
-                if not text:
-                    continue
-                new = PACMAN_NAME if key == "name" else text.replace(old, PACMAN_NAME)
-                if new != text:
-                    data = langdll.set_string(data, sid, new)
-        except (langdll.DllError, struct.error) as exc:
-            notes.append(f"Pac-Man's name: {name} not changed ({exc})")
-            continue
-        if data != files[name]:
-            changed[name] = data
-    if changed:
-        notes.insert(0, f"Pac-Man's name: {old!r} is now {PACMAN_NAME!r} in {', '.join(changed)} "
-                        f"(strings {', '.join(str(v) for v in strings.values())})")
-    return changed, notes
