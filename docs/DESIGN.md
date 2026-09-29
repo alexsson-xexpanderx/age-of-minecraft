@@ -174,11 +174,10 @@ The main menu is one 800x600 picture (`interfac.drs` 50189) with, for every
 button, pictures drawn over it at its place: the object cut out, with a yellow
 glow (the mouse is on it), with a white glow (pressed), and plain. The game
 writes the button names and the Single Player menu over the picture. Age of
-Minecraft's menu is a snowy block village at night, and each button a
-Minecraft thing in the original's exact place. On the right, where the Single
-Player menu opens, is one flat dark board between two dark oak logs: the game
-draws only the edges and names of those buttons, so nothing may show through
-them.
+Minecraft's menu is a snowy block village at night with a blacksmith on the
+right, and each button a Minecraft thing in the original's exact place. The
+game draws only the edges and names of the Single Player menu's buttons, so the
+picture has a solid dark plate behind each of them: nothing shows through.
 
 | Button | Minecraft |
 |---|---|
