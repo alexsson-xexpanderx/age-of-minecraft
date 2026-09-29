@@ -115,7 +115,7 @@ each one backed up first, and **`restore_original.bat`** puts them back.
   parchment is the grey of Minecraft's inventory, the dark area behind the
   minimap is an inventory slot, and the carved frames are planks. The
   resource icons are an oak log (wood), bread (food), a gold ingot,
-  cobblestone (stone) and a villager's head (population). If a panel's icons
+  cobblestone (stone) and a villager's face (population). If a panel's icons
   can't be found, that panel keeps its original look, and the report says so.
 * The map is replaced too: forests, chopped trees, gold and stone mines,
   berry bushes, rocks, plants, animals, fish and decorations.

@@ -617,13 +617,24 @@ def test_full_build(tmp: Path):
     assert "INTERFACE PANELS" in report and "Minecraft style" in report and "were not found" in report
     menu_before, menu_after = slp.decode(ui_before.get(50189)), slp.decode(ui.get(50189))  # the Minecraft menu
     assert len(menu_after) == 53 and not np.array_equal(menu_after[0].pixels, menu_before[0].pixels)
-    assert all(a.pixels.shape == b.pixels.shape and a.hotspot == b.hotspot for a, b in zip(menu_after, menu_before))
+    assert all(a.hotspot == b.hotspot for a, b in zip(menu_after, menu_before))
+    assert all(a.pixels.shape == b.pixels.shape for k, (a, b) in enumerate(zip(menu_after, menu_before))
+               if k not in (11, 12))
+    for k in (11, 12):  # Single Player highlighted, shown while its menu is open: bigger, with the buttons' plates
+        (x0, y0, _, _), (bx, by) = menu.SUBMENU[0], menu.BUTTONS["single"][2]
+        big = menu_after[k].pixels
+        assert big.shape[0] > menu_before[k].pixels.shape[0] and big.shape[1] > menu_before[k].pixels.shape[1]
+        assert big[y0 + 10 - by, x0 + 10 - bx] >= 0 and big[y0 - 20 - by, x0 + 10 - bx] == slp.TRANSPARENT
+    plate = menu_after[11].pixels[menu.SUBMENU[0][1] + 10 - 12, menu.SUBMENU[0][0] + 10 - 309]
+    assert not (menu_after[0].pixels[80:470, 470:750] == plate).mean() > 0.5  # not in the menu picture itself
     shades = menu.border(parse_jasc(fake_palette()))  # the buttons' border: a little darker than the plates
     pal = parse_jasc(fake_palette())
     assert len(shades) == 6 and all(pal[i].sum() < 3 * 30 for i in shades)
     assert ui.get(50089, "bina") == (b"background1_files      xmain none 50189 -1\r\npalette_file           xmain 50589\r\n"
                                      b"bevel_colors           " + " ".join(map(str, shades)).encode() + b"\r\n")
-    assert (menu_after[10].pixels < 0).mean() > 0.1 and (menu_after[11].pixels >= 0).all()
+    assert (menu_after[10].pixels < 0).mean() > 0.1 and (menu_after[13].pixels >= 0).all()
+    h, w = menu_before[11].pixels.shape
+    assert (menu_after[11].pixels[:h, :w] >= 0).all()  # the button itself: whole
     assert not (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).exists()
 
 

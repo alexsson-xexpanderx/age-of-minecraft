@@ -50,7 +50,9 @@ TITLE_SIGN = (453, 3, 775, 53)
 DARKER = {"single": (0.6, 0.45)}
 DESCRIPTION = (380, 490, 790, 597)
 # the Single Player menu's six buttons (measured on photos of the game): the game draws only their edges and names,
-# so the picture gets a solid plate behind each (as wide as the button, a little taller), and nothing shows through
+# so they get a solid plate behind each (as wide as the button, a little taller), and nothing shows through. The
+# plates are not in the menu picture (empty, they looked bad): Single Player's highlighted pictures, which the game
+# shows while its menu is open, are made bigger to hold them (`plates`)
 SUBMENU = [(462, y, 759, y + 39) for y in (90, 155, 221, 286, 351, 417)]
 PLATE = "#1e1e1e"
 BORDER = ("#0a0a0a", "#101010", "#161616")  # the game's border around those buttons: a little darker, a shadow
@@ -307,6 +309,14 @@ def _sign(img, masks, name, box) -> None:
     _mark(masks, name, box)
 
 
+def plates() -> np.ndarray:
+    """Where the plates behind the Single Player menu's buttons are, on the 800x600 picture."""
+    m = np.zeros((H, W), bool)
+    for x0, y0, x1, y1 in SUBMENU:
+        m[y0 - 2:y1 + 3, x0:x1] = True
+    return m
+
+
 def scene() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """The 800x600 menu picture (RGB 0..1) and each button object's mask."""
     img = np.zeros((H, W, 3))
@@ -357,8 +367,6 @@ def scene() -> tuple[np.ndarray, dict[str, np.ndarray]]:
     _tile(img, (692, 392, 772, 402), _tex("stone_bricks"), px=1, dark=0.5)
     for x in range(482, 690, 44):  # a rack of diamond swords on the wall
         _blit(img, masks, None, sword(), x, 296, 2)
-    for x0, y0, x1, y1 in SUBMENU:  # solid behind the Single Player menu's buttons
-        _rect(img, (x0, y0 - 2, x1, y1 + 3), PLATE)
     _sign(img, masks, "title", TITLE_SIGN)
 
     # the ground: snow, and a cobblestone path
@@ -504,7 +512,23 @@ def pictures(original: list[slp.SlpFrame], palette: np.ndarray, quant: Quantiser
             px = quant.indices(np.clip(picture * 255 + 0.5, 0, 255).astype(np.int64).reshape(-1, 3)).reshape(h, w)
             px = px.astype(np.int16)
             px[(~shape) if cut else (f.pixels < 0)] = slp.TRANSPARENT
+            if name == "single" and not cut and k in frames[1:3]:  # shown while its menu is open: with the plates
+                px = _with_plates(px, x, y, quant)
             out[k] = slp.SlpFrame(px, f.hotspot)
+    return out
+
+
+def _with_plates(px: np.ndarray, x: int, y: int, quant: Quantiser) -> np.ndarray:
+    """A picture drawn at (x, y), made bigger to the right and down (its top left, so its place, is the same) to
+    hold the plates behind the Single Player menu's buttons; clear everywhere else."""
+    m = plates()
+    ys, xs = np.nonzero(m)
+    h, w = max(px.shape[0], ys.max() + 1 - y), max(px.shape[1], xs.max() + 1 - x)
+    out = np.full((h, w), slp.TRANSPARENT, np.int16)
+    out[:px.shape[0], :px.shape[1]] = px
+    colour = quant.indices(np.clip(parse(PLATE)[None, :3] * 255 + 0.5, 0, 255).astype(np.int64))[0]
+    region = m[y:y + h, x:x + w]
+    out[:region.shape[0], :region.shape[1]][region] = colour
     return out
 
 

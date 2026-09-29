@@ -156,10 +156,10 @@ widescreen panels from the same pictures. The build repaints each one, every pix
 | AoE2 | Minecraft |
 |---|---|
 | Parchment (where the game writes the unit's details) | the grey of Minecraft's inventory, with a black edge, a white bevel at the top left and a dark one at the bottom right |
-| The resource bar's boxes (the game writes the amounts in white) | flat and nearly black, no shading, so the white numbers stand out |
+| The resource bar's boxes (the game writes the amounts in white) | flat and nearly black, no shading, so the white numbers stand out; wide enough that the numbers stay inside, from right after the icon |
 | Dark areas (behind the minimap) | an inventory slot, sunk in |
 | Carved frames | planks, as dark or light as the original frame, so the game's text stays readable |
-| Resource icons: wood, food, gold, stone, population | an oak log, bread, a gold ingot, cobblestone, a villager's head |
+| Resource icons: wood, food, gold, stone, population | an oak log, bread, a gold ingot, cobblestone, a villager's face |
 | Where a panel meets the game view | a black edge, like every Minecraft window |
 
 The icons sit at fixed places in the 1280x1024 pictures. In the 800x600 and 1024x768 pictures they are found
@@ -177,7 +177,10 @@ writes the button names and the Single Player menu over the picture. Age of
 Minecraft's menu is a snowy block village at night with a blacksmith on the
 right, and each button a Minecraft thing in the original's exact place. The
 game draws only the edges and names of the Single Player menu's buttons, so the
-picture has a solid dark plate behind each of them: nothing shows through. Their
+menu has a solid dark plate behind each of them: nothing shows through. The
+plates are only there while the Single Player menu is open (they are part of
+the Single Player button's highlighted picture, which the game shows then), so
+the closed menu shows the blacksmith as it is. Their
 light border is drawn in shades a little darker than the plates instead, a soft
 shadow around each button. When
 Single Player is chosen, its shield and sign turn darker instead of glowing

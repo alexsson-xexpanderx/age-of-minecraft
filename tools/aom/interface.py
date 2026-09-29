@@ -17,7 +17,7 @@ Each picture is repainted in the Minecraft style, every pixel keeping its place:
   game's white and black text stays readable on it;
 * where the panels meet the game view they get a black edge, like every Minecraft window;
 * the five resource icons in the top bar (wood, food, gold, stone, population) become an oak log, bread, a
-  gold ingot, cobblestone and a villager's head.
+  gold ingot, cobblestone and a villager's face.
 
 The icons sit at fixed places in the 1280x1024 pictures (openage's hardcoded/interface.py). In the smaller
 pictures they are found by matching the same civilisation's 1280x1024 icons; a picture whose icons can't be
@@ -32,7 +32,6 @@ import numpy as np
 
 from . import slp
 from . import voxel as V
-from .geometry import Part, cuboid
 from .palette import Quantiser
 from .render import fit_camera, render
 from .textures import Painter, parse
@@ -148,21 +147,31 @@ def _label(m: np.ndarray) -> tuple[np.ndarray, int]:
     return lab, len(ids)
 
 
-def _widen(boxes: np.ndarray, icons: Optional[list[tuple[int, int]]], more: int = 10, gap: int = 2) -> np.ndarray:
-    """Each box as wide as it can be: `gap` pixels from the icon before it and from the next icon or box, at most
-    `more` pixels wider on each side. Room for the game's numbers."""
+def _drawn(icons: Optional[list[tuple[int, int]]]) -> list[tuple[int, int]]:
+    """Where each resource icon's item is drawn, left and right: narrower than the original's icon box."""
+    out = []
+    for (x, _), what in zip(icons or [], RESOURCES):
+        iw = item(what).shape[1]
+        out.append((x + (ICON_W - iw) // 2, x + (ICON_W - iw) // 2 + iw))
+    return out
+
+
+def _widen(boxes: np.ndarray, icons: Optional[list[tuple[int, int]]], more: int = 12, gap: int = 1) -> np.ndarray:
+    """Each box as wide as it can be: on the left up to `gap` pixels from the item drawn before it (the game starts
+    its numbers close to the icon), on the right at most `more` pixels wider and `gap` from the next item or box.
+    Room for the game's numbers."""
     lab, n = _label(boxes)
     spans = []
     for k in range(1, n + 1):
         ys, xs = np.nonzero(lab == k)
         spans.append((xs.min(), xs.max() + 1, ys.min(), ys.max() + 1))
-    icons = icons or []
-    starts = sorted([x for x, _ in icons] + [x0 for x0, _, _, _ in spans])
-    ends = sorted([x + ICON_W for x, _ in icons] + [x1 for _, x1, _, _ in spans])
+    drawn = _drawn(icons)
+    starts = sorted([a for a, _ in drawn] + [x0 for x0, _, _, _ in spans])
+    ends = sorted([b for _, b in drawn] + [x1 for _, x1, _, _ in spans])
     out = boxes.copy()
     for x0, x1, y0, y1 in spans:
         right = min([x1 + more] + [x - gap for x in starts if x >= x1])
-        left = max([x0 - more] + [x + gap for x in ends if x <= x0])
+        left = max([x0 - 3 * more] + [x + gap for x in ends if x <= x0])
         out[y0:y1, max(0, left):max(x1, right)] = True
     return out
 
@@ -331,6 +340,8 @@ ART = {
               "..kkkkkkkkkkkk..",
               "................"],
              {"k": "#3a2410", "b": "#b8732f", "L": "#e8b060", "d": "#8a5220"}),
+    "population": (None, {"k": "#24160c", "s": "#b8866c", "b": "#4a2c22", "w": "#f0f0f0", "g": "#2f8a3a",
+                          "n": "#9a6c56", "m": "#7a5040"}),
     "gold": (["................",
               "................",
               "................",
@@ -346,23 +357,33 @@ ART = {
 }
 
 
+VILLAGER = ["ssssssss", "ssssssss", "sbbbbbbs", "swgssgws", "sssnnsss", "sssnnsss", "ssmnnmss", "ssssssss"]
+
+
+def _doubled(rows: list[str]) -> list[str]:
+    """A grid at twice the size: each pixel two by two."""
+    return ["".join(c * 2 for c in row) for row in rows for _ in range(2)]
+
+
+def _outlined(rows: list[str]) -> list[str]:
+    """A grid with a one-pixel dark ("k") edge around it, so it stands out on the planks."""
+    w = len(rows[0]) + 2
+    return ["k" * w] + ["k" + row + "k" for row in rows] + ["k" * w]
+
+
 @lru_cache(maxsize=None)
 def item(what: str) -> np.ndarray:
-    """A resource icon, RGBA 0..1: drawn items for food and gold, little blocks for the rest."""
+    """A resource icon, RGBA 0..1: drawn items for food and gold, a villager's face for population, little blocks
+    for the rest."""
     if what in ART:
         rows, legend = ART[what]
+        if rows is None:  # population: a villager's face, like the one on the menu's Learn to Play banner
+            rows = _outlined(_doubled(VILLAGER))
         tex = Painter(f"icon_{what}").grid(rows, {".": None, **legend}, noise=0.04)
         return tex[..., :4]
-    if what == "population":
-        from .units import VILLAGER_SKIN, villager_head
-        faces, extras = villager_head(Painter("icon_villager"), VILLAGER_SKIN)
-        root = Part("head", boxes=[cuboid((-4, -4, 0), (8, 8, 10), faces)] +
-                    [cuboid((b.lo[0], 4, b.lo[2] - 24), b.hi - b.lo, b.faces) for b in extras])
-        scale = 1.1
-    else:
-        s = V.Structure(what, origin=(0.5, 0.5))
-        s.set(0, 0, 0, "oak_log" if what == "wood" else "cobblestone")
-        root, scale = s.part(V.all_blocks()), 0.62
+    s = V.Structure(what, origin=(0.5, 0.5))
+    s.set(0, 0, 0, "oak_log" if what == "wood" else "cobblestone")
+    root, scale = s.part(V.all_blocks()), 0.62
     cam = fit_camera(root, V.BUILDING_HEADING, scale=scale, pad=1)
     frame = render(root, V.BUILDING_HEADING, camera=cam, shadow=False)
     rgba = frame.to_rgba().astype(np.float64) / 255
