@@ -60,7 +60,7 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "button": "b", "cost": "hhhhhhhhh", "creatable_type": "b", "hotkey": "i", "name_id": "H",
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
            "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h",
-           "terrain_restriction": "h", "speed": "f",
+           "terrain_restriction": "h", "speed": "f", "collision_size": "fff", "outline_size": "fff",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
 
 
@@ -86,7 +86,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     v["hit_points"] = r.one("h")
     r.one("f")  # line of sight
     r.one("b")  # garrison capacity
-    r.take("fff")  # collision size
+    f["collision_size"] = r.p
+    v["collision_size"] = r.take("fff")  # radius across, radius along (tiles), height
     f["train_sound"] = r.p
     v["train_sound"] = r.one("h")
     r.one("h")  # damage sound
@@ -122,7 +123,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.take("bbb")  # occlusion mode, obstruction type, obstruction class
     r.take("Bbh")  # trait, civilisation, nothing
     r.take("bB")  # selection effect, editor selection colour
-    r.take("fff")  # outline size
+    f["outline_size"] = r.p
+    v["outline_size"] = r.take("fff")  # the selection outline drawn around the unit
     r.skip(3 * 7)  # resource storages: (int16 type, float amount, int8 flag) x 3
     n_damage = r.one("B")
     r.skip(n_damage * 5)

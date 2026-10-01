@@ -475,6 +475,8 @@ def test_full_build(tmp: Path):
         assert pac.values["cost"] == (0, 500, 1, 3, 500, 1, 4, 1, 0)  # 500 food, 500 gold, 1 population
         assert pac.values["speed"] == 5.0  # faster than any unit
         assert pac.values["train_time"] == 300  # 5 minutes
+        assert pac.values["collision_size"] == (0.5, 0.5, 2.0)  # room for his doubled size, height kept
+        assert pac.values["outline_size"][:2] == (0.5, 0.5)
         assert civ[4].values["enabled"] == 0  # nothing else changes
         assert pac.values["icon"] == 170  # his own icon, added to the sheet
         assert pac.values["class"] == 6  # infantry, not a predator animal: ships take him

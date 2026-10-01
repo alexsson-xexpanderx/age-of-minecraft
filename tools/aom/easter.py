@@ -69,8 +69,9 @@ def pacman(key: str = "pacman") -> Unit:
                              cuboid((-7, -1, centre - 1), (14, 2, 2), white),
                              cuboid((-1, -7, centre - 1), (2, 14, 2), white)])
     root = Part("root").add(Part("body").add(upper, lower), pop)
+    # twice the size he first had (1.2), with twice the room on the map to match (gameplay.PACMAN_SIZE)
     return Unit(key, "Pac-Man", "Furious the Monkey Boy (cheat)", "pacman", root, group="easter",
-                attack="chomp", scale=1.2)
+                attack="chomp", scale=2.4)
 
 
 def ghost(key: str = "ghost") -> Unit:

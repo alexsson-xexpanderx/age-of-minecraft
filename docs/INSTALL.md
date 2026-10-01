@@ -144,7 +144,9 @@ each one backed up first, and **`restore_original.bat`** puts them back.
 
 **Pac-Man at the Wonder.** Once you have built a Wonder, select it: its
 first button trains **Pac-Man** (500 food, 500 gold, 5 minutes, 250 hit
-points; he takes 1 population like any unit), with his own Pac-Man icon, and
+points; he takes 1 population like any unit). He is big, taller than a
+knight on horseback, and takes as much room as a Mangonel, so nothing stands
+inside him, and he still fits through gates. He has his own Pac-Man icon, and
 the game calls him **Pac-Man**. He is faster than any unit in the game, even
 the Cobra Car cheat: 5 tiles a second, more than three times a Hussar. This
 works for every civilisation. He is infantry, not a wild animal like the cheat
