@@ -284,7 +284,7 @@ windshield (the game draws the car from one picture per direction for
 everything it does). Pac-Man is also the one
 rule change: every civilisation can train him at a finished Wonder
 (`gameplay.py` patches his unit in the `.dat`: enabled, trained at the
-Wonder, 500 food and 500 gold, 30 s, 250 hit points, speed 5 (faster than
+Wonder, 500 food and 500 gold, 5 minutes, 250 hit points, speed 5 (faster than
 any unit, the cheats' Cobra Car included), and infantry instead of
 the Monkey Boy's "predator animal" class, which Transport Ships refuse; he
 also gets the Militia's "board a Transport Ship" task if his task list lacks

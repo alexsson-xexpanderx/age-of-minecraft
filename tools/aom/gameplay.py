@@ -34,7 +34,9 @@ from . import slp
 PACMAN_UNIT = 860
 WONDER_UNIT = 276
 PACMAN_COST = (0, 500, 1, 3, 500, 1, 4, 1, 0)  # 500 food, 500 gold, 1 population
-PACMAN_TIME = 30  # seconds
+# seconds: 5 minutes, so one Wonder trains few of him; he keeps the cheat unit's attack and armour (99), and
+# in Death Match no price would hold him back
+PACMAN_TIME = 300
 PACMAN_BUTTON = 1
 PACMAN_HP = 250  # the Monkey Boy has 50; a unit from a Wonder should last a bit longer
 # tiles per second: faster than any unit, the cheats' Cobra Car (4.5) included; the fastest units you can train are
