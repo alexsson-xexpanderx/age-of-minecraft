@@ -171,7 +171,7 @@ that, Smart App Control has to be off.
 > Multiplayer: because the rules change, every player needs the same build
 > of the mod, or the game goes out of sync.
 
-**Cheats.** Two hidden cheat units are replaced. In a single-player game,
+**Cheats.** Three hidden cheat units are replaced. In a single-player game,
 press **Enter**, type the cheat and press **Enter** again; the unit appears
 next to your Town Center:
 
@@ -179,6 +179,7 @@ next to your Town Center:
 |---|---|
 | `furious the monkey boy` | **Pac-Man**, who chomps as he runs and attacks, and dies the arcade way |
 | `i love the monkey head` | a **ghost** in your team colour (red for player 2, like Blinky) |
+| `how do you turn this on` | the **Cobra Car**, built from blocks in your team colour, with white racing stripes |
 
 In a multiplayer game, cheats only work if "Allow cheats" is ticked in the
 game setup.

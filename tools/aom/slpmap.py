@@ -208,6 +208,7 @@ TARGETS: list[Target] = [
     Target(5299, "pacman", "idle", "Furious the Monkey Boy"), Target(5300, "pacman", "decay", "Furious the Monkey Boy"),
     Target(5301, "pacman", "walk", "Furious the Monkey Boy"),
     Target(4681, "ghost", "walk", "the VDML cheat guy (one sprite for everything)"),
+    Target(4685, "cobra_car", "idle", "the Cobra Car cheat (one sprite for everything)"),
     # javelina (BOARJ in the .dat)
     Target(5157, "javelina", "attack"), Target(5158, "javelina", "die"), Target(5159, "javelina", "idle"),
     Target(5160, "javelina", "run"), Target(5161, "javelina", "decay"), Target(5162, "javelina", "walk"),

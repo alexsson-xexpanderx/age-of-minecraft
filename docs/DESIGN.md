@@ -277,7 +277,11 @@ of Empires II: The Conquerors Expansion"), so your settings carry over.
 
 Pac-Man takes Furious the Monkey Boy's slot (unit 860): a voxel ball whose
 jaw chomps as he runs and attacks, and who dies the arcade way. A ghost in
-the owner's team colour takes the VDML cheat guy's. Pac-Man is also the one
+the owner's team colour takes the VDML cheat guy's, and the Cobra Car becomes
+a blocky Cobra: the same open roadster built from blocks, in the owner's team
+colour with two white racing stripes, wide fenders, side pipes and a glass
+windshield (the game draws the car from one picture per direction for
+everything it does). Pac-Man is also the one
 rule change: every civilisation can train him at a finished Wonder
 (`gameplay.py` patches his unit in the `.dat`: enabled, trained at the
 Wonder, 500 food and 500 gold, 30 s, 250 hit points, speed 5 (faster than

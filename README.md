@@ -57,7 +57,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/menu.png` | the main menu: a block village on a clear day, with the game's texts and buttons drawn over it |
 | `previews/screens.png` | the other screens as the deepslate hall, and the loading screen, on stand-in screens |
 | `previews/player_colors.png` | a unit in all 8 player colours |
-| `previews/roster_easter.png` | the easter eggs: Pac-Man and a ghost in the cheat units' slots |
+| `previews/roster_easter.png` | the easter eggs: Pac-Man, a ghost and a blocky Cobra Car in the cheat units' slots |
 | `previews/sounds/pacman_*.wav` | Pac-Man's sounds: clicking on him, orders, training, bites and his death |
 
 ## Layout
@@ -98,7 +98,7 @@ tools/aom/langdll.py     reads and changes strings in the game's language DLLs
 tools/aom/pe.py          Windows DLL/exe resources: read them, give a copy new ones in an added section
 tools/aom/appicon.py     the villager king icon: the .ico file, and in place in the mod's own exe (and PNGs)
 tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
-tools/aom/easter.py      Pac-Man and the ghost
+tools/aom/easter.py      Pac-Man, the ghost and the Cobra Car
 tools/aom/slpmap.py      which original sprite id each unit render replaces
 tools/aom/spritemap.py   finds buildings, walls, trees and decorations by name in the .dat
 tools/aom/export.py      renders an animation in the original sprite's frame layout
