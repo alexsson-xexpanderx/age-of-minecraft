@@ -61,6 +61,7 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
            "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h",
            "terrain_restriction": "h", "speed": "f", "collision_size": "fff", "outline_size": "fff",
+           "blast_width": "f", "reload": "f", "blast_level": "b",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
 
 
@@ -162,17 +163,22 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         r.one("b")  # run pattern
     if utype >= 50:  # combat
         r.one("h")  # base armour
-        n = r.one("H")
-        r.skip(n * 4)  # attacks
-        n = r.one("H")
-        r.skip(n * 4)  # armours
+        for kind in ("attacks", "armours"):  # (class, amount) pairs
+            n = r.one("H")
+            f[kind] = r.p
+            v[kind] = [r.take("hh") for _ in range(n)]
         r.one("h")  # defence terrain bonus
-        r.take("fff")  # max range, blast width, reload time
+        r.one("f")  # max range
+        f["blast_width"] = r.p
+        v["blast_width"] = r.one("f")
+        f["reload"] = r.p
+        v["reload"] = r.one("f")  # seconds between attacks
         r.take("hh")  # projectile unit, accuracy
         r.one("b")  # break off combat
         r.one("h")  # frame delay
         r.take("fff")  # graphic displacement
-        r.one("b")  # blast attack level
+        f["blast_level"] = r.p
+        v["blast_level"] = r.one("b")  # who else a blast hurts
         r.one("f")  # min range
         r.one("f")  # accuracy dispersion
         f["attack_graphic"] = r.p
@@ -370,8 +376,15 @@ def compress(data: bytes) -> bytes:
 
 
 def patch(data: bytearray, unit: UnitRecord, **values) -> None:
-    """Overwrite fixed-size fields of one civ's copy of a unit."""
+    """Overwrite fixed-size fields of one civ's copy of a unit. Its attacks and armours ((class, amount) pairs) can
+    be rewritten too, as many pairs as it has."""
     for name, value in values.items():
+        if name in ("attacks", "armours"):
+            if len(value) != len(unit.values[name]):
+                raise ValueError(f"unit {unit.id} has {len(unit.values[name])} {name}, not {len(value)}")
+            for k, pair in enumerate(value):
+                struct.pack_into("<hh", data, unit.fields[name] + 4 * k, *pair)
+            continue
         if name not in unit.fields:
             raise KeyError(f"unit {unit.id} ({unit.name}) has no field {name}")
         fmt = "<" + FORMATS[name]

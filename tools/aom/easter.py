@@ -5,6 +5,9 @@
   where the mouth opens all the way and he vanishes with a pop.
 * A ghost replaces the VDML cheat guy ("i love the monkey head"): the ghost is
   in the owner's team colour, like Blinky, Pinky, Inky and Clyde.
+* A giant red Pac-Man replaces the Saboteur ("to smithereens"; gameplay._giant):
+  Pac-Man painted red and drawn 12.5 times as big as him, wider and taller than a
+  Castle and a Wonder side by side.
 * A blocky Cobra replaces the Cobra Car ("how do you turn this on"): the same
   roadster built from blocks, in the owner's team colour (the original is
   always blue) with its two white racing stripes, wide fenders, side pipes and
@@ -13,6 +16,7 @@
 """
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import numpy as np
@@ -100,6 +104,32 @@ def ghost(key: str = "ghost") -> Unit:
         skirt.append(Part(f"foot{k % 2}_{k}", boxes=[cuboid((cx - 1.5, cy - 1.5, 1), (3, 3, 3.5), faces)]))
     root = Part("root", offset=(0, 0, 2)).add(body, *skirt)
     return Unit(key, "Ghost", "VDML (cheat)", "ghost", root, group="easter", attack="none", scale=1.2)
+
+
+GIANT_SCALE = 30.0  # Pac-Man is drawn at 2.4: this is wider and taller than a Castle and a Wonder side by side
+RED_TEAM = 32  # the game palette's red team shades, dark to light: plain pixels there stay red whoever owns him
+
+
+def _team_paint(part: Part) -> None:
+    """Pac-Man's yellow becomes team-colour paint of the same lightness (drawn later in RED_TEAM's shades)."""
+    for b in part.boxes:
+        for face, tex in b.faces.items():
+            t = tex.astype(np.float32)
+            yellow = (t[..., 0] > 0.6) & (t[..., 1] > 0.45) & (t[..., 2] < 0.45) & (t[..., 3] > 0)
+            if yellow.any():
+                t = t.copy()
+                light = np.clip(t[..., :3].mean(-1)[yellow], 0, 1)
+                t[yellow] = np.stack([light, light, light, np.ones_like(light), np.ones_like(light)], -1)
+                b.faces[face] = t
+    for c in part.children:
+        _team_paint(c)
+
+
+def giant_pacman(key: str = "giant_pacman") -> Unit:
+    """The giant red Pac-Man: Pac-Man himself, painted for the red team's shades and drawn far bigger."""
+    u = pacman(key)
+    _team_paint(u.root)
+    return dataclasses.replace(u, name="Giant Pac-Man", replaces="Saboteur (cheat)", scale=GIANT_SCALE)
 
 
 WINDSHIELD_TILT = -25  # degrees

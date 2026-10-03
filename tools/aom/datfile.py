@@ -39,6 +39,7 @@ class Graphic:
     sound: int = -1
     sound_at: int = -1  # offset of the sound id in the decompressed file
     angle_sounds_at: int = -1  # offset of the per-angle sounds (3 x (delay, sound id) per angle), if any
+    slp_at: int = -1  # offset of the SLP id in the decompressed file
 
     @property
     def stored_angles(self) -> int:
@@ -131,6 +132,7 @@ def _graphics(data: bytes) -> tuple[dict[int, Graphic], int]:
     for gid, ptr in enumerate(ptrs):
         if not ptr:
             continue
+        slp_at = r.p + 34
         name, filename, slp_id = r.take("21s13si")
         _loaded, _old, layer, _force, _adapt, _sel = r.take("bbbbbB")
         r.skip(8)  # coordinates
@@ -147,7 +149,7 @@ def _graphics(data: bytes) -> tuple[dict[int, Graphic], int]:
         if attack_sounds:
             r.skip(max(1, angles) * 3 * 4)
         g = Graphic(own_id if own_id >= 0 else gid, _cstr(name), _cstr(filename), slp_id, layer, frames, angles,
-                    rate, seq, mirror, deltas, sound, sound_at, angle_sounds_at)
+                    rate, seq, mirror, deltas, sound, sound_at, angle_sounds_at, slp_at)
         _check(g)
         graphics[gid] = g
     return graphics, r.p

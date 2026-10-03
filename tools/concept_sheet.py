@@ -15,6 +15,7 @@ Writes into previews/ by default:
     fortifications.png  walls, gates, towers and castles
     walls.png           wall lines in every direction, with corners, as the game places them
     sounds/*.wav        Pac-Man's sounds (clicking on him, orders, training, bites, death)
+    giant.png           the "to smithereens" cheat's giant red Pac-Man by a Castle, a Wonder, Pac-Man and a knight
     nature.png          trees, resources and map decorations
     farms.png           farms, which are terrain: being built, grown and exhausted
     interface.png       the resource bar and bottom panel in the Minecraft style (on a stand-in panel)
@@ -486,6 +487,16 @@ def village_scene(out: Path, units: dict[str, Unit]) -> None:
     compose(placed + place_units(folk, units), out, fields=[("ripe", 9.0, 10.5), ("growing", 12.0, 7.5)])
 
 
+def giant_scene(out: Path, units: dict[str, Unit]) -> None:
+    """The giant red Pac-Man (red: player 2's colour, which the game's red shades are) by a Castle, a Wonder, Pac-Man
+    and a knight, at the game's size."""
+    from aom.easter import giant_pacman
+    placed = place_buildings([(B("CSTL", "W", 3), 0.0, 0.0), ({"model": "wonder", "letter": "B"}, 5.5, -2.0)])
+    placed += place_units([("pacman", 1, 6.5, 3.5, 1, "idle", 0.0), ("knight", 1, 7.5, 3.0, 1, "idle", 0.0)], units)
+    placed += place_units([("giant_pacman", 2, 19.0, -6.0, 1, "idle", 0.0)], {"giant_pacman": giant_pacman()})
+    compose(placed, out, k=1)
+
+
 def farms_sheet(out: Path, units: dict[str, Unit]) -> None:
     """The farm's stages side by side, as 3x3 tile fields on the grass, with a farmer on the grown one."""
     fields = [(stage, 3.5 * n, -3.5 * n) for n, stage in enumerate(farmland.STAGES)]
@@ -709,6 +720,7 @@ def main() -> None:
     pacman_sounds(out / "sounds")
     nature_sheet(out / "nature.png")
     farms_sheet(out / "farms.png", units)
+    giant_scene(out / "giant.png", units)
     interface_sheet(out / "interface.png")
     menu_sheet(out / "menu.png")
     screens_sheet(out / "screens.png")

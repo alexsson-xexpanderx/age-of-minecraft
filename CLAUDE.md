@@ -13,7 +13,7 @@ game files. `README.md` has the module-by-module layout table, and `docs/DESIGN.
 
 ```bash
 pip install -r tools/requirements.txt          # numpy (build) + pillow (previews only)
-python tools/tests/test_export.py              # the whole suite, about 7 s
+python tools/tests/test_export.py              # the whole suite, about 20 s
 python tools/concept_sheet.py [out_dir]        # regenerate previews/* (and always docs/UNITS.md)
 python tools/build_mod.py --game <AoE2 folder> [--only militia,archer | buildings,walls,...] [--dry-run]
 ```
@@ -109,7 +109,10 @@ putting `tools/` on `sys.path`.
 6. `write_outputs` writes the UserPatch mod, a standalone game `MOD` = `age_of_minecraft` (`Games/age_of_minecraft/`),
    or patches `Data/` directly with backups. Then `apply_gameplay` runs:
    - `gameplay.py` + `datunits.py` patch the `.dat` so the Wonder trains Pac-Man, and give the Javelina its own
-     sprites.
+     sprites. The Saboteur ("to smithereens", 706) becomes the giant red Pac-Man (`gameplay._giant`): Pac-Man's
+     attacks, armours and sounds written over its own in place, and an unused graphic (`GIANT_GRAPHICS`, found by
+     `giant_graphic`) pointed at his new SLP (`giant_slp`, in red-team palette shades, written next to Pac-Man's
+     sounds), as the Saboteur shares the Petard's sprites.
    - `sounds.py` WAVs go into `gamedata_x1_p1.drs`.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,
      `mod_language` gives the mod its own `language_x1_p1.dll` (`langdll.with_strings`: a new resource section

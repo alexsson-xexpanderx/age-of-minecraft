@@ -44,7 +44,8 @@ def fake_palette() -> bytes:
     return f"JASC-PAL\r\n0100\r\n256\r\n{body}\r\n".encode()
 
 
-def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1) -> bytes:
+def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1, attacks=(), armours=(),
+                blast: float = 0.0, blast_level: int = 0, reload: float = 0.0) -> bytes:
     """One unit record in the Conquerors layout (mirrors aom.datunits)."""
     nb = name.encode()
     b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 10 if uid == 860 else 0))
@@ -61,7 +62,10 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     if utype >= 40:
         b += struct.pack("<hffhhbhhb", -1, 0, 0, -1, -1, 0, -1, -1, 0)
     if utype >= 50:
-        b += struct.pack("<hHHhfffhhbhfffbffhhhff", 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0)
+        b += struct.pack("<hH", 0, len(attacks)) + b"".join(struct.pack("<hh", *a) for a in attacks)
+        b += struct.pack("<H", len(armours)) + b"".join(struct.pack("<hh", *a) for a in armours)
+        b += struct.pack("<hfffhhbhfffbffhhhff", 0, 0, blast, reload, -1, 0, 0, 0, 0, 0, 0, blast_level, 0, 0, -1, 0, 0,
+                         0, 0)
     if utype >= 70:
         b += struct.pack("<hhhhhhhhhhhbffbbifbfffiibh", 0, 25, 1, 3, 25, 1, 4, 1, 0, 20, -1, 0, 0, 0, 2, 0, -1, 0, 0,
                          0, 0, 0, -1, -1, 0, 0)
@@ -71,9 +75,11 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     return bytes(b)
 
 
-def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0) -> bytes:
-    """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860), and the
-    Javelina (822) borrowing the Wild Boar's sprites, with its carcass (823) and the boar's (356).
+def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0,
+              saboteur_graphic: int = 0) -> bytes:
+    """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860) with his bite and
+    armour, the Saboteur (706) with its blast, and the Javelina (822) borrowing the Wild Boar's sprites, with its
+    carcass (823) and the boar's (356).
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -98,7 +104,11 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
             if u == 276:
                 out += _unit_bytes(u, 80, "WNDR")
             elif u == 860:
-                out += _unit_bytes(u, 70, "mkyby", monkey_graphic)
+                out += _unit_bytes(u, 70, "mkyby", monkey_graphic, attacks=[(21, 999), (4, 99)],
+                                   armours=[(4, 99), (3, 99)], reload=0.9)
+            elif u == 706:
+                out += _unit_bytes(u, 70, "HDSQD", saboteur_graphic, attacks=[(11, 500), (4, 100), (13, 500)],
+                                   armours=[(16, 0), (4, 1), (3, 3)], blast=2.5, blast_level=2, reload=5.0)
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -338,13 +348,16 @@ def fake_game(root: Path) -> Path:
     near[:3] = 7  # a near copy of team 1's mark
     patch.put(53301, slp.encode([slp.SlpFrame(near, marks[1].hotspot)]))
     patch.write(data / "gamedata_x1_p1.drs")
+    saboteur = len(table)  # the Saboteur borrows the Petard's sprites; an old Trade Cog piece no one uses
+    table += [{"name": "HDSQD_FN", "slp": 4497, "frames": 10, "angles": 8, "mirror": 6},
+              {"name": "COGXX_F1", "slp": 2909, "frames": 1, "angles": 8, "mirror": 6}]
     boar = len(table)
     table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
     for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
                                  ("BOARJ_RN", 5160, 10), ("BOARJ_SN", 5161, 5), ("BOARJ_WN", 5162, 10)):
         table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8})  # only 5157 has a file
-    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar),
-                                                       FAKE_TERRAINS))
+    (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar,
+                                                                         saboteur_graphic=saboteur), FAKE_TERRAINS))
     return root
 
 
@@ -481,6 +494,21 @@ def test_full_build(tmp: Path):
         assert pac.values["icon"] == 170  # his own icon, added to the sheet
         assert pac.values["class"] == 6  # infantry, not a predator animal: ships take him
         assert pac.values["terrain_restriction"] == 7  # the Militia's: he may stand on the beach ships unload onto
+        sab = civ[706]  # "to smithereens": the giant red Pac-Man, Pac-Man's strength, no blast, 10000 hit points
+        assert sab.values["class"] == 6 and sab.values["hit_points"] == 10000 and sab.values["enabled"] == 0
+        assert sab.values["attacks"] == [(21, 999), (4, 99), (11, 0)]
+        assert sab.values["armours"] == [(4, 99), (3, 99), (16, 99)]
+        assert sab.values["blast_width"] == 0 and sab.values["blast_level"] == 0 and abs(sab.values["reload"] - 0.9) < 1e-6
+        assert sab.values["collision_size"][:2] == (2.5, 2.5) and sab.values["dead_unit"] == -1
+        assert sab.values["standing"][0] == sab.values["walking"][0] == sab.values["attack_graphic"]
+    from aom.datfile import read_graphics
+    giant = read_graphics((mod / "Data" / "empires2_x1_p1.dat").read_bytes())[units.units[1][706].values["standing"][0]]
+    assert giant.name == "COGXX_F1" and giant.slp == 15600  # a free graphic, pointed at his own SLP
+    frames = slp.decode(Drs(mod / "Data" / "gamedata_x1_p1.drs").get(15600))
+    assert len(frames) == 5 and min(f.pixels.shape[0] for f in frames) > 900  # far bigger than a Wonder
+    team = frames[1].pixels[frames[1].pixels >= 0]
+    assert ((team >= 32) & (team < 40)).mean() > 0.5  # red whoever owns him: the red team's shades, as plain pixels
+    assert "Giant Pac-Man: the Saboteur" in report
     heads = datunits.read_unit_headers(datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes()), units)
     assert [(t[1], t[3], t[4]) for t in heads.tasks[860]] == [(0, 7, -1), (1, 3, 20)]  # the Militia's boarding task
     assert len(heads.tasks[74]) == 2 and heads.tasks[861] is None
@@ -498,6 +526,7 @@ def test_full_build(tmp: Path):
     assert [langdll.read_string(p1, i) for i in (5860, 6860, 26860, 9999, 4)] == [
         "Pac-Man", "Create <b>Pac-Man<b> (<cost>)", "Create <b>Pac-Man<b> (<cost>)\nA very fast cheat unit.",
         "UserPatch", "Age of Minecraft"]
+    assert langdll.read_string(p1, 5706) == "Giant Pac-Man"
     assert langdll.read_string(p1_before, 5860) == "Furious the Monkey Boy"
     assert langdll.read_string((game / "language_x1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()

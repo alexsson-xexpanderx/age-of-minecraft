@@ -1079,6 +1079,9 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log, folder: 
     log(f"patched {live}")
 
 
+GIANT_SLP = 15600  # the first id tried for the giant Pac-Man's SLP
+
+
 def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True) -> None:
     """The .dat changes (Pac-Man at the Wonder, the Javelina's own sprites), Pac-Man's icon and his name."""
     from aom import gameplay
@@ -1107,7 +1110,8 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         waves = sounds.pacman_sounds()
         free = free_resource_ids(game, raw, sum(len(v) for v in waves.values()))
         sound_ids = {name: [next(free) for _ in variants] for name, variants in waves.items()}
-    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids)
+    giant = next(free_resource_ids(game, raw, 1, start=GIANT_SLP)) if pacman else None  # the giant's own SLP
+    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant)
     for note in notes:
         log(note)
     if patch is None:
@@ -1128,12 +1132,34 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         touched[sound_name] = sound_drs
         log(f"Pac-Man's sounds: {sum(len(v) for v in waves.values())} WAV files in {sound_name} "
             f"(ids {min(min(v) for v in sound_ids.values())}-{max(max(v) for v in sound_ids.values())})")
+    if patch.giant_name is not None:  # the giant red Pac-Man's picture, where the game finds new files
+        sound_drs.put(giant, gameplay.giant_slp(quant))
+        touched[sound_name] = sound_drs
+        log(f"Giant Pac-Man: his picture is SLP {giant} in {sound_name}")
+        name_giant(game, mode, patch.giant_name, log)
     for name, drs in touched.items():  # each archive written once
         tmp = game.data / (name + ".aom-new")
         drs.write(tmp)
         write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
     rename_pacman(game, mode, patch.pacman_strings, log)
+
+
+def name_giant(game: Game, mode: str, sid: int, log) -> None:
+    """The giant's name: in the mod's own language file, or in the game's where it fits in place."""
+    from aom import gameplay, langdll
+    if mode == "upmod":
+        game.mod_strings[sid] = gameplay.GIANT_NAME
+        return
+    for name, path in game.language_files().items():
+        data = path.read_bytes()
+        try:
+            if not langdll.read_string(data, sid):
+                continue
+            write_game_file(game, mode, name, langdll.set_string(data, sid, gameplay.GIANT_NAME), log,
+                            folder=game.root)
+        except (langdll.DllError, struct.error) as exc:
+            log(f"Giant Pac-Man's name: {name} not changed ({exc})")
 
 
 def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):
