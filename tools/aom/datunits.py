@@ -180,7 +180,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         v["projectile"] = r.one("h")  # the unit it shoots
         r.one("h")  # accuracy
         r.one("b")  # break off combat
-        r.one("h")  # frame delay
+        f["frame_delay"] = r.p
+        v["frame_delay"] = r.one("h")  # the frame of its attack animation its shot leaves on
         f["displacement"] = r.p
         v["displacement"] = r.take("fff")  # where its shots leave it: across, forward and up (tiles)
         f["blast_level"] = r.p

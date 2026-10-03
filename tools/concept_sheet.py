@@ -14,7 +14,7 @@ Writes into previews/ by default:
     wonders.png         the eighteen wonders and the scenario monuments
     fortifications.png  walls, gates, towers and castles
     walls.png           wall lines in every direction, with corners, as the game places them
-    sounds/*.wav        Pac-Man's sounds (clicking on him, orders, training, bites, death)
+    sounds/*.wav        Pac-Man's sounds (clicking on him, orders, training, bites, death), and the Dragon's
     giant.png           the "to smithereens" cheat's giant red Pac-Man by a Castle, a Wonder, Pac-Man and a knight
     nature.png          trees, resources and map decorations
     farms.png           farms, which are terrain: being built, grown and exhausted
@@ -701,6 +701,14 @@ def pacman_sounds(out: Path) -> None:
             (out / f"pacman_{name}{k + 1 if len(variants) > 1 else ''}.wav").write_bytes(sounds.wav(x))
 
 
+def dragon_sounds(out: Path) -> None:
+    from aom import roars, sounds
+    out.mkdir(parents=True, exist_ok=True)
+    for name, variants in roars.dragon_sounds().items():  # its death thuds as it lands in the game (0.8 s)
+        for k, x in enumerate(variants):
+            (out / f"dragon_{name}{k + 1 if len(variants) > 1 else ''}.wav").write_bytes(sounds.wav(x))
+
+
 def main() -> None:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "previews"
     out.mkdir(parents=True, exist_ok=True)
@@ -718,6 +726,7 @@ def main() -> None:
     fortifications_sheet(out / "fortifications.png")
     walls_scene(out / "walls.png")
     pacman_sounds(out / "sounds")
+    dragon_sounds(out / "sounds")
     nature_sheet(out / "nature.png")
     farms_sheet(out / "farms.png", units)
     giant_scene(out / "giant.png", units)

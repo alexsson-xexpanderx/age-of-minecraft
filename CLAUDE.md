@@ -116,7 +116,8 @@ putting `tools/` on `sys.path`.
      the never-used Advanced Heavy Crossbowman's slot (493): its own sprites (slpmap), every terrain, its shots
      (508, and 520 after Chemistry) drawn by an unused graphic (`FIRE_GRAPHICS`) pointed at a new fireball SLP
      (`fireball_slp`), its texts by `name_dragon`.
-   - `sounds.py` WAVs go into `gamedata_x1_p1.drs`.
+   - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
+     come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,
      `mod_language` gives the mod its own `language_x1_p1.dll` (`langdll.with_strings`: a new resource section
      added by `pe.py`) with his texts and "Age of Minecraft".

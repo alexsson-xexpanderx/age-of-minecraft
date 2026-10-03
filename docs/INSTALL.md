@@ -40,7 +40,7 @@ files are not changed. It writes:
 
 ```
 Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
-Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, Pac-Man's icon and sounds
+Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, Pac-Man's and the Dragon's icons and sounds
 Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man and the Dragon at the Wonder, the Javelina's own look
 Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's and the Dragon's names, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
@@ -170,8 +170,11 @@ ship. It spits fireballs: 40 damage every 3 seconds, at a range of 6 tiles,
 and its fire burns buildings as well as units. Armour: 4 against melee, 6
 against arrows. It flies at 1.4 tiles a second, as fast as Light Cavalry. It
 counts as an archer, so the Blacksmith's archer upgrades give it more range.
-It growls like a wolf when you click on it, and its fire roars like a Fire
-Ship's. Its icon is the dragon's head breathing fire. It lives in a slot the
+It has its own sounds: it growls, snorts or rumbles when you click on it,
+beats its wings when it moves, roars when you send it to attack and when the
+Wonder trains it, every fireball goes "fwoosh", and it dies with a falling
+roar, a thud as it hits the ground and a last groan. Listen to them in
+`previews/sounds/`. Its icon is the dragon's head breathing fire. It lives in a slot the
 game has but never uses (the "Advanced Heavy Crossbowman"), so no other unit
 changes. With `build_mod_direct.bat` its help text is too long for the
 game's own language file: hovering over its button there says only "Create

@@ -1126,19 +1126,26 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
             if all(sheet is not None for _, _, (sheet, _) in added):
                 dragon_sheets, dragon_icon = [(n, d, sheet) for n, d, (sheet, _) in added], index
     raw = game.dat_path.read_bytes()
-    waves, sound_ids, sound_drs = {}, None, None
-    if pacman:  # his sounds go where the game finds new files: the patch archive if there is one
-        from aom import sounds
+    waves, sound_ids, sound_drs, roars, roar_ids = {}, None, None, {}, None
+    if pacman or dragon:  # their sounds go where the game finds new files: the patch archive if there is one
         sound_name, sound_drs = next(((n, d) for n, d in game.archives if n.lower() == "gamedata_x1_p1.drs"),
                                      (game.graphics_path.name, game.graphics))
+    if pacman:
+        from aom import sounds
         waves = sounds.pacman_sounds()
-        free = free_resource_ids(game, raw, sum(len(v) for v in waves.values()))
+    if dragon:
+        from aom.roars import dragon_sounds
+        roars = dragon_sounds(gameplay.dragon_fall(game.graphics_table))
+    free = free_resource_ids(game, raw, sum(len(v) for v in [*waves.values(), *roars.values()]))
+    if pacman:  # his first, so his ids stay what they were
         sound_ids = {name: [next(free) for _ in variants] for name, variants in waves.items()}
+    if dragon:
+        roar_ids = {name: [next(free) for _ in variants] for name, variants in roars.items()}
     pictures = free_resource_ids(game, raw, 2, start=GIANT_SLP)
     giant = next(pictures) if pacman else None  # the giant's own SLP
     fire = next(pictures) if dragon else None  # the dragon's fireball's
     patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon,
-                                      fire, dragon_icon)
+                                      fire, dragon_icon, roar_ids)
     for note in notes:
         log(note)
     if patch is None:
@@ -1169,6 +1176,14 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         touched[sound_name] = sound_drs
         log(f"Pac-Man's sounds: {sum(len(v) for v in waves.values())} WAV files in {sound_name} "
             f"(ids {min(min(v) for v in sound_ids.values())}-{max(max(v) for v in sound_ids.values())})")
+    if patch.dragon_sounds_added:
+        from aom import sounds
+        for name, variants in roars.items():
+            for rid, x in zip(roar_ids[name], variants):
+                sound_drs.put(rid, sounds.wav(x), "wav")
+        touched[sound_name] = sound_drs
+        log(f"Dragon's sounds: {sum(len(v) for v in roars.values())} WAV files in {sound_name} "
+            f"(ids {min(min(v) for v in roar_ids.values())}-{max(max(v) for v in roar_ids.values())})")
     if patch.giant_name is not None:  # the giant red Pac-Man's picture, where the game finds new files
         sound_drs.put(giant, gameplay.giant_slp(quant))
         touched[sound_name] = sound_drs

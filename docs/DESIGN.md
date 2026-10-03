@@ -310,12 +310,29 @@ of fire at its mouth on the frame the shot leaves (the game's frame 5 of 10).
 minutes, 600 hit points), lets it go over every terrain (restriction 0, the
 hawk's), gives it fire (40 melee damage, range 6, every 3 seconds) and the
 numbers its panel shows, moves its shots' starting point up to its mouth, and
-swaps the slot's soldier voice for the wolf's growl and its crossbow sound for
-the Fire Ship's. Its shot (unit 508, and 520 that Chemistry turns it into;
+gives it its own sounds instead of the slot's soldier voice and crossbow twang
+(below). Its shot (unit 508, and 520 that Chemistry turns it into;
 nothing else shoots either) becomes a fireball: an unused torch graphic
 (TORCH2) pointed at a new SLP of a flickering ball of fire, on the
 projectiles' layer. Its icon, the dragon's head breathing fire, comes after
 the giant's in the unit icon sheet.
+
+Its sounds (`roars.py`) are synthesised as well, nothing sampled. A roar is a
+voice: a low buzz (a sawtooth, plus one an octave below for the rough double
+beat of a growl), chopped into a rattle 20-30 times a second, with breath,
+through a mouth of formants (the resonances that make vowels) that opens from
+"oo" to "aah" and shuts again, pitched for a throat about twice as long as a
+person's; then overdriven for grit, with a short echo. Its wing beats are a
+rush of air and a deep whump; its fire is noise opening up bright and closing
+down dull, with a rumble under it and crackles over it. Clicking on it gets a
+growl, a snort and a purr, or a rumbling "hrrm?"; orders to move beat its
+wings, orders to attack roar, and the Wonder sends it off with a long roar and
+wing beats. They are new entries in the sound table after Pac-Man's (so his
+stay where they were), with their WAV files next to his. Its fire replaces the
+crossbow's sound on its attack animation, moved to the frame its fireball
+leaves (the twang came two frames later); its death sound, on its dying
+animation, roars as it falls, thuds when it lands (timed from the game's own
+frames) and ends in a groan.
 
 Pac-Man is also a
 rule change: every civilisation can train him at a finished Wonder

@@ -18,6 +18,7 @@ DIRECTIONS = [("S", -90), ("SW", -135), ("W", 180), ("NW", 135), ("N", 90),
 ACTIONS = ("idle", "walk", "attack", "die")
 WHEELS = [f"wheel_{i}" for i in range(1, 7)]
 QUAD_LEGS = (("leg_fr", 1), ("leg_bl", 1), ("leg_fl", -1), ("leg_br", -1))
+DRAGON_FALL = 0.8  # the part of its dying animation the dragon takes to hit the ground (its death sound thuds then)
 
 
 def _ease(x: float) -> float:
@@ -143,7 +144,7 @@ def pose(unit, action: str, t: float) -> Pose:
         p.hidden |= {"body"} if t >= 0.85 else {"pop"}
         return p
     if action == "die" and rig == "dragon":  # it falls out of the sky and lands on its belly, wings and head drooping
-        drop = min(1.0, t / 0.8) ** 2
+        drop = min(1.0, t / DRAGON_FALL) ** 2
         _move(p, "root", dz=-(unit.root.offset[2] - 5) * drop)
         _add(p, "wing_r", ry=12 * drop)
         _add(p, "wing_l", ry=-12 * drop)

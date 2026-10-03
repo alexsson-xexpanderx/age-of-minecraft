@@ -32,7 +32,8 @@ Heavy Crossbowman (unit 493), which the game never trains: its own sprites
 are redrawn as the dragon (slpmap), it may go over every terrain (water too),
 its shots (508, and 520 after Chemistry, which no other unit shoots) become
 fireballs drawn by an unused graphic (`FIRE_GRAPHICS`) pointed at a new SLP,
-and it growls like the wolf instead of talking like a soldier.
+and it gets its own roars, wing beats and fire (roars.py), new entries in the
+sound table after Pac-Man's, instead of talking like a soldier.
 """
 from __future__ import annotations
 
@@ -91,6 +92,7 @@ class DatPatch:
     giant_name: Optional[int] = None  # the Saboteur's name string, if he became the giant (his SLP must be written)
     dragon_strings: Optional[dict[str, int]] = None  # the dragon's text ids, if it was patched (its SLP must be written)
     fire_layout: Optional[tuple[int, int, bool]] = None  # its fireball's frames, angles and mirroring
+    dragon_sounds_added: bool = False  # the sound table has the dragon's sounds: their WAV files must be written too
 
 
 def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
@@ -101,12 +103,12 @@ def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
 
 def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None,
               sounds: Optional[dict[str, list[int]]] = None, giant: Optional[int] = None,
-              giant_icon: Optional[int] = None, fire: Optional[int] = None,
-              dragon_icon: Optional[int] = None) -> tuple[Optional[DatPatch], list[str]]:
+              giant_icon: Optional[int] = None, fire: Optional[int] = None, dragon_icon: Optional[int] = None,
+              dragon_sounds: Optional[dict[str, list[int]]] = None) -> tuple[Optional[DatPatch], list[str]]:
     """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), the giant red Pac-Man
     drawn from SLP `giant` (if given; with Pac-Man only), the dragon at the Wonder with its fireballs drawn from SLP
-    `fire` (if given), and the Javelina's own sprites. `sounds` maps a sound name (see SOUND_USES) to the resource
-    ids of its WAV files.
+    `fire` (if given, with `dragon_sounds`), and the Javelina's own sprites. `sounds` maps a sound name (see
+    SOUND_USES) to the resource ids of its WAV files; `dragon_sounds` the same for DRAGON_SOUND_USES.
 
     Returns (patch, notes)."""
     try:
@@ -132,12 +134,20 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
     if pac_done and giant is not None:  # after the sounds: he gets Pac-Man's
         msg, giant_gid, giant_name = _giant(data, civs, graphics, giant, giant_icon)
         notes.append(msg)
-    fire_gid = dragon_strings = None
+    fire_gid = dragon_strings = roar_ids = None
     if fire is not None:  # in place, like the giant: before anything below grows the file
+        if dragon_sounds:  # its sounds come after Pac-Man's in the sound table
+            try:
+                first = datfile.sound_table(bytes(data)).count + (len(sounds) if table is not None else 0)
+                roar_ids = {name: first + k for k, name in enumerate(dragon_sounds)}
+            except (ValueError, struct.error) as exc:
+                notes.append(f"Dragon's sounds: not added, the sound table could not be read ({exc})")
         msg, fire_gid, dragon_strings = _dragon(data, civs, graphics, fire, dragon_icon,
-                                                {giant_gid} if giant_gid is not None else set())
+                                                {giant_gid} if giant_gid is not None else set(), roar_ids)
         changed |= fire_gid is not None
         notes.append(msg)
+        if fire_gid is None:
+            roar_ids = None
     # last, from the back of the file to the front: these grow the file, which moves everything after them
     if pac_done:
         notes.append(_boarding(data, civs))
@@ -145,6 +155,8 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         notes.append(_giant_boarding(data))
     if table is not None:
         _add_sounds(data, table, sounds)
+    if roar_ids is not None:  # after Pac-Man's
+        _add_sounds(data, datfile.sound_table(bytes(data)), dragon_sounds, "drg")
     if not changed:
         return None, notes
     check = DU.read_units(bytes(data))  # read everything back: same layout, new values
@@ -173,10 +185,11 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
                                              for t in heads.tasks[SABOTEUR] or []):
             return None, notes + ["not changed: the giant Pac-Man's boarding task did not read back as expected"]
     packed = DU.compress(bytes(data))
-    if table is not None:
+    if table is not None or roar_ids is not None:
+        count = max(roar_ids.values()) + 1 if roar_ids is not None else table.count + len(sounds)
         try:
             datfile.read_graphics(packed)
-            ok = datfile.sound_table(bytes(data)).count == table.count + len(sounds)
+            ok = datfile.sound_table(bytes(data)).count == count
         except (ValueError, struct.error):
             ok = False
         if not ok:
@@ -190,7 +203,8 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the dragon's fireball did not read back as expected"]
         fire_layout = (g.frame_count, g.angle_count, bool(g.mirroring))
     return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, sounds_added=table is not None,
-                    giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout), notes
+                    giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout,
+                    dragon_sounds_added=roar_ids is not None), notes
 
 
 def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple[str, Optional[dict[str, int]]]:
@@ -344,7 +358,11 @@ FLYING = 0  # terrain restriction 0: every terrain, deep water too (the hawk's)
 FIRE_GRAPHICS = ("TORCH2",)
 DRAGON_LAYER = 22  # drawn over units and buildings, as the birds are (it is up in the air)
 FIRE_LAYER = 30  # drawn over everything, as every projectile is
-DRAGON_SOUNDS = {"growl": "wolfx.wav", "fire": "fgalley.wav"}  # the game's own sounds: the wolf, the Fire Ship
+# which unit sound each of its own sounds (roars.py) replaces; "fire" and "death" go on its attack and death animations
+DRAGON_SOUND_USES = {"select": "selection_sound", "move": "move_sound", "attack": "attack_sound",
+                     "train": "train_sound", "fire": None, "death": None}
+# without its own sounds (if the sound table cannot be read): the game's, the wolf's growl and the Fire Ship's fire
+DRAGON_SOUNDS = {"growl": "wolfx.wav", "fire": "fgalley.wav"}
 TILE_PIXELS = 96 / 2 ** 0.5  # screen pixels across one tile
 HEIGHT_PIXELS = 24  # screen pixels a shot rises per tile of height (the Castle's arrows leave at 4, about 96 up)
 
@@ -358,6 +376,15 @@ def dragon_mouth() -> tuple[float, float, float]:
     forward, up = DRAGON_MOUTH
     return (0.0, round(forward * px / TILE_PIXELS, 2),
             round((DRAGON_HEIGHT + up) * math.cos(math.radians(30)) * px / HEIGHT_PIXELS, 2))
+
+
+def dragon_fall(graphics: dict) -> float:
+    """Seconds from the start of the dragon's dying animation until it hits the ground, as the game plays it."""
+    from .animation import DRAGON_FALL
+    g = next((g for g in graphics.values() if g.name.upper() == "AHXBW_DN"), None)
+    if g is None or g.frame_count <= 0 or not 0 < g.frame_rate < 1:
+        return DRAGON_FALL
+    return round(DRAGON_FALL * g.frame_count * g.frame_rate, 2)
 
 
 def fire_graphic(graphics: dict, civs, taken: set[int]) -> Optional[int]:
@@ -383,9 +410,11 @@ def fire_graphic(graphics: dict, civs, taken: set[int]) -> Optional[int]:
 
 
 def _dragon(data: bytearray, civs, graphics: dict, fire_slp: int, icon: Optional[int] = None,
-            taken: Optional[set[int]] = None) -> tuple[str, Optional[int], Optional[dict[str, int]]]:
-    """Unit 493 becomes the dragon, trained at the Wonder, its shots fireballs drawn from SLP `fire_slp`: (note, the
-    fireball's graphic, its text ids)."""
+            taken: Optional[set[int]] = None,
+            own: Optional[dict[str, int]] = None) -> tuple[str, Optional[int], Optional[dict[str, int]]]:
+    """Unit 493 becomes the dragon, trained at the Wonder, its shots fireballs drawn from SLP `fire_slp`, with its
+    `own` sounds (name -> sound id, see DRAGON_SOUND_USES; added to the table afterwards), or else the game's wolf and
+    Fire Ship: (note, the fireball's graphic, its text ids)."""
     gid = fire_graphic(graphics, civs, taken or set())
     if gid is None:
         return f"Dragon: not changed, none of {', '.join(FIRE_GRAPHICS)} is free for its fireball", None, None
@@ -415,7 +444,9 @@ def _dragon(data: bytearray, civs, graphics: dict, fire_slp: int, icon: Optional
                  outline_size=(DRAGON_OUTLINE, DRAGON_OUTLINE, u.values["outline_size"][2]),
                  displayed=(DRAGON_ARMOUR[0][1], DRAGON_ATTACK[0][1], DRAGON_RANGE, DRAGON_RELOAD),
                  displayed_pierce=DRAGON_ARMOUR[1][1])
-        if sound["growl"] is not None:  # not the slot's soldier's voice
+        if own:  # not the slot's soldier's voice
+            DU.patch(data, u, **{field: own[name] for name, field in DRAGON_SOUND_USES.items() if field})
+        elif sound["growl"] is not None:
             DU.patch(data, u, selection_sound=sound["growl"], move_sound=sound["growl"], attack_sound=sound["growl"])
         if icon is not None:
             DU.patch(data, u, icon=icon)
@@ -433,10 +464,17 @@ def _dragon(data: bytearray, civs, graphics: dict, fire_slp: int, icon: Optional
         if g is not None and g.layer_at >= 0:
             struct.pack_into("<b", data, g.layer_at, DRAGON_LAYER)
     attack, dying = graphics.get(first.values["attack_graphic"]), graphics.get(first.values["dying"][0])
-    if sound["fire"] is not None and attack is not None:  # not the crossbow's twang
-        _graphic_sound(data, attack, sound["fire"])
-    if sound["growl"] is not None and dying is not None and dying.sound >= 0:  # not a soldier's scream
-        struct.pack_into("<h", data, dying.sound_at, sound["growl"])
+    if own:  # its fire, not the crossbow's twang; its death, not a soldier's scream
+        if attack is not None:
+            _graphic_sound(data, attack, own["fire"])
+            _sound_frame(data, attack, own["fire"], first.values["frame_delay"])
+        if dying is not None:
+            _graphic_sound(data, dying, own["death"])
+    else:
+        if sound["fire"] is not None and attack is not None:
+            _graphic_sound(data, attack, sound["fire"])
+        if sound["growl"] is not None and dying is not None and dying.sound >= 0:
+            struct.pack_into("<h", data, dying.sound_at, sound["growl"])
     strings = {"name": first.values["name_id"], "creation": first.values["creation_id"]}
     if first.values["help_id"] > HELP_STRINGS:
         strings["help"] = first.values["help_id"] - HELP_STRINGS
@@ -445,7 +483,9 @@ def _dragon(data: bytearray, civs, graphics: dict, fire_slp: int, icon: Optional
             f"{DRAGON_ATTACK[0][1]} at range {DRAGON_RANGE:g}, flies over every terrain"
             + (f", icon {icon}" if icon is not None else "")
             + f"; its shots (units {', '.join(map(str, DRAGON_SHOTS))}) are fireballs: graphic {gid} "
-              f"({graphics[gid].name}) now draws SLP {fire_slp}"), gid, strings
+              f"({graphics[gid].name}) now draws SLP {fire_slp}"
+            + (f"; its own sounds: {', '.join(own)} (sounds {min(own.values())}-{max(own.values())})" if own else
+               "; the wolf's growl and the Fire Ship's fire")), gid, strings
 
 
 _FIRE_SLPS: dict[tuple, bytes] = {}
@@ -546,12 +586,24 @@ def _graphic_sound(data: bytearray, g, sid: int) -> None:
         struct.pack_into("<h", data, g.sound_at, sid)
 
 
-def _add_sounds(data: bytearray, table, sounds: dict[str, list[int]]) -> None:
+def _sound_frame(data: bytearray, g, sid: int, frame: int) -> None:
+    """Play sound `sid` on `frame` wherever the animation plays it per angle: the dragon's fire as its fireball leaves
+    (the crossbow's twang came two frames later)."""
+    if g.angle_sounds_at < 0 or not 0 <= frame < g.frame_count:
+        return
+    for a in range(max(1, g.angle_count)):
+        for k in range(3):
+            at = g.angle_sounds_at + 12 * a + 4 * k
+            if struct.unpack_from("<h", data, at + 2)[0] == sid:
+                struct.pack_into("<h", data, at, frame)
+
+
+def _add_sounds(data: bytearray, table, sounds: dict[str, list[int]], prefix: str = "pac") -> None:
     entries = b""
     for k, (name, rids) in enumerate(sounds.items()):
         probs = [100 // len(rids)] * len(rids)
         probs[0] += 100 - sum(probs)
-        entries += datfile.sound_entry(table.count + k, [(f"pac{name[:4]}{v}.wav", rid, prob)
+        entries += datfile.sound_entry(table.count + k, [(f"{prefix}{name[:4]}{v}.wav", rid, prob)
                                                          for v, (rid, prob) in enumerate(zip(rids, probs))])
     data[table.end:table.end] = entries
     struct.pack_into("<H", data, table.count_at, table.count + len(sounds))

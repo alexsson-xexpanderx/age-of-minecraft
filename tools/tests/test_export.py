@@ -573,6 +573,13 @@ def test_full_build(tmp: Path):
     dragon_icon = icons_after[172].pixels
     assert dragon_icon.shape == (36, 36) and len(np.unique(dragon_icon)) >= 6
     assert "Dragon (unit 493) trainable at the Wonder" in report and "the dragon is icon 172 (36x36)" in report
+    # its own sounds, after Pac-Man's in the sound table: clicks, orders and training; its fire and its death
+    d = units.units[1][493]
+    assert (d.values["selection_sound"], d.values["move_sound"], d.values["attack_sound"],
+            d.values["train_sound"]) == (7, 8, 9, 10)
+    assert graphics_after[d.values["attack_graphic"]].sound == 11 and graphics_after[d.values["dying"][0]].sound == 12
+    assert "its own sounds: select, move, attack, train, fire, death (sounds 7-12)" in report
+    assert "Dragon's sounds: 11 WAV files in gamedata_x1_p1.drs (ids 15511-15521)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -658,13 +665,13 @@ def test_full_build(tmp: Path):
     # his sounds: six new sounds in the .dat, their WAV files in the patch archive (on free ids)
     from aom.datfile import sound_table
     dat = datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
-    assert sound_table(dat).count == 7
+    assert sound_table(dat).count == 13  # and the dragon's six
     pac = units.units[1][860]
     assert (pac.values["selection_sound"], pac.values["move_sound"], pac.values["attack_sound"],
             pac.values["train_sound"]) == (1, 2, 3, 4)
     p1 = Drs(mod / "Data" / "gamedata_x1_p1.drs")
-    assert p1.ids("wav") == {15500} | set(range(15502, 15511))  # 15501 is a sound the .dat already uses
-    assert all(p1.get(i, "wav")[:4] == b"RIFF" and p1.get(i, "wav")[8:12] == b"WAVE" for i in range(15502, 15511))
+    assert p1.ids("wav") == {15500} | set(range(15502, 15522))  # 15501 is a sound the .dat already uses
+    assert all(p1.get(i, "wav")[:4] == b"RIFF" and p1.get(i, "wav")[8:12] == b"WAVE" for i in range(15502, 15522))
     assert "Pac-Man's sounds: select, move, attack, train, chomp, death" in report
     # the Javelina gets its own sprites: the missing files are created, the unit points at them
     table = read_graphics((game / "Data" / "empires2_x1_p1.dat").read_bytes())
@@ -774,7 +781,7 @@ def test_direct_mode_and_restore(tmp: Path):
     icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     assert len(icons) == 173  # Pac-Man's, the giant's and the dragon's icons added, not three per build
     assert Drs(game / "Data" / "interfac.drs").get(51141) != panel_before  # the panel too, in the same file
-    assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15511))
+    assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15522))
     assert build_mod.main(["--game", str(game), "--restore"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() == before
     assert (game / "Data" / "terrain.drs").read_bytes() == ground_before
@@ -883,6 +890,31 @@ def test_pacman_sounds():
     silent = bytearray(struct.pack("<h", -1))  # an animation with no sound gets ours as its own
     gameplay._graphic_sound(silent, Graphic(2, "mkyby_DN", "", 2, 0, 10, 2, 0.1, 0, 0, [], -1, 0, -1), 601)
     assert struct.unpack("<h", silent)[0] == 601
+
+
+def test_dragon_sounds():
+    from aom import gameplay, roars, sounds
+    waves = roars.dragon_sounds()
+    assert set(waves) == set(gameplay.DRAGON_SOUND_USES)
+    for variants in waves.values():
+        for x in variants:
+            assert 0.5 < len(x) / 22050 < 3.5 and np.isclose(np.abs(x).max(), 0.8) and abs(x.mean()) < 0.01
+            assert sounds.wav(x)[:4] == b"RIFF"
+    assert all(np.array_equal(a, b) for a, b in zip(waves["select"], roars.dragon_sounds.__wrapped__()["select"]))
+    # it thuds when it hits the ground: as long into its death sound as its dying animation takes to land
+    for fall in (0.6, 1.0):
+        x = roars.dragon_sounds.__wrapped__(fall)["death"][0]
+        loud = [np.sqrt((x[int(a * 22050):int((a + 0.1) * 22050)] ** 2).mean()) for a in (fall - 0.1, fall)]
+        assert loud[1] > 1.4 * loud[0]
+    from aom.datfile import Graphic
+    dying = Graphic(1, "AHXBW_DN", "", 2714, 20, 10, 8, 0.1, 0, 6)
+    assert gameplay.dragon_fall({1: dying}) == 0.8 and gameplay.dragon_fall({}) == 0.8
+    # its fire plays on the frame its fireball leaves, not on the crossbow's (two frames later)
+    data = bytearray(struct.pack("<h", -1) + struct.pack("<6h", 7, 314, -1, -1, -1, -1) * 2)
+    attack = Graphic(2, "AHXBW_AN", "", 2711, 20, 10, 2, 0.07, 0, 0, [], -1, 0, 2)
+    gameplay._graphic_sound(data, attack, 516)
+    gameplay._sound_frame(data, attack, 516, 5)
+    assert struct.unpack_from("<12h", data, 2) == (5, 516, -1, -1, -1, -1) * 2
 
 
 def test_language_files():
