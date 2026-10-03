@@ -21,7 +21,7 @@ SHEETS = [
     ("ships", "Ships", lambda u: u.group == "ship" and not u.civ),
     ("uniques", "Unique units", lambda u: u.civ is not None),
     ("animals", "Animals", lambda u: u.group == "animal"),
-    ("easter", "Easter eggs (cheat units)", lambda u: u.group == "easter"),
+    ("easter", "Easter eggs (cheat units) and the Dragon", lambda u: u.group == "easter"),
 ]
 
 

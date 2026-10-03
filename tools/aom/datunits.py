@@ -61,7 +61,8 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "creation_id": "H", "help_id": "i", "hotkey_text_id": "i", "standing": "hh", "hit_points": "h",
            "dying": "hh", "walking": "hh", "attack_graphic": "h", "dead_unit": "h", "class": "h",
            "terrain_restriction": "h", "speed": "f", "collision_size": "fff", "outline_size": "fff",
-           "blast_width": "f", "reload": "f", "blast_level": "b",
+           "blast_width": "f", "reload": "f", "blast_level": "b", "line_of_sight": "f", "max_range": "f",
+           "projectile": "h", "displacement": "fff", "displayed": "hhff", "displayed_pierce": "h",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
 
 
@@ -85,7 +86,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.one("b")  # undead mode
     f["hit_points"] = r.p
     v["hit_points"] = r.one("h")
-    r.one("f")  # line of sight
+    f["line_of_sight"] = r.p
+    v["line_of_sight"] = r.one("f")  # tiles
     r.one("b")  # garrison capacity
     f["collision_size"] = r.p
     v["collision_size"] = r.take("fff")  # radius across, radius along (tiles), height
@@ -128,7 +130,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     v["outline_size"] = r.take("fff")  # the selection outline drawn around the unit
     r.skip(3 * 7)  # resource storages: (int16 type, float amount, int8 flag) x 3
     n_damage = r.one("B")
-    r.skip(n_damage * 5)
+    v["damage_graphics"] = [r.take("hbbb")[0] for _ in range(n_damage)]  # e.g. a building's flames
     f["selection_sound"] = r.p
     v["selection_sound"] = r.one("h")
     f["dying_sound"] = r.p
@@ -168,23 +170,27 @@ def _unit(r: _R, civ: int) -> UnitRecord:
             f[kind] = r.p
             v[kind] = [r.take("hh") for _ in range(n)]
         r.one("h")  # defence terrain bonus
-        r.one("f")  # max range
+        f["max_range"] = r.p
+        v["max_range"] = r.one("f")  # tiles
         f["blast_width"] = r.p
         v["blast_width"] = r.one("f")
         f["reload"] = r.p
         v["reload"] = r.one("f")  # seconds between attacks
-        r.take("hh")  # projectile unit, accuracy
+        f["projectile"] = r.p
+        v["projectile"] = r.one("h")  # the unit it shoots
+        r.one("h")  # accuracy
         r.one("b")  # break off combat
         r.one("h")  # frame delay
-        r.take("fff")  # graphic displacement
+        f["displacement"] = r.p
+        v["displacement"] = r.take("fff")  # where its shots leave it: across, forward and up (tiles)
         f["blast_level"] = r.p
         v["blast_level"] = r.one("b")  # who else a blast hurts
         r.one("f")  # min range
         r.one("f")  # accuracy dispersion
         f["attack_graphic"] = r.p
         v["attack_graphic"] = r.one("h")
-        r.take("hh")  # displayed melee armour, displayed attack
-        r.take("ff")  # displayed range, displayed reload time
+        f["displayed"] = r.p  # what the unit's panel shows: melee armour, attack, range, reload time
+        v["displayed"] = r.take("hhff")
     if utype == 60:  # projectiles
         r.take("bbbbb")
         r.one("f")
@@ -207,7 +213,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         r.take("fff")  # projectile spawning area
         r.take("ii")  # secondary projectile, special graphic
         r.one("b")  # special ability
-        r.one("h")  # displayed pierce armour
+        f["displayed_pierce"] = r.p
+        v["displayed_pierce"] = r.one("h")  # the pierce armour its panel shows
     if utype == 80:  # buildings
         r.take("hh")  # construction graphic, snow graphic
         r.one("b")  # adjacent mode

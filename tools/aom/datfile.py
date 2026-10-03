@@ -42,6 +42,11 @@ class Graphic:
     slp_at: int = -1  # offset of the SLP id in the decompressed file
 
     @property
+    def layer_at(self) -> int:
+        """Offset of the drawing layer (10 shadows, 20 units and buildings, 22 birds, 30 projectiles), if known."""
+        return self.slp_at + 6 if self.slp_at >= 0 else -1
+
+    @property
     def stored_angles(self) -> int:
         """Angles actually stored in the SLP (the rest are mirrored by the game)."""
         a = max(1, self.angle_count)
@@ -104,6 +109,18 @@ def sound_table(data: bytes) -> SoundTable:
         _sid, _delay, files, _cache = r.take("hhHi")
         r.skip(files * SOUND_FILE.size)
     return SoundTable(at, r.p, count)
+
+
+def sound_files(data: bytes) -> dict[int, list[str]]:
+    """Every sound's file names, by sound id."""
+    table = sound_table(data)
+    out, at = {}, table.count_at + 2
+    for _ in range(table.count):
+        sid, _delay, files, _cache = struct.unpack_from("<hhHi", data, at)
+        at += 10
+        out[sid] = [_cstr(SOUND_FILE.unpack_from(data, at + k * SOUND_FILE.size)[0]) for k in range(files)]
+        at += files * SOUND_FILE.size
+    return out
 
 
 def sound_entry(sid: int, files: list[tuple[str, int, int]]) -> bytes:

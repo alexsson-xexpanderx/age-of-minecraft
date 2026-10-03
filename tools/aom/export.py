@@ -78,7 +78,7 @@ def _crop(codes: np.ndarray, origin: tuple[int, int]) -> slp.SlpFrame:
 
 
 def render_frames(unit: Unit, action: str, frames_per_angle: int, angle_count: int, mirroring: bool,
-                  quant: Quantiser) -> list[slp.SlpFrame]:
+                  quant: Quantiser, shadow: bool = True) -> list[slp.SlpFrame]:
     frames_per_angle = max(1, frames_per_angle)
     hs = headings(angle_count, mirroring)
     cam = camera_for(unit, action, hs, frames_per_angle)
@@ -86,7 +86,7 @@ def render_frames(unit: Unit, action: str, frames_per_angle: int, angle_count: i
     for a, h in enumerate(hs):
         for i in range(frames_per_angle):
             t = _time(action, i, frames_per_angle)
-            frame = render(unit.root, h, _pose(unit, action, t), cam)
+            frame = render(unit.root, h, _pose(unit, action, t), cam, shadow=shadow)
             if action == "decay":
                 _dissolve(frame, max(0.0, (t - 0.45) / 0.55), seed=1000 + a)
             out.append(_crop(quant.frame_codes(frame), cam.origin))

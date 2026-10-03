@@ -45,11 +45,12 @@ def fake_palette() -> bytes:
 
 
 def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1, attacks=(), armours=(),
-                blast: float = 0.0, blast_level: int = 0, reload: float = 0.0) -> bytes:
+                blast: float = 0.0, blast_level: int = 0, reload: float = 0.0, walking: int = -1, dying: int = -1,
+                attack_graphic: int = -1, projectile: int = -1) -> bytes:
     """One unit record in the Conquerors layout (mirrors aom.datunits)."""
     nb = name.encode()
     b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 10 if uid == 860 else 0))
-    b += struct.pack("<hhhhbhfb", standing, -1, -1, -1, 0, 30, 4.0, 0)
+    b += struct.pack("<hhhhbhfb", standing, -1, dying, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
     b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 1 if uid == 860 else 7,  # no beaches
                      0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
@@ -58,14 +59,16 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     if utype >= 20:
         b += struct.pack("<f", 1.0)
     if utype >= 30:
-        b += struct.pack("<hhfbhbfbfffff", -1, -1, 0.0, 0, -1, 0, 0.0, 0, 0, 0, 0, 0, 0)
+        b += struct.pack("<hhfbhbfbfffff", walking, -1, 0.0, 0, -1, 0, 0.0, 0, 0, 0, 0, 0, 0)
     if utype >= 40:
         b += struct.pack("<hffhhbhhb", -1, 0, 0, -1, -1, 0, -1, -1, 0)
     if utype >= 50:
         b += struct.pack("<hH", 0, len(attacks)) + b"".join(struct.pack("<hh", *a) for a in attacks)
         b += struct.pack("<H", len(armours)) + b"".join(struct.pack("<hh", *a) for a in armours)
-        b += struct.pack("<hfffhhbhfffbffhhhff", 0, 0, blast, reload, -1, 0, 0, 0, 0, 0, 0, blast_level, 0, 0, -1, 0, 0,
-                         0, 0)
+        b += struct.pack("<hfffhhbhfffbffhhhff", 0, 0, blast, reload, projectile, 0, 0, 0, 0, 0, 0, blast_level, 0, 0,
+                         attack_graphic, 0, 0, 0, 0)
+    if utype == 60:
+        b += struct.pack("<bbbbbf", 0, 0, 0, 0, 0, 0.0)
     if utype >= 70:
         b += struct.pack("<hhhhhhhhhhhbffbbifbfffiibh", 0, 25, 1, 3, 25, 1, 4, 1, 0, 20, -1, 0, 0, 0, 2, 0, -1, 0, 0,
                          0, 0, 0, -1, -1, 0, 0)
@@ -76,10 +79,11 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
 
 
 def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0,
-              saboteur_graphic: int = 0) -> bytes:
+              saboteur_graphic: int = 0, crossbow_graphic: int = 0) -> bytes:
     """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860) with his bite and
-    armour, the Saboteur (706) with its blast, and the Javelina (822) borrowing the Wild Boar's sprites, with its
-    carcass (823) and the boar's (356).
+    armour, the Saboteur (706) with its blast, the Javelina (822) borrowing the Wild Boar's sprites, with its
+    carcass (823) and the boar's (356), and the Advanced Heavy Crossbowman (493: graphics `crossbow_graphic` on,
+    attack, dying, standing, walking) with its shot (508) and the shot Chemistry makes of it (520).
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -88,15 +92,15 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     board = (1, 1, 0, 3, 20, -1, -1, -1, -1, -1, -1, 0.0, 0.0, 1.0, 0, 0.0, 0, 0, 0, 0, 4, 0, 0, -1, -1, -1, -1, -1, -1)
     out = bytearray(struct.pack("<I", slots))
     for u in range(slots):
-        tasks = [attack, board] if u == 74 else [attack] if u == 860 else []
+        tasks = [attack, board] if u in (74, 493) else [attack] if u == 860 else []
         out += struct.pack("<bH", 1, len(tasks)) + b"".join(TASK.pack(*t) for t in tasks) if u % 2 == 0 or u in (
-            276, 860, 823) else b"\0"
+            276, 860, 823, 493) else b"\0"
     out += struct.pack("<H", civs)
     rng = np.random.default_rng(5)
     for c in range(civs):
         out += struct.pack("<b20sHhh", 1, [b"Gaia", b"British", b"French"][c % 3], 4, 1, 1)
         out += struct.pack("<4f", 1, 2, 3, 4) + struct.pack("<bH", 0, slots)
-        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823)]
+        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823, 493)]
         # like the original game's file, a pointer is a memory address (0 = no unit)
         out += struct.pack(f"<{slots}i", *[int(rng.integers(0x400000, 0x7fffffff)) if u in present else 0
                                            for u in range(slots)])
@@ -109,6 +113,13 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
             elif u == 706:
                 out += _unit_bytes(u, 70, "HDSQD", saboteur_graphic, attacks=[(11, 500), (4, 100), (13, 500)],
                                    armours=[(16, 0), (4, 1), (3, 3)], blast=2.5, blast_level=2, reload=5.0)
+            elif u == 493:
+                g = crossbow_graphic
+                out += _unit_bytes(u, 70, "AHXBW", g + 2, attacks=[(3, 8)], armours=[(4, 0), (3, 3)], reload=4.0,
+                                   walking=g + 3, dying=g + 1, attack_graphic=g, projectile=508)
+            elif u in (508, 520):
+                out += _unit_bytes(u, 60, "MRAHX" if u == 508 else "MFAHX", crossbow_graphic + 5,
+                                   walking=crossbow_graphic + 5)
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -284,7 +295,8 @@ def fake_game(root: Path) -> Path:
               26860: "Create <b>Furious the Monkey Boy<b> (<cost>)\nA very fast cheat unit.", 5861: "Next unit"}
     (root / "language_x1_p1.dll").write_bytes(langdll.build_dll({5860: monkey[5860], 9999: "UserPatch"}))
     (root / "language_x1.dll").write_bytes(langdll.build_dll({**monkey, 4: "Age of Empires II Expansion"}))
-    (root / "language.dll").write_bytes(langdll.build_dll({5079: "Militia"}))
+    (root / "language.dll").write_bytes(langdll.build_dll({  # and the Advanced Heavy Crossbowman's (5493, 6493, 26493)
+        5079: "Militia", 5493: "Advanced Heavy Crossbowman", 6493: "not used 6493", 26493: "not used #26493"}))
     graphics = Drs()
     table = []
     # militia (5 sprites), archer (5), a battering ram with a separate swinging head and wheels
@@ -332,6 +344,13 @@ def fake_game(root: Path) -> Path:
     monkey = len(table)
     table.append({"name": "mkyby_FN", "slp": 5299, "frames": 15, "angles": 8})
     graphics.put(5299, build_mod.blank(15 * 5))
+    crossbow = len(table)  # the Advanced Heavy Crossbowman's own sprites, its shot's, and an old torch no one uses
+    for name, slp_id, frames in (("AHXBW_AN", 2711, 10), ("AHXBW_DN", 2714, 10), ("AHXBW_FN", 2717, 1),
+                                 ("AHXBW_WN", 2721, 15), ("AHXBW_SN", 2718, 6)):
+        table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8, "mirror": 6})
+        graphics.put(slp_id, build_mod.blank(frames * 5))
+    table += [{"name": "M_SPEA_R", "slp": 3820, "frames": 10, "angles": 32, "mirror": 24},
+              {"name": "TORCH2", "slp": 5283, "frames": 14, "angles": 1, "mirror": 0}]
     graphics.put(40000, b"not a sprite we touch")
     graphics.write(data / "graphics.drs")
     extra = Drs()  # some sprites only exist in gamedata_x1.drs
@@ -357,7 +376,8 @@ def fake_game(root: Path) -> Path:
                                  ("BOARJ_RN", 5160, 10), ("BOARJ_SN", 5161, 5), ("BOARJ_WN", 5162, 10)):
         table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8})  # only 5157 has a file
     (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar,
-                                                                         saboteur_graphic=saboteur), FAKE_TERRAINS))
+                                                                         saboteur_graphic=saboteur,
+                                                                         crossbow_graphic=crossbow), FAKE_TERRAINS))
     return root
 
 
@@ -517,13 +537,42 @@ def test_full_build(tmp: Path):
     assert "boarding task added" in report
     icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     icons_after = slp.decode(out.get(50730))
-    assert len(icons_after) == len(icons_before) + 2  # Pac-Man's, then the giant's
+    assert len(icons_after) == len(icons_before) + 3  # Pac-Man's, the giant's, then the dragon's
     assert all(np.array_equal(a.pixels, b.pixels) for a, b in zip(icons_after, icons_before))
     assert icons_after[170].pixels.shape == (36, 36) and len(np.unique(icons_after[170].pixels)) >= 4
     giant_icon = icons_after[171].pixels
     assert giant_icon.shape == (36, 36) and (giant_icon == 36).sum() > 100  # red: the palette's red team shade
     assert all(c[706].values["icon"] == 171 for c in units.units)
     assert "trainable at the Wonder" in report and "Pac-Man is icon 170 (36x36)" in report
+    # the dragon: the Advanced Heavy Crossbowman's slot (493), trained at the Wonder, flying, spitting fireballs
+    graphics_after = read_graphics((mod / "Data" / "empires2_x1_p1.dat").read_bytes())
+    fire_gid = units.units[1][508].values["standing"][0]
+    for civ in units.units:
+        d = civ[493]
+        assert d.values["enabled"] == 1 and d.values["train_location"] == 276 and d.values["button"] == 2
+        assert d.values["cost"] == (0, 300, 1, 3, 300, 1, 4, 1, 0) and d.values["train_time"] == 120
+        assert d.values["terrain_restriction"] == 0  # every terrain: it flies over water
+        assert d.values["hit_points"] == 600 and d.values["attacks"] == [(4, 40)]
+        assert d.values["armours"] == [(4, 4), (3, 6)] and d.values["class"] == 0
+        assert (d.values["max_range"], d.values["line_of_sight"], d.values["reload"]) == (6.0, 9.0, 3.0)
+        assert d.values["displayed"] == (4, 40, 6.0, 3.0) and d.values["displayed_pierce"] == 6  # what its panel says
+        assert d.values["standing"][0] == d.values["walking"][0]  # it beats its wings when it stays put
+        assert d.values["projectile"] == 508 and d.values["displacement"][2] > 2  # fire from its mouth, high up
+        assert d.values["icon"] == 172
+        assert civ[508].values["standing"][0] == civ[508].values["walking"][0] == fire_gid
+        assert civ[520].values["standing"][0] == fire_gid  # after Chemistry too
+    fire = graphics_after[fire_gid]
+    assert fire.name == "TORCH2" and fire.slp == 15601 and fire.layer == 30
+    assert graphics_after[units.units[1][493].values["walking"][0]].layer == 22  # up in the air: over buildings
+    balls = slp.decode(out.get(15601))
+    assert len(balls) == 14 and all((f.pixels != slp.SHADOW).all() for f in balls)  # no shadow: it is in the air
+    assert all(f.pixels.shape[0] < 40 for f in balls)
+    for s in (2711, 2714, 2717, 2718, 2721):  # its own sprites, redrawn
+        assert out.get(s) != orig.get(s) and slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
+    assert slp.info(out.get(2721)).sizes[0][1] > 120  # far bigger than a soldier
+    dragon_icon = icons_after[172].pixels
+    assert dragon_icon.shape == (36, 36) and len(np.unique(dragon_icon)) >= 6
+    assert "Dragon (unit 493) trainable at the Wonder" in report and "the dragon is icon 172 (36x36)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -532,6 +581,8 @@ def test_full_build(tmp: Path):
         "Pac-Man", "Create <b>Pac-Man<b> (<cost>)", "Create <b>Pac-Man<b> (<cost>)\nA very fast cheat unit.",
         "UserPatch", "Age of Minecraft"]
     assert langdll.read_string(p1, 5706) == "Giant Pac-Man"
+    assert [langdll.read_string(p1, i) for i in (5493, 6493)] == ["Dragon", "Create Dragon"]
+    assert langdll.read_string(p1, 26493).startswith("Create <b> Dragon<b> (<cost>) \nA flying dragon")
     assert langdll.read_string(p1_before, 5860) == "Furious the Monkey Boy"
     assert langdll.read_string((game / "language_x1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()
@@ -705,8 +756,8 @@ def test_direct_mode_and_restore(tmp: Path):
     ground_before = (game / "Data" / "terrain.drs").read_bytes()
     panel_before = Drs(game / "Data" / "interfac.drs").get(51141)
     for _ in range(2):  # building twice starts from the originals again
-        assert build_mod.main(["--game", str(game), "--mode", "direct", "--only", "militia,pacman,farms,interface",
-                               "--jobs", "1"]) == 0
+        assert build_mod.main(["--game", str(game), "--mode", "direct", "--only",
+                               "militia,pacman,dragon,farms,interface", "--jobs", "1"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() != before
     assert (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).read_bytes() == before
     assert (game / "Data" / "terrain.drs").read_bytes() != ground_before
@@ -717,9 +768,11 @@ def test_direct_mode_and_restore(tmp: Path):
         "Pac-Man", "Create <b>Pac-Man<b> (<cost>)", "Create <b>Pac-Man<b> (<cost>)\nA very fast cheat unit.",
         "Next unit"]
     assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Pac-Man"
-    assert (game / "language.dll").read_bytes() == lang_before["language.dll"]  # nothing of his in it
+    base = (game / "language.dll").read_bytes()  # nothing of his in it; the dragon's name and button where they fit
+    assert [langdll.read_string(base, i) for i in (5079, 5493, 6493, 26493)] == [
+        "Militia", "Dragon", "Create Dragon", "Create Dragon"]  # its long help does not fit: the button's text
     icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
-    assert len(icons) == 172  # Pac-Man's and the giant's icons added, not two per build
+    assert len(icons) == 173  # Pac-Man's, the giant's and the dragon's icons added, not three per build
     assert Drs(game / "Data" / "interfac.drs").get(51141) != panel_before  # the panel too, in the same file
     assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15511))
     assert build_mod.main(["--game", str(game), "--restore"]) == 0

@@ -13,7 +13,7 @@ game files. `README.md` has the module-by-module layout table, and `docs/DESIGN.
 
 ```bash
 pip install -r tools/requirements.txt          # numpy (build) + pillow (previews only)
-python tools/tests/test_export.py              # the whole suite, about 20 s
+python tools/tests/test_export.py              # the whole suite, about 25 s
 python tools/concept_sheet.py [out_dir]        # regenerate previews/* (and always docs/UNITS.md)
 python tools/build_mod.py --game <AoE2 folder> [--only militia,archer | buildings,walls,...] [--dry-run]
 ```
@@ -112,7 +112,10 @@ putting `tools/` on `sys.path`.
      sprites. The Saboteur ("to smithereens", 706) becomes the giant red Pac-Man (`gameplay._giant`): Pac-Man's
      attacks, armours and sounds written over its own in place, and an unused graphic (`GIANT_GRAPHICS`, found by
      `giant_graphic`) pointed at his new SLP (`giant_slp`, in red-team palette shades, written next to Pac-Man's
-     sounds), as the Saboteur shares the Petard's sprites.
+     sounds), as the Saboteur shares the Petard's sprites. The Wonder also trains the dragon (`gameplay._dragon`), in
+     the never-used Advanced Heavy Crossbowman's slot (493): its own sprites (slpmap), every terrain, its shots
+     (508, and 520 after Chemistry) drawn by an unused graphic (`FIRE_GRAPHICS`) pointed at a new fireball SLP
+     (`fireball_slp`), its texts by `name_dragon`.
    - `sounds.py` WAVs go into `gamedata_x1_p1.drs`.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,
      `mod_language` gives the mod its own `language_x1_p1.dll` (`langdll.with_strings`: a new resource section

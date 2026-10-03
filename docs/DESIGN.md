@@ -295,6 +295,28 @@ per direction (an animation that big would be hundreds of megabytes).
 
 ![giant](../previews/giant.png)
 
+The Wonder also trains a dragon, in the slot of the Advanced Heavy
+Crossbowman (unit 493): a leftover with its own sprites, its own placeholder
+texts ("not used") and its own projectile, which the game never trains and no
+research turns anything into. It is drawn black like the Ender Dragon, with
+grey plates down its back, neck and tail, purple eyes, and bony wings with
+membranes in the owner's colour. It is always in the air: its body 40 pixels
+above the ground in the sprite, with its shadow on the ground below, and its
+graphics are moved to the birds' layer (22) so buildings do not cover it. It
+beats its wings while it stands still too (its standing graphic is its flying
+one). It rears back and snaps its head forward to spit, its jaw open and a cone
+of fire at its mouth on the frame the shot leaves (the game's frame 5 of 10).
+`gameplay.py` enables it at the Wonder (second button; 300 food, 300 gold, 2
+minutes, 600 hit points), lets it go over every terrain (restriction 0, the
+hawk's), gives it fire (40 melee damage, range 6, every 3 seconds) and the
+numbers its panel shows, moves its shots' starting point up to its mouth, and
+swaps the slot's soldier voice for the wolf's growl and its crossbow sound for
+the Fire Ship's. Its shot (unit 508, and 520 that Chemistry turns it into;
+nothing else shoots either) becomes a fireball: an unused torch graphic
+(TORCH2) pointed at a new SLP of a flickering ball of fire, on the
+projectiles' layer. Its icon, the dragon's head breathing fire, comes after
+the giant's in the unit icon sheet.
+
 Pac-Man is also a
 rule change: every civilisation can train him at a finished Wonder
 (`gameplay.py` patches his unit in the `.dat`: enabled, trained at the

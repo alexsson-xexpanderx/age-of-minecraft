@@ -26,6 +26,13 @@ Militia's boarding task (`_giant_boarding`). The Saboteur borrows the Petard's s
 Petard's: the giant gets a graphic no unit and no other graphic uses (an old
 piece of the Trade Cog, `GIANT_GRAPHICS`), pointed at a new SLP of his own
 (`giant_slp`: one picture per direction, he is far too big for animations).
+
+The Wonder also trains a dragon (`_dragon`), in the slot of the Advanced
+Heavy Crossbowman (unit 493), which the game never trains: its own sprites
+are redrawn as the dragon (slpmap), it may go over every terrain (water too),
+its shots (508, and 520 after Chemistry, which no other unit shoots) become
+fireballs drawn by an unused graphic (`FIRE_GRAPHICS`) pointed at a new SLP,
+and it growls like the wolf instead of talking like a soldier.
 """
 from __future__ import annotations
 
@@ -82,6 +89,8 @@ class DatPatch:
     pacman_strings: dict[str, int] = None  # the Monkey Boy's text ids: name, creation, help (if Pac-Man was patched)
     sounds_added: bool = False  # the sound table has Pac-Man's sounds: their WAV files must be written too
     giant_name: Optional[int] = None  # the Saboteur's name string, if he became the giant (his SLP must be written)
+    dragon_strings: Optional[dict[str, int]] = None  # the dragon's text ids, if it was patched (its SLP must be written)
+    fire_layout: Optional[tuple[int, int, bool]] = None  # its fireball's frames, angles and mirroring
 
 
 def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
@@ -92,10 +101,12 @@ def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
 
 def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None,
               sounds: Optional[dict[str, list[int]]] = None, giant: Optional[int] = None,
-              giant_icon: Optional[int] = None) -> tuple[Optional[DatPatch], list[str]]:
+              giant_icon: Optional[int] = None, fire: Optional[int] = None,
+              dragon_icon: Optional[int] = None) -> tuple[Optional[DatPatch], list[str]]:
     """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), the giant red Pac-Man
-    drawn from SLP `giant` (if given; with Pac-Man only), and the Javelina's own sprites. `sounds` maps a sound name
-    (see SOUND_USES) to the resource ids of its WAV files.
+    drawn from SLP `giant` (if given; with Pac-Man only), the dragon at the Wonder with its fireballs drawn from SLP
+    `fire` (if given), and the Javelina's own sprites. `sounds` maps a sound name (see SOUND_USES) to the resource
+    ids of its WAV files.
 
     Returns (patch, notes)."""
     try:
@@ -121,6 +132,12 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
     if pac_done and giant is not None:  # after the sounds: he gets Pac-Man's
         msg, giant_gid, giant_name = _giant(data, civs, graphics, giant, giant_icon)
         notes.append(msg)
+    fire_gid = dragon_strings = None
+    if fire is not None:  # in place, like the giant: before anything below grows the file
+        msg, fire_gid, dragon_strings = _dragon(data, civs, graphics, fire, dragon_icon,
+                                                {giant_gid} if giant_gid is not None else set())
+        changed |= fire_gid is not None
+        notes.append(msg)
     # last, from the back of the file to the front: these grow the file, which moves everything after them
     if pac_done:
         notes.append(_boarding(data, civs))
@@ -143,6 +160,10 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         if sab is not None and sab.type == 70 and sab.values["standing"][0] == giant_gid and (
                 sab.values["hit_points"] != GIANT_HP or sab.values["blast_width"] != 0):
             return None, notes + ["not changed: the giant Pac-Man did not read back as expected"]
+        drake = units[DRAGON] if fire_gid is not None and len(units) > DRAGON else None
+        if drake is not None and drake.type == 70 and drake.values["hit_points"] == DRAGON_HP and (
+                drake.values["train_location"] != WONDER_UNIT or drake.values["terrain_restriction"] != FLYING):
+            return None, notes + ["not changed: the dragon did not read back as expected"]
     if pac_done:
         try:
             heads = DU.read_unit_headers(bytes(data), check)
@@ -162,8 +183,14 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the patched sound table did not read back as expected"]
     if giant_gid is not None and datfile.read_graphics(packed)[giant_gid].slp != giant:
         return None, notes + ["not changed: the giant Pac-Man's graphic did not read back as expected"]
+    fire_layout = None
+    if fire_gid is not None:
+        g = datfile.read_graphics(packed)[fire_gid]
+        if g.slp != fire or g.layer != FIRE_LAYER:
+            return None, notes + ["not changed: the dragon's fireball did not read back as expected"]
+        fire_layout = (g.frame_count, g.angle_count, bool(g.mirroring))
     return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, sounds_added=table is not None,
-                    giant_name=giant_name), notes
+                    giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout), notes
 
 
 def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple[str, Optional[dict[str, int]]]:
@@ -290,6 +317,149 @@ def giant_slp(quant) -> bytes:
             out.append(slp.SlpFrame(px, (f.hotspot[0] * 2, f.hotspot[1] * 2)))
         _GIANT_SLPS[key] = slp.encode(out)
     return _GIANT_SLPS[key]
+
+
+# The dragon lives in the Advanced Heavy Crossbowman's slot (unit 493): a leftover the game never trains, with its
+# own sprites (AHXBW_*), its own texts ("not used" placeholders) and its own shot (508, which no other unit shoots;
+# Chemistry turns it into 520, which nothing else shoots either). The .dat's old upgrade from the Skirmisher into it is
+# applied by no research.
+DRAGON = 493
+DRAGON_SHOTS = (508, 520)
+DRAGON_TEXTS = {"name": "Dragon", "creation": "Create Dragon",
+                "help": "Create <b> Dragon<b> (<cost>) \nA flying dragon that spits fire. It flies over land and "
+                        "water. \n<hp> <attack> <armor> <piercearmor> <range>"}
+DRAGON_COST = (0, 300, 1, 3, 300, 1, 4, 1, 0)  # 300 food, 300 gold, 1 population
+DRAGON_TIME = 120  # seconds
+DRAGON_BUTTON = 2  # next to Pac-Man's
+DRAGON_HP = 600
+DRAGON_ATTACK = [(4, 40)]  # its fire, as melee damage, which burns buildings as well as units
+DRAGON_ARMOUR = [(4, 4), (3, 6)]  # melee, pierce
+DRAGON_RANGE = 6.0  # tiles; the Blacksmith's archer upgrades add to it, as it is an archer (unit class 0)
+DRAGON_SIGHT = 9.0
+DRAGON_RELOAD = 3.0  # seconds between fireballs
+DRAGON_SPEED = 1.4  # tiles per second, a Light Cavalry's
+DRAGON_OUTLINE = 1.0  # the selection outline under it; its room on the map stays the slot's (it flies over others)
+FLYING = 0  # terrain restriction 0: every terrain, deep water too (the hawk's)
+# graphics no unit and no other graphic uses, for its fireball (an old torch's flames, 14 frames)
+FIRE_GRAPHICS = ("TORCH2",)
+DRAGON_LAYER = 22  # drawn over units and buildings, as the birds are (it is up in the air)
+FIRE_LAYER = 30  # drawn over everything, as every projectile is
+DRAGON_SOUNDS = {"growl": "wolfx.wav", "fire": "fgalley.wav"}  # the game's own sounds: the wolf, the Fire Ship
+TILE_PIXELS = 96 / 2 ** 0.5  # screen pixels across one tile
+HEIGHT_PIXELS = 24  # screen pixels a shot rises per tile of height (the Castle's arrows leave at 4, about 96 up)
+
+
+def dragon_mouth() -> tuple[float, float, float]:
+    """Where its fireballs leave it (tiles across, forward and up): its mouth, high in the air."""
+    import math
+    from .easter import DRAGON_HEIGHT, DRAGON_MOUTH, DRAGON_SCALE
+    from .export import BASE_SCALE
+    px = BASE_SCALE * DRAGON_SCALE
+    forward, up = DRAGON_MOUTH
+    return (0.0, round(forward * px / TILE_PIXELS, 2),
+            round((DRAGON_HEIGHT + up) * math.cos(math.radians(30)) * px / HEIGHT_PIXELS, 2))
+
+
+def fire_graphic(graphics: dict, civs, taken: set[int]) -> Optional[int]:
+    """A graphic for the fireball: one of FIRE_GRAPHICS that no unit, no other graphic and no flame on a damaged
+    building uses, with an SLP of its own (not `taken` by the giant)."""
+    used = set(taken)
+    for units in civs.units:
+        for u in units:
+            if u is not None:
+                used |= {g for k in ("standing", "dying", "walking") for g in u.values.get(k, ())}
+                used |= set(u.values.get("damage_graphics", ()))
+                used.add(u.values.get("attack_graphic", -1))
+    used |= {d.graphic_id for g in graphics.values() for d in g.deltas}
+    sharing = {}
+    for g in graphics.values():
+        sharing[g.slp] = sharing.get(g.slp, 0) + 1
+    for name in FIRE_GRAPHICS:
+        for gid, g in graphics.items():
+            if (g.name.upper() == name and gid not in used and not g.deltas and g.slp > 0 and sharing[g.slp] == 1
+                    and g.slp_at >= 0):
+                return gid
+    return None
+
+
+def _dragon(data: bytearray, civs, graphics: dict, fire_slp: int, icon: Optional[int] = None,
+            taken: Optional[set[int]] = None) -> tuple[str, Optional[int], Optional[dict[str, int]]]:
+    """Unit 493 becomes the dragon, trained at the Wonder, its shots fireballs drawn from SLP `fire_slp`: (note, the
+    fireball's graphic, its text ids)."""
+    gid = fire_graphic(graphics, civs, taken or set())
+    if gid is None:
+        return f"Dragon: not changed, none of {', '.join(FIRE_GRAPHICS)} is free for its fireball", None, None
+    try:
+        sounds = datfile.sound_files(bytes(data))
+    except (ValueError, struct.error):
+        sounds = {}
+    sound = {key: next((sid for sid, files in sounds.items() if name in (f.lower() for f in files)), None)
+             for key, name in DRAGON_SOUNDS.items()}
+    patched, first = 0, None
+    for units in civs.units:
+        if len(units) <= max(DRAGON, WONDER_UNIT, *DRAGON_SHOTS):
+            continue
+        u, wonder = units[DRAGON], units[WONDER_UNIT]
+        if u is None or wonder is None or u.type != 70 or wonder.type != 80:
+            continue
+        stand = graphics.get(u.values["standing"][0])
+        if stand is None or not stand.name.upper().startswith("AHXBW") or u.values["projectile"] != DRAGON_SHOTS[0]:
+            continue  # not the leftover this build knows
+        if len(u.values["attacks"]) != len(DRAGON_ATTACK) or len(u.values["armours"]) != len(DRAGON_ARMOUR):
+            continue
+        walk = u.values["walking"][0]
+        DU.patch(data, u, enabled=1, train_location=WONDER_UNIT, button=DRAGON_BUTTON, cost=DRAGON_COST,
+                 train_time=DRAGON_TIME, hit_points=DRAGON_HP, speed=DRAGON_SPEED, terrain_restriction=FLYING,
+                 attacks=DRAGON_ATTACK, armours=DRAGON_ARMOUR, max_range=DRAGON_RANGE, line_of_sight=DRAGON_SIGHT,
+                 reload=DRAGON_RELOAD, standing=(walk, -1), displacement=dragon_mouth(),
+                 outline_size=(DRAGON_OUTLINE, DRAGON_OUTLINE, u.values["outline_size"][2]),
+                 displayed=(DRAGON_ARMOUR[0][1], DRAGON_ATTACK[0][1], DRAGON_RANGE, DRAGON_RELOAD),
+                 displayed_pierce=DRAGON_ARMOUR[1][1])
+        if sound["growl"] is not None:  # not the slot's soldier's voice
+            DU.patch(data, u, selection_sound=sound["growl"], move_sound=sound["growl"], attack_sound=sound["growl"])
+        if icon is not None:
+            DU.patch(data, u, icon=icon)
+        for shot in (units[s] for s in DRAGON_SHOTS):
+            if shot is not None and shot.type == 60:
+                DU.patch(data, shot, standing=(gid, -1), walking=(gid, -1))
+        first = first or u
+        patched += 1
+    if not patched:
+        return f"Dragon: not changed, unit {DRAGON} is not the Advanced Heavy Crossbowman here", None, None
+    struct.pack_into("<i", data, graphics[gid].slp_at, fire_slp)
+    struct.pack_into("<b", data, graphics[gid].layer_at, FIRE_LAYER)
+    looks = {first.values["walking"][0], first.values["attack_graphic"], first.values["dying"][0]}
+    for g in (graphics.get(k) for k in looks):
+        if g is not None and g.layer_at >= 0:
+            struct.pack_into("<b", data, g.layer_at, DRAGON_LAYER)
+    attack, dying = graphics.get(first.values["attack_graphic"]), graphics.get(first.values["dying"][0])
+    if sound["fire"] is not None and attack is not None:  # not the crossbow's twang
+        _graphic_sound(data, attack, sound["fire"])
+    if sound["growl"] is not None and dying is not None and dying.sound >= 0:  # not a soldier's scream
+        struct.pack_into("<h", data, dying.sound_at, sound["growl"])
+    strings = {"name": first.values["name_id"], "creation": first.values["creation_id"]}
+    if first.values["help_id"] > HELP_STRINGS:
+        strings["help"] = first.values["help_id"] - HELP_STRINGS
+    return (f"Dragon (unit {DRAGON}) trainable at the Wonder (unit {WONDER_UNIT}) for {patched} civilisations: "
+            f"{DRAGON_COST[1]} food, {DRAGON_COST[4]} gold, {DRAGON_TIME} s, {DRAGON_HP} hit points, fire "
+            f"{DRAGON_ATTACK[0][1]} at range {DRAGON_RANGE:g}, flies over every terrain"
+            + (f", icon {icon}" if icon is not None else "")
+            + f"; its shots (units {', '.join(map(str, DRAGON_SHOTS))}) are fireballs: graphic {gid} "
+              f"({graphics[gid].name}) now draws SLP {fire_slp}"), gid, strings
+
+
+_FIRE_SLPS: dict[tuple, bytes] = {}
+
+
+def fireball_slp(quant, frames: int, angles: int, mirroring: bool) -> bytes:
+    """The fireball's SLP, laid out as its graphic says: a fire charge tumbling, with no shadow (it is in the air)."""
+    key = (np.asarray(quant.palette).tobytes(), frames, angles, bool(mirroring))
+    if key not in _FIRE_SLPS:
+        from .easter import fireball
+        from .export import render_frames
+        _FIRE_SLPS[key] = slp.encode(render_frames(fireball(), "idle", frames, angles, mirroring, quant,
+                                                   shadow=False))
+    return _FIRE_SLPS[key]
 
 
 def _boarding(data: bytearray, civs) -> str:
@@ -530,6 +700,61 @@ def add_giant_icon(data: bytes, index: int, quant) -> tuple[Optional[bytes], str
         full[y0:y0 + px.shape[0], x0:x0 + px.shape[1]] = px
         px = full
     return slp.append_frames(data, [slp.SlpFrame(px, (0, 0))]), f"the giant Pac-Man is icon {index} ({w}x{h})"
+
+
+DRAGON_ICON_COLOURS = {0: (34, 18, 52), 1: (226, 222, 190), 2: (26, 26, 30), 3: (78, 78, 88), 4: (214, 120, 255),
+                       5: (120, 18, 18), 6: (255, 236, 90), 7: (255, 150, 24), 8: (226, 58, 12), 9: (104, 104, 116)}
+
+
+def dragon_icon(size: int = 36) -> np.ndarray:
+    """A unit icon (drawn at 36x36, scaled to `size`): the dragon's head side on, breathing fire, against the End's
+    dark purple sky with a few stars. Colours are keys of DRAGON_ICON_COLOURS."""
+    sky, star, black, grey, eye, mouth, yellow, orange, red, nostril = range(10)
+    px = np.full((36, 36), sky, np.int16)
+    for y, x in ((3, 3), (5, 27), (10, 33), (29, 25), (33, 31), (31, 18)):
+        px[y, x] = star
+    px[25:36, 3:13] = black  # the neck
+    px[26:36:3, 2:4] = grey  # the plates down its neck
+    px[9:26, 5:21] = black  # the head
+    px[9, 5:21] = grey
+    px[5:9, 7:10] = px[6:9, 13:16] = grey  # two horns
+    px[13:19, 21:31] = black  # the upper jaw
+    px[13, 27:30] = nostril
+    px[19:21, 21:31] = mouth
+    px[21:24, 21:30] = black  # the lower jaw
+    px[13:16, 14:19] = eye
+    px[14, 17:19] = star  # its glint
+    px[16:25, 31:36] = orange  # the fire
+    px[18:23, 32:36] = yellow
+    px[14:16, 33:36] = px[25:27, 33:36] = red
+    if size != 36:
+        idx = np.arange(size) * 36 // size
+        px = px[idx][:, idx]
+    return px
+
+
+def add_dragon_icon(data: bytes, index: int, quant) -> tuple[Optional[bytes], str]:
+    """The unit icon sheet with the dragon's icon added as icon `index` (blank icons fill any gap before it)."""
+    try:
+        info = slp.info(data)
+    except ValueError as exc:
+        return None, f"not changed ({exc})"
+    if info.num_frames > index:
+        return None, f"not changed: this sheet already has an icon {index}"
+    sizes = [(w, h) for w, h, _, _ in info.sizes if 16 <= w <= 96 and 16 <= h <= 96]
+    if not sizes:
+        return None, "not changed: no icon in this sheet has a usable size"
+    w, h = max(set(sizes), key=sizes.count)
+    lut = {k: int(quant.indices(np.array([rgb], np.int64))[0]) for k, rgb in DRAGON_ICON_COLOURS.items()}
+    px = np.vectorize(lut.get)(dragon_icon(min(w, h))).astype(np.int16)
+    if (w, h) != px.shape[::-1]:  # not square: centred on the sky
+        full = np.full((h, w), lut[0], np.int16)
+        y0, x0 = (h - px.shape[0]) // 2, (w - px.shape[1]) // 2
+        full[y0:y0 + px.shape[0], x0:x0 + px.shape[1]] = px
+        px = full
+    blank = slp.SlpFrame(np.full((1, 1), slp.TRANSPARENT, np.int16), (0, 0))
+    frames = [blank] * (index - info.num_frames) + [slp.SlpFrame(px, (0, 0))]
+    return slp.append_frames(data, frames), f"the dragon is icon {index} ({w}x{h})"
 
 
 def rename_pacman(files: dict[str, bytes], strings: dict[str, int]) -> tuple[dict[str, bytes], list[str]]:

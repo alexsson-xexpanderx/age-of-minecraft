@@ -10,8 +10,8 @@ wool. All 90 units are modelled, and every building too: houses, town centers,
 castles, walls and gates in five Minecraft village styles that upgrade with
 each age, the eighteen wonders, wheat farms, and the whole map (forests, gold
 and stone, berry bushes, animals, fish and decorations). Even the panels at the
-top and bottom of the screen look like Minecraft's inventory. And an easter
-egg: build a Wonder and it trains Pac-Man.
+top and bottom of the screen look like Minecraft's inventory. And easter
+eggs: build a Wonder and it trains Pac-Man, and a dragon that spits fire.
 
 ![battle](previews/battle.png)
 
@@ -57,7 +57,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/menu.png` | the main menu: a block village on a clear day, with the game's texts and buttons drawn over it |
 | `previews/screens.png` | the other screens as the deepslate hall, and the loading screen, on stand-in screens |
 | `previews/player_colors.png` | a unit in all 8 player colours |
-| `previews/roster_easter.png` | the easter eggs: Pac-Man, a ghost and a blocky Cobra Car in the cheat units' slots |
+| `previews/roster_easter.png` | the easter eggs: Pac-Man, a ghost and a blocky Cobra Car in the cheat units' slots, and the Wonder's Dragon |
 | `previews/giant.png` | the "to smithereens" cheat's giant red Pac-Man by a Castle, a Wonder, Pac-Man and a knight |
 | `previews/sounds/pacman_*.wav` | Pac-Man's sounds: clicking on him, orders, training, bites and his death |
 
@@ -94,12 +94,12 @@ tools/aom/drs.py         DRS archive reader/writer
 tools/aom/palette.py     game palette and colour matching
 tools/aom/datfile.py     graphics and terrain table reader for empires2_x1_p1.dat
 tools/aom/datunits.py    reads and patches the civilisations' unit tables in the .dat
-tools/aom/gameplay.py    Pac-Man at the Wonder: the .dat change, his icon, name and sounds
+tools/aom/gameplay.py    Pac-Man and the Dragon at the Wonder: the .dat changes, icons, names and sounds
 tools/aom/langdll.py     reads and changes strings in the game's language DLLs
 tools/aom/pe.py          Windows DLL/exe resources: read them, give a copy new ones in an added section
 tools/aom/appicon.py     the villager king icon: the .ico file, and in place in the mod's own exe (and PNGs)
 tools/aom/sounds.py      Pac-Man's sounds, synthesised in an 8-bit arcade style
-tools/aom/easter.py      Pac-Man, the ghost, the Cobra Car and the giant red Pac-Man
+tools/aom/easter.py      Pac-Man, the ghost, the Cobra Car, the giant red Pac-Man and the Dragon
 tools/aom/slpmap.py      which original sprite id each unit render replaces
 tools/aom/spritemap.py   finds buildings, walls, trees and decorations by name in the .dat
 tools/aom/export.py      renders an animation in the original sprite's frame layout

@@ -627,9 +627,10 @@ def main(argv=None) -> int:
                          "Your game is probably under Program Files: run the command prompt as administrator "
                          "(right-click > Run as administrator) and try again.")
     pacman = not args.no_wonder_pacman and (only is None or "pacman" in only)
+    dragon = not args.no_wonder_pacman and (only is None or "dragon" in only)
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
-    if not args.no_dat and (pacman or javelina):
-        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina)
+    if not args.no_dat and (pacman or javelina or dragon):
+        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon)
     exe_ok = False
     if args.mode == "upmod":
         mod_archive(game, log)
@@ -1082,8 +1083,9 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log, folder: 
 GIANT_SLP = 15600  # the first id tried for the giant Pac-Man's SLP
 
 
-def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True) -> None:
-    """The .dat changes (Pac-Man at the Wonder, the Javelina's own sprites), Pac-Man's icon and his name."""
+def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True,
+                   dragon: bool = True) -> None:
+    """The .dat changes (Pac-Man and the dragon at the Wonder, the Javelina's own sprites), their icons and names."""
     from aom import gameplay
     if game.dat_path is None:
         log(".dat changes: no empires2_x1_p1.dat found, skipped")
@@ -1112,6 +1114,17 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         if all(sheet is not None and slp.info(sheet).num_frames == icon + 2 for _, _, sheet in added
                if sheet is not None):
             new_sheets, giant_icon = added, icon + 1
+    dragon_icon, dragon_sheets = None, []  # the dragon's, after those (in every copy, with Pac-Man's or not)
+    if dragon:
+        with_pacman = {n: sheet for n, _, sheet in new_sheets if sheet is not None} if icon is not None else {}
+        current = [(n, d, with_pacman.get(n, sheet)) for n, d, sheet in gameplay.icon_sheets(archives)]
+        if current:
+            index = max(slp.info(sheet).num_frames for _, _, sheet in current)
+            added = [(n, d, gameplay.add_dragon_icon(sheet, index, quant)) for n, d, sheet in current]
+            for n, _, (_, msg) in added:
+                log(f"Dragon icon in {n}: {msg}")
+            if all(sheet is not None for _, _, (sheet, _) in added):
+                dragon_sheets, dragon_icon = [(n, d, sheet) for n, d, (sheet, _) in added], index
     raw = game.dat_path.read_bytes()
     waves, sound_ids, sound_drs = {}, None, None
     if pacman:  # his sounds go where the game finds new files: the patch archive if there is one
@@ -1121,20 +1134,33 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         waves = sounds.pacman_sounds()
         free = free_resource_ids(game, raw, sum(len(v) for v in waves.values()))
         sound_ids = {name: [next(free) for _ in variants] for name, variants in waves.items()}
-    giant = next(free_resource_ids(game, raw, 1, start=GIANT_SLP)) if pacman else None  # the giant's own SLP
-    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon)
+    pictures = free_resource_ids(game, raw, 2, start=GIANT_SLP)
+    giant = next(pictures) if pacman else None  # the giant's own SLP
+    fire = next(pictures) if dragon else None  # the dragon's fireball's
+    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon,
+                                      fire, dragon_icon)
     for note in notes:
         log(note)
     if patch is None:
         return
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
-    if not patch.pacman_strings:
+    if not patch.pacman_strings and not patch.dragon_strings:
         return
     touched: dict[str, Drs] = {}
-    for name, drs, new_sheet in new_sheets if icon is not None else []:
+    if patch.dragon_strings and dragon_icon is not None:
+        new_sheets = dragon_sheets
+    elif not patch.pacman_strings or icon is None:
+        new_sheets = []
+    for name, drs, new_sheet in new_sheets:  # the icons: Pac-Man's and the giant's, the dragon's
         if new_sheet is not None:
             drs.put(gameplay.UNIT_ICONS, new_sheet)
             touched[name] = drs
+    if patch.dragon_strings:  # its fireball's picture, where the game finds new files
+        art_name, art_drs = next(((n, d) for n, d in game.archives if n.lower() == "gamedata_x1_p1.drs"),
+                                 (game.graphics_path.name, game.graphics))
+        art_drs.put(fire, gameplay.fireball_slp(quant, *patch.fire_layout))
+        touched[art_name] = art_drs
+        log(f"Dragon: its fireball is SLP {fire} in {art_name}")
     if patch.sounds_added:
         from aom import sounds
         for name, variants in waves.items():
@@ -1153,7 +1179,10 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         drs.write(tmp)
         write_game_file(game, mode, name, tmp.read_bytes(), log)
         tmp.unlink()
-    rename_pacman(game, mode, patch.pacman_strings, log)
+    if patch.pacman_strings:
+        rename_pacman(game, mode, patch.pacman_strings, log)
+    if patch.dragon_strings:  # last: in direct mode it adds to the language files as the lines above left them
+        name_dragon(game, mode, patch.dragon_strings, log)
 
 
 def name_giant(game: Game, mode: str, sid: int, log) -> None:
@@ -1171,6 +1200,29 @@ def name_giant(game: Game, mode: str, sid: int, log) -> None:
                             folder=game.root)
         except (langdll.DllError, struct.error) as exc:
             log(f"Giant Pac-Man's name: {name} not changed ({exc})")
+
+
+def name_dragon(game: Game, mode: str, strings: dict[str, int], log) -> None:
+    """The dragon's name, button and help texts: in the mod's own language file, or in the game's where they fit."""
+    from aom import gameplay, langdll
+    texts = {sid: gameplay.DRAGON_TEXTS[key] for key, sid in strings.items()}
+    if mode == "upmod":
+        game.mod_strings.update(texts)
+        return
+    short = gameplay.DRAGON_TEXTS["creation"]  # a help text that fits where the game's placeholder was
+    for name in game.language_files():
+        path = pick(game.root, name)  # as rename_pacman and name_giant left it
+        data = new = path.read_bytes()
+        for sid, text in texts.items():
+            for attempt in (text, short) if sid == strings.get("help") else (text,):
+                try:
+                    if langdll.read_string(new, sid):
+                        new = langdll.set_string(new, sid, attempt)
+                    break
+                except (langdll.DllError, struct.error) as exc:
+                    log(f"Dragon's texts: string {sid} in {name} not set to {attempt[:30]!r} ({exc})")
+        if new != data:
+            write_game_file(game, mode, name, new, log, folder=game.root)
 
 
 def free_resource_ids(game: Game, raw_dat: bytes, n: int, start: int = 15500):

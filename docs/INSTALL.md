@@ -41,8 +41,8 @@ files are not changed. It writes:
 ```
 Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
 Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, Pac-Man's icon and sounds
-Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man at the Wonder, the Javelina's own look
-Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's name, and "Age of Minecraft"
+Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man and the Dragon at the Wonder, the Javelina's own look
+Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's and the Dragon's names, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
 Games\age_of_minecraft\menu_originals\         your game's main menu pictures (for a Minecraft menu)
 Games\age_of_minecraft\screen_originals\       your game's other screens (setup, loading, dialogues...)
@@ -91,8 +91,8 @@ each one backed up first, and **`restore_original.bat`** puts them back.
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs`, the farms into `Data\terrain.drs` and the panels into `Data\interfac.drs` (no mod exe needed); each file is backed up first as `<name>.aom-backup` |
 | `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file, the icons and the language files) |
-| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man at the Wonder, and the cheat unit keeps its name and icon) |
-| `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man at the Wonder, and the Javelina keeps the Wild Boar's look) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man or Dragon at the Wonder, and the cheat unit keeps its name and icon) |
+| `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man or Dragon at the Wonder, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
 
@@ -138,7 +138,7 @@ each one backed up first, and **`restore_original.bat`** puts them back.
   The build follows the game's own frame layout for those and fills the
   unused frames, so every direction still lines up.
 * Still original: cliffs, bridges, the rest of the terrain, fire and explosions, ships sinking,
-  and the other menus. Unit names are unchanged, except Pac-Man's.
+  and the other menus. Unit names are unchanged, except Pac-Man's, the giant's and the Dragon's.
 
 ## Easter eggs
 
@@ -158,8 +158,24 @@ He has his own arcade sounds: click on him and he goes "waka-waka" (or
 boings, or giggles), orders get a "wakawakawaka" or a big CHOMP and
 "nom nom", the Wonder plays a little jingle when he is ready, every bite
 chomps, and he dies with a sad "wah wah wah waaah" and two pops. Listen to
-them in `previews/sounds/`. It is the only change the mod makes to the
-game's rules; `--no-wonder-pacman` leaves the rules alone.
+them in `previews/sounds/`. He and the Dragon below are the mod's changes to
+the game's rules; `--no-wonder-pacman` leaves the rules alone.
+
+**The Dragon at the Wonder.** The Wonder's second button trains a **Dragon**
+(300 food, 300 gold, 2 minutes, 600 hit points, 1 population), for every
+civilisation. It is black like Minecraft's Ender Dragon, with purple eyes and
+wings in your team colour, and it is always up in the air, its shadow on the
+ground below. It flies over land, water and the deep sea, so it needs no
+ship. It spits fireballs: 40 damage every 3 seconds, at a range of 6 tiles,
+and its fire burns buildings as well as units. Armour: 4 against melee, 6
+against arrows. It flies at 1.4 tiles a second, as fast as Light Cavalry. It
+counts as an archer, so the Blacksmith's archer upgrades give it more range.
+It growls like a wolf when you click on it, and its fire roars like a Fire
+Ship's. Its icon is the dragon's head breathing fire. It lives in a slot the
+game has but never uses (the "Advanced Heavy Crossbowman"), so no other unit
+changes. With `build_mod_direct.bat` its help text is too long for the
+game's own language file: hovering over its button there says only "Create
+Dragon".
 
 His name lives in the game's language files (`language_x1_p1.dll`,
 `language_x1.dll`, `language.dll`, in the game's main folder). Age of

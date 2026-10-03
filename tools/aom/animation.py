@@ -142,6 +142,18 @@ def pose(unit, action: str, t: float) -> Pose:
         _add(p, "jaw_bottom", rx=-opening / 2)
         p.hidden |= {"body"} if t >= 0.85 else {"pop"}
         return p
+    if action == "die" and rig == "dragon":  # it falls out of the sky and lands on its belly, wings and head drooping
+        drop = min(1.0, t / 0.8) ** 2
+        _move(p, "root", dz=-(unit.root.offset[2] - 5) * drop)
+        _add(p, "wing_r", ry=12 * drop)
+        _add(p, "wing_l", ry=-12 * drop)
+        _add(p, "tip_r", ry=10 * drop)
+        _add(p, "tip_l", ry=-10 * drop)
+        _add(p, "neck", rx=-18 * drop)
+        _add(p, "head", rx=-10 * drop)
+        p.hidden |= {"fire_long", "fire_short"} | ({"legs"} if drop > 0.6 else set())
+        p.tint = (1.0, 0.15, 0.15, 0.35 * min(1.0, t * 3))
+        return p
     if action == "die":
         fall = _ease(t / 0.6)
         if rig == "ship":
@@ -300,6 +312,29 @@ def pose(unit, action: str, t: float) -> Pose:
         _add(p, "jaw_top", rx=opening / 2)
         _add(p, "jaw_bottom", rx=-opening / 2)
         _move(p, "body", dz=bob)
+    elif rig == "dragon":  # wing beats, the body rising on each down-stroke and the tail swaying behind
+        beat = 0.5 * s if action == "attack" else s  # it hovers while it spits fire
+        _add(p, "wing_r", ry=-34 * beat)
+        _add(p, "wing_l", ry=34 * beat)
+        _add(p, "tip_r", ry=-20 * beat)
+        _add(p, "tip_l", ry=20 * beat)
+        _move(p, "torso", dz=-2.5 * beat)
+        for k in range(5):
+            _add(p, f"tail{k + 1}", rz=5 * math.sin(2 * math.pi * t - 0.7 * k))
+        p.hidden |= {"fire_long", "fire_short"}
+        if action == "attack":  # rears back, then snaps its head forward and spits: the shot leaves at half-time
+            back = _ease(t / 0.4) if t < 0.4 else 1 - _ease((t - 0.4) / 0.1)
+            lunge = _pulse(t, 0.4, 0.95)
+            _add(p, "neck", rx=20 * back - 10 * lunge)
+            _add(p, "head", rx=10 * back - 6 * lunge)
+            _add(p, "jaw", rx=-8 * back - 32 * _pulse(t, 0.4, 0.9))
+            if 0.45 <= t < 0.65:
+                p.hidden.discard("fire_long")
+            elif 0.65 <= t < 0.8:
+                p.hidden.discard("fire_short")
+    elif rig == "fireball":  # tumbling, its flames flickering
+        _add(p, "root", rx=360 * t, rz=720 * t)
+        p.hidden |= {"flame_a"} if (t * 4) % 1.0 < 0.5 else {"flame_b"}
     elif rig == "ghost":  # floating, the skirt rippling
         _move(p, "body", dz=0.8 * s)
         for k in range(8):
