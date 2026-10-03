@@ -12,7 +12,7 @@ names change.
 | Rule | Value | Why |
 |---|---|---|
 | Model units | Minecraft pixels: head 8×8×8, body 8×4×12, limbs 4×4×12 | The classic proportions everyone recognises |
-| Scale | 1.5 screen px per Minecraft pixel → infantry ≈ 45 px tall; large siege and ships are drawn 1.1–1.6× bigger | Roughly the size of AoE2 units on a 96×48 tile |
+| Scale | 1.5 screen px per Minecraft pixel → infantry ≈ 45 px tall; large siege is drawn 1.1–1.6× bigger, ships 2.2–2.6× (twice their first size, as the player asked) | Roughly the size of AoE2 units on a 96×48 tile |
 | Camera | Orthographic, looking down at 30° (AoE2's 2:1 isometric view) | Sprites sit correctly on AoE2 terrain |
 | Sampling | Nearest texel, no anti-aliasing | Keeps the pixel look and suits AoE2's 256-colour palette |
 | Light | From the upper left and front; Minecraft-like flat face shading | Matches the lighting of the original sprites |
@@ -50,7 +50,7 @@ and an animation sample in `previews/anim_<group>.gif`.
 | Monk / Missionary | Cleric villager in a hooded team robe with a book (the Missionary rides a donkey) |
 | Siege | Ravager rams (bare → iron-capped → netherite). Dispenser minecarts as mangonels. Crossbow turrets as scorpions. A TNT cannon with an obsidian barrel. A log-frame trebuchet that packs flat. |
 | Wagons | War Wagon as a covered wagon with a team canopy; Trade Cart as a chest minecart pulled by a donkey |
-| Ships | Minecraft boats scaled up, with team wool sails. The Fire Ship carries a campfire (soul fire when upgraded), the Demolition Ship is loaded with TNT, and the Cannon Galleon mounts a TNT cannon. |
+| Ships | Minecraft boats scaled up, twice the size they were first drawn, with team wool sails. The Fire Ship carries a campfire (soul fire when upgraded), the Demolition Ship is loaded with TNT, and the Cannon Galleon mounts a TNT cannon. |
 | Unique units | Longbowman → Stray · Woad Raider → Zombie · Chu Ko Nu → Illusioner · Throwing Axeman → Piglin · Huskarl → Piglin Brute · Samurai → Wither Skeleton · War Elephant → Iron Golem · Teutonic Knight → netherite knight · Janissary → Blaze · Berserk → Vindicator · Jaguar Warrior → ocelot-hooded warrior · Plumed Archer → Bogged · Cataphract → netherite-barded horseman · Mangudai → Pillager on horseback · Mameluke → Husk on a llama · Tarkan → Zombie on a zombie horse · Conquistador → firework rider · War Wagon → armoured wagon · Longboat → spruce longship with shields · Turtle Ship → turtle-shell ship |
 | Animals | Sheep (dyed wool) · Turkey → Chicken · Deer → Goat · Wild Boar → Hoglin · Javelina → Pig · Wolf |
 

@@ -87,8 +87,11 @@ def barrel(p: Painter, x: float, y: float, z: float) -> list:
                                                                               (1, "#3a3a3a")), top="#6b4a2a"))]
 
 
+SHIP_SIZE = 2.0  # every ship drawn twice as big as first designed (the player asked for bigger ships)
+
+
 def _ship(key, name, replaces, root, attack="fire", civ=None, scale=1.0) -> Unit:
-    return Unit(key, name, replaces, "ship", root, group="ship", attack=attack, civ=civ, scale=scale)
+    return Unit(key, name, replaces, "ship", root, group="ship", attack=attack, civ=civ, scale=scale * SHIP_SIZE)
 
 
 # --------------------------------------------------------------------------- the fleet
