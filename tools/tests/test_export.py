@@ -499,7 +499,8 @@ def test_full_build(tmp: Path):
         assert sab.values["attacks"] == [(21, 999), (4, 99), (11, 0)]
         assert sab.values["armours"] == [(4, 99), (3, 99), (16, 99)]
         assert sab.values["blast_width"] == 0 and sab.values["blast_level"] == 0 and abs(sab.values["reload"] - 0.9) < 1e-6
-        assert sab.values["collision_size"][:2] == (2.5, 2.5) and sab.values["dead_unit"] == -1
+        assert sab.values["collision_size"][:2] == (0.5, 0.5) and sab.values["dead_unit"] == -1  # ships unload him
+        assert sab.values["outline_size"][:2] == (2.5, 2.5)
         assert sab.values["standing"][0] == sab.values["walking"][0] == sab.values["attack_graphic"]
     from aom.datfile import read_graphics
     giant = read_graphics((mod / "Data" / "empires2_x1_p1.dat").read_bytes())[units.units[1][706].values["standing"][0]]
@@ -516,9 +517,12 @@ def test_full_build(tmp: Path):
     assert "boarding task added" in report
     icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     icons_after = slp.decode(out.get(50730))
-    assert len(icons_after) == len(icons_before) + 1
+    assert len(icons_after) == len(icons_before) + 2  # Pac-Man's, then the giant's
     assert all(np.array_equal(a.pixels, b.pixels) for a, b in zip(icons_after, icons_before))
     assert icons_after[170].pixels.shape == (36, 36) and len(np.unique(icons_after[170].pixels)) >= 4
+    giant_icon = icons_after[171].pixels
+    assert giant_icon.shape == (36, 36) and (giant_icon == 36).sum() > 100  # red: the palette's red team shade
+    assert all(c[706].values["icon"] == 171 for c in units.units)
     assert "trainable at the Wonder" in report and "Pac-Man is icon 170 (36x36)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
@@ -715,7 +719,7 @@ def test_direct_mode_and_restore(tmp: Path):
     assert langdll.read_string((game / "language_x1_p1.dll").read_bytes(), 5860) == "Pac-Man"
     assert (game / "language.dll").read_bytes() == lang_before["language.dll"]  # nothing of his in it
     icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
-    assert len(icons) == 171  # one icon added, not one per build
+    assert len(icons) == 172  # Pac-Man's and the giant's icons added, not two per build
     assert Drs(game / "Data" / "interfac.drs").get(51141) != panel_before  # the panel too, in the same file
     assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15511))
     assert build_mod.main(["--game", str(game), "--restore"]) == 0

@@ -1101,6 +1101,17 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         log(f"Pac-Man icon: no unit icon sheet ({gameplay.UNIT_ICONS}) in {', '.join(n for n, _ in archives)}")
     if not any(new for _, _, new in new_sheets):
         icon = None  # he keeps the Monkey Boy's icon
+    giant_icon = None  # the giant red Pac-Man's icon, right after Pac-Man's
+    if icon is not None:
+        added = []
+        for name, drs, new_sheet in new_sheets:
+            sheet, msg = gameplay.add_giant_icon(new_sheet, icon + 1, quant) if new_sheet else (None, "")
+            added.append((name, drs, sheet or new_sheet))
+            if new_sheet:
+                log(f"Giant Pac-Man icon in {name}: {msg}")
+        if all(sheet is not None and slp.info(sheet).num_frames == icon + 2 for _, _, sheet in added
+               if sheet is not None):
+            new_sheets, giant_icon = added, icon + 1
     raw = game.dat_path.read_bytes()
     waves, sound_ids, sound_drs = {}, None, None
     if pacman:  # his sounds go where the game finds new files: the patch archive if there is one
@@ -1111,7 +1122,7 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         free = free_resource_ids(game, raw, sum(len(v) for v in waves.values()))
         sound_ids = {name: [next(free) for _ in variants] for name, variants in waves.items()}
     giant = next(free_resource_ids(game, raw, 1, start=GIANT_SLP)) if pacman else None  # the giant's own SLP
-    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant)
+    patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon)
     for note in notes:
         log(note)
     if patch is None:

@@ -20,8 +20,9 @@ are left alone.
 
 The "to smithereens" cheat's unit, the Saboteur (706), becomes a giant red
 Pac-Man (`_giant`): Pac-Man's bite, armour, attack speed and sounds, no
-blast (the Saboteur blows itself up), 10000 hit points, a Wonder's room
-on the map, and the Militia's boarding task (`_giant_boarding`). The Saboteur borrows the Petard's sprites, which stay the
+blast (the Saboteur blows itself up), 10000 hit points, a Mangonel's room
+on the map (any more and Transport Ships cannot unload him), and the
+Militia's boarding task (`_giant_boarding`). The Saboteur borrows the Petard's sprites, which stay the
 Petard's: the giant gets a graphic no unit and no other graphic uses (an old
 piece of the Trade Cog, `GIANT_GRAPHICS`), pointed at a new SLP of his own
 (`giant_slp`: one picture per direction, he is far too big for animations).
@@ -63,7 +64,10 @@ PACMAN_NAME = "Pac-Man"
 SABOTEUR = 706  # the "to smithereens" cheat's unit
 GIANT_NAME = "Giant Pac-Man"
 GIANT_HP = 10000  # more than a Castle and a Wonder together (4800 each)
-GIANT_SIZE = 2.5  # tiles from his centre to his edge, a Wonder's: any bigger and the cheat may find no room for him
+# his room on the map, tiles from his centre to his edge: a Mangonel's, the most a Transport Ship can unload (with a
+# Wonder's 2.5 the ship found no beach for him); the selection outline drawn around him stays big, like his picture
+GIANT_ROOM = 0.5
+GIANT_OUTLINE = 2.5
 # graphics no unit and no other graphic uses, each with an SLP of its own (old pieces of the Trade Cog and Galley); the
 # first one found becomes the giant's
 GIANT_GRAPHICS = ("COGXX_F1", "COGXX_A1", "COGXX_W1", "GALLY_F1", "GALLY_A1")
@@ -87,8 +91,8 @@ def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
 
 
 def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None,
-              sounds: Optional[dict[str, list[int]]] = None, giant: Optional[int] = None
-              ) -> tuple[Optional[DatPatch], list[str]]:
+              sounds: Optional[dict[str, list[int]]] = None, giant: Optional[int] = None,
+              giant_icon: Optional[int] = None) -> tuple[Optional[DatPatch], list[str]]:
     """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), the giant red Pac-Man
     drawn from SLP `giant` (if given; with Pac-Man only), and the Javelina's own sprites. `sounds` maps a sound name
     (see SOUND_USES) to the resource ids of its WAV files.
@@ -115,7 +119,7 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         notes.append(msg)
     giant_gid = giant_name = None
     if pac_done and giant is not None:  # after the sounds: he gets Pac-Man's
-        msg, giant_gid, giant_name = _giant(data, civs, graphics, giant)
+        msg, giant_gid, giant_name = _giant(data, civs, graphics, giant, giant_icon)
         notes.append(msg)
     # last, from the back of the file to the front: these grow the file, which moves everything after them
     if pac_done:
@@ -216,8 +220,9 @@ def giant_graphic(graphics: dict, civs) -> Optional[int]:
     return None
 
 
-def _giant(data: bytearray, civs, graphics: dict, slp_id: int) -> tuple[str, Optional[int], Optional[int]]:
-    """The Saboteur becomes the giant red Pac-Man: (note, his graphic, his name string)."""
+def _giant(data: bytearray, civs, graphics: dict, slp_id: int,
+           icon: Optional[int] = None) -> tuple[str, Optional[int], Optional[int]]:
+    """The Saboteur becomes the giant red Pac-Man, with icon `icon` if given: (note, his graphic, his name string)."""
     gid = giant_graphic(graphics, civs)
     if gid is None:
         return f"Giant Pac-Man: not changed, none of {', '.join(GIANT_GRAPHICS)} is free for his picture", None, None
@@ -240,17 +245,19 @@ def _giant(data: bytearray, civs, graphics: dict, slp_id: int) -> tuple[str, Opt
         DU.patch(data, sab, hit_points=GIANT_HP, standing=(gid, -1), walking=(gid, -1), dying=(gid, -1),
                  attack_graphic=gid, dead_unit=-1, blast_width=0.0, blast_level=0, reload=pac.values["reload"],
                  attacks=_spares(sab.values["attacks"], bite, 0), armours=_spares(sab.values["armours"], armour, thick),
-                 collision_size=(GIANT_SIZE, GIANT_SIZE, sab.values["collision_size"][2]),
-                 outline_size=(GIANT_SIZE, GIANT_SIZE, sab.values["outline_size"][2]), **sounds,
+                 collision_size=(GIANT_ROOM, GIANT_ROOM, sab.values["collision_size"][2]),
+                 outline_size=(GIANT_OUTLINE, GIANT_OUTLINE, sab.values["outline_size"][2]), **sounds,
                  **{"class": INFANTRY})
+        if icon is not None:
+            DU.patch(data, sab, icon=icon)
         name = sab.values["name_id"]
         patched += 1
     if not patched:
         return "Giant Pac-Man: not changed, unit 706 is not the Saboteur here", None, None
     struct.pack_into("<i", data, graphics[gid].slp_at, slp_id)
     return (f"Giant Pac-Man: the Saboteur (unit {SABOTEUR}, cheat \"to smithereens\") for {patched} civilisations: "
-            f"Pac-Man's bite and armour, no blast, {GIANT_HP} hit points, {GIANT_SIZE:g} tiles from his centre to his "
-            f"edge; graphic {gid} ({graphics[gid].name}) now draws SLP {slp_id}"), gid, name
+            f"Pac-Man's bite and armour, no blast, {GIANT_HP} hit points, a Mangonel's room on the map ({GIANT_ROOM:g} "
+            f"tiles) so ships can unload him; graphic {gid} ({graphics[gid].name}) now draws SLP {slp_id}"), gid, name
 
 
 def _spares(own: list, wanted: list, amount: int) -> list:
@@ -496,6 +503,33 @@ def add_icon(data: bytes, index: int, quant) -> tuple[Optional[bytes], str]:
     blank = slp.SlpFrame(np.full((1, 1), slp.TRANSPARENT, np.int16), (0, 0))
     frames = [blank] * (index - info.num_frames) + [slp.SlpFrame(px, (0, 0))]
     return slp.append_frames(data, frames), f"Pac-Man is icon {index} ({w}x{h})"
+
+
+GIANT_ICON_SHADES = {2: 36, 3: 34}  # the giant's icon: Pac-Man's, his body in the palette's red team shades (fixed)
+
+
+def add_giant_icon(data: bytes, index: int, quant) -> tuple[Optional[bytes], str]:
+    """The unit icon sheet with the giant's icon added as icon `index`, just after Pac-Man's: Pac-Man's icon in red."""
+    try:
+        info = slp.info(data)
+    except ValueError as exc:
+        return None, f"not changed ({exc})"
+    if info.num_frames != index:
+        return None, f"not changed: icon {index} does not come right after this sheet's last"
+    sizes = [(w, h) for w, h, _, _ in info.sizes if 16 <= w <= 96 and 16 <= h <= 96]
+    if not sizes:
+        return None, "not changed: no icon in this sheet has a usable size"
+    w, h = max(set(sizes), key=sizes.count)
+    frame = pacman_icon(min(w, h))
+    lut = {k: int(quant.indices(np.array([rgb], np.int64))[0]) for k, rgb in ICON_COLOURS.items()}
+    lut.update(GIANT_ICON_SHADES)
+    px = np.vectorize(lut.get)(frame.pixels).astype(np.int16)
+    if (w, h) != px.shape[::-1]:
+        full = np.full((h, w), lut[0], np.int16)
+        y0, x0 = (h - px.shape[0]) // 2, (w - px.shape[1]) // 2
+        full[y0:y0 + px.shape[0], x0:x0 + px.shape[1]] = px
+        px = full
+    return slp.append_frames(data, [slp.SlpFrame(px, (0, 0))]), f"the giant Pac-Man is icon {index} ({w}x{h})"
 
 
 def rename_pacman(files: dict[str, bytes], strings: dict[str, int]) -> tuple[dict[str, bytes], list[str]]:

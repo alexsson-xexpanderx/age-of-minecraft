@@ -285,8 +285,10 @@ everything it does). The "to smithereens" cheat's Saboteur becomes a giant red
 Pac-Man, wider and taller than a Castle and a Wonder side by side, red
 whoever owns him (the palette's red team shades as plain colours). He has
 Pac-Man's bite, armour, attack speed and sounds, no blast (the Saboteur blew
-itself up), 10000 hit points, a Wonder's room on the map, and the Militia's task for
-boarding Transport Ships (the Saboteur had none). The Saboteur
+itself up), 10000 hit points, the Militia's task for boarding Transport Ships (the
+Saboteur had none), and a Mangonel's room on the map: with a Wonder's, ships
+found no beach to unload him. His icon is Pac-Man's in red, added to the unit
+icon sheet just after Pac-Man's. The Saboteur
 borrowed the Petard's sprites, which stay the Petard's: the giant gets an old,
 unused graphic of the Trade Cog, pointed at a new SLP of his own, one picture
 per direction (an animation that big would be hundreds of megabytes).
