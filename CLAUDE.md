@@ -110,7 +110,8 @@ putting `tools/` on `sys.path`.
    or patches `Data/` directly with backups. Then `apply_gameplay` runs:
    - `gameplay.py` + `datunits.py` patch the `.dat` so the Wonder trains Pac-Man, and give the Javelina its own
      sprites. The Saboteur ("to smithereens", 706) becomes the giant red Pac-Man (`gameplay._giant`): Pac-Man's
-     attacks, armours and sounds written over its own in place, and an unused graphic (`GIANT_GRAPHICS`, found by
+     attacks, armours and sounds written over its own in place, resource capacity 1 (`GIANT_CARRY`: UserPatch 1.5
+     otherwise blows up units 440, 527, 528 and 706 on their first attack), and an unused graphic (`GIANT_GRAPHICS`, found by
      `giant_graphic`) pointed at his new SLP (`giant_slp`, in red-team palette shades, written next to Pac-Man's
      sounds), as the Saboteur shares the Petard's sprites. The Wonder also trains the dragon (`gameplay._dragon`), in
      the never-used Advanced Heavy Crossbowman's slot (493): its own sprites (slpmap), every terrain, its shots

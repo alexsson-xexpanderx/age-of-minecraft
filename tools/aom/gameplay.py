@@ -20,7 +20,7 @@ are left alone.
 
 The "to smithereens" cheat's unit, the Saboteur (706), becomes a giant red
 Pac-Man (`_giant`): Pac-Man's bite, armour, attack speed and sounds, no
-blast (the Saboteur blows itself up), 10000 hit points, a Mangonel's room
+blast and no self-destruct (`GIANT_CARRY`), 10000 hit points, a Mangonel's room
 on the map (any more and Transport Ships cannot unload him), and the
 Militia's boarding task (`_giant_boarding`). The Saboteur borrows the Petard's sprites, which stay the
 Petard's: the giant gets a graphic no unit and no other graphic uses (an old
@@ -72,6 +72,12 @@ PACMAN_NAME = "Pac-Man"
 SABOTEUR = 706  # the "to smithereens" cheat's unit
 GIANT_NAME = "Giant Pac-Man"
 GIANT_HP = 10000  # more than a Castle and a Wonder together (4800 each)
+# The game blows up units 440, 527, 528 and 706 (the Petard, the Demolition Ships and the Saboteur) on their first
+# attack, whatever their blast, hit points or class: with the Saboteur's resource capacity (2) the giant vanished as
+# soon as he bit. UserPatch 1.5: with a resource capacity of 1 they only blow up if their hero status has flag 32
+# (self-destruct), which the Saboteur's (1, a hero) has not.
+GIANT_CARRY = 1
+SELF_DESTRUCT = 32
 # his room on the map, tiles from his centre to his edge: a Mangonel's, the most a Transport Ship can unload (with a
 # Wonder's 2.5 the ship found no beach for him); the selection outline drawn around him stays big, like his picture
 GIANT_ROOM = 0.5
@@ -170,7 +176,8 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the patched file did not read back as expected"]
         sab = units[SABOTEUR] if giant_gid is not None and len(units) > SABOTEUR else None
         if sab is not None and sab.type == 70 and sab.values["standing"][0] == giant_gid and (
-                sab.values["hit_points"] != GIANT_HP or sab.values["blast_width"] != 0):
+                sab.values["hit_points"] != GIANT_HP or sab.values["blast_width"] != 0
+                or sab.values["resource_capacity"] != GIANT_CARRY or sab.values["hero_status"] & SELF_DESTRUCT):
             return None, notes + ["not changed: the giant Pac-Man did not read back as expected"]
         drake = units[DRAGON] if fire_gid is not None and len(units) > DRAGON else None
         if drake is not None and drake.type == 70 and drake.values["hit_points"] == DRAGON_HP and (
@@ -285,6 +292,7 @@ def _giant(data: bytearray, civs, graphics: dict, slp_id: int,
                   for f in ("selection_sound", "dying_sound", "attack_sound", "move_sound")}
         DU.patch(data, sab, hit_points=GIANT_HP, standing=(gid, -1), walking=(gid, -1), dying=(gid, -1),
                  attack_graphic=gid, dead_unit=-1, blast_width=0.0, blast_level=0, reload=pac.values["reload"],
+                 resource_capacity=GIANT_CARRY, hero_status=sab.values["hero_status"] & ~SELF_DESTRUCT,
                  attacks=_spares(sab.values["attacks"], bite, 0), armours=_spares(sab.values["armours"], armour, thick),
                  collision_size=(GIANT_ROOM, GIANT_ROOM, sab.values["collision_size"][2]),
                  outline_size=(GIANT_OUTLINE, GIANT_OUTLINE, sab.values["outline_size"][2]), **sounds,

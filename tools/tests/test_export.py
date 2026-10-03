@@ -53,7 +53,7 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     b += struct.pack("<hhhhbhfb", standing, -1, dying, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
     b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 1 if uid == 860 else 7,  # no beaches
-                     0, 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)
+                     0, 2 if uid == 706 else 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)  # the Saboteur's carry blows him up
     b += struct.pack("<iiibbbbbbbBbhbBfff", 105000 + uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
     b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
     if utype >= 20:
@@ -70,8 +70,8 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
     if utype == 60:
         b += struct.pack("<bbbbbf", 0, 0, 0, 0, 0, 0.0)
     if utype >= 70:
-        b += struct.pack("<hhhhhhhhhhhbffbbifbfffiibh", 0, 25, 1, 3, 25, 1, 4, 1, 0, 20, -1, 0, 0, 0, 2, 0, -1, 0, 0,
-                         0, 0, 0, -1, -1, 0, 0)
+        b += struct.pack("<hhhhhhhhhhhbffbbifbfffiibh", 0, 25, 1, 3, 25, 1, 4, 1, 0, 20, -1, 0, 0, 0, 2,
+                         1 if uid == 706 else 0, -1, 0, 0, 0, 0, 0, -1, -1, 0, 0)  # the Saboteur is a hero
     if utype == 80:
         b += struct.pack("<hhbhbhhhhb", -1, -1, 0, 0, 0, -1, -1, -1, -1, 0) + bytes(40)
         b += struct.pack("<hhhhbffh", -1, -1, -1, -1, 0, 0, 0, -1) + bytes(6)
@@ -521,6 +521,8 @@ def test_full_build(tmp: Path):
         assert sab.values["blast_width"] == 0 and sab.values["blast_level"] == 0 and abs(sab.values["reload"] - 0.9) < 1e-6
         assert sab.values["collision_size"][:2] == (0.5, 0.5) and sab.values["dead_unit"] == -1  # ships unload him
         assert sab.values["outline_size"][:2] == (2.5, 2.5)
+        # UserPatch blows the Saboteur's unit up on its first attack unless it carries 1 and lacks flag 32
+        assert sab.values["resource_capacity"] == 1 and sab.values["hero_status"] == 1
         assert sab.values["standing"][0] == sab.values["walking"][0] == sab.values["attack_graphic"]
     from aom.datfile import read_graphics
     giant = read_graphics((mod / "Data" / "empires2_x1_p1.dat").read_bytes())[units.units[1][706].values["standing"][0]]

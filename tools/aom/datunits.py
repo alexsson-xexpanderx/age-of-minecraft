@@ -63,7 +63,8 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "terrain_restriction": "h", "speed": "f", "collision_size": "fff", "outline_size": "fff",
            "blast_width": "f", "reload": "f", "blast_level": "b", "line_of_sight": "f", "max_range": "f",
            "projectile": "h", "displacement": "fff", "displayed": "hhff", "displayed_pierce": "h",
-           "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h"}
+           "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h",
+           "resource_capacity": "h", "hero_status": "b"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -111,7 +112,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     f["terrain_restriction"] = r.p
     v["terrain_restriction"] = r.one("h")  # which terrains the unit may stand on (a row of the restriction table)
     r.one("b")  # fly mode
-    r.one("h")  # resource capacity
+    f["resource_capacity"] = r.p
+    v["resource_capacity"] = r.one("h")  # how much it carries; UserPatch's "resource carry" (see gameplay.GIANT_CARRY)
     r.one("f")  # resource decay
     r.take("bbbbb")  # blast defence, combat level, interaction mode, minimap mode, interface kind
     r.one("f")  # multiple attribute mode
@@ -207,7 +209,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         r.take("ff")  # rear and flank attack modifiers
         f["creatable_type"] = r.p
         v["creatable_type"] = r.one("b")
-        r.one("b")  # hero mode
+        f["hero_status"] = r.p
+        v["hero_status"] = r.one("b")  # 0 none, 1 a hero; UserPatch 1.5 adds flags, 32 self-destruct
         r.one("i")  # garrison graphic
         r.one("f")  # total projectiles
         r.one("b")  # max total projectiles

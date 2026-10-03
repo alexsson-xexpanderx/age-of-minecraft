@@ -284,8 +284,13 @@ windshield (the game draws the car from one picture per direction for
 everything it does). The "to smithereens" cheat's Saboteur becomes a giant red
 Pac-Man, wider and taller than a Castle and a Wonder side by side, red
 whoever owns him (the palette's red team shades as plain colours). He has
-Pac-Man's bite, armour, attack speed and sounds, no blast (the Saboteur blew
-itself up), 10000 hit points, the Militia's task for boarding Transport Ships (the
+Pac-Man's bite, armour, attack speed and sounds, no blast, 10000 hit points,
+and he no longer blows himself up: the game blows up the Petard, the
+Demolition Ships and the Saboteur (units 440, 527, 528 and 706) on their
+first attack, whatever their blast or hit points, so he vanished at his first
+bite. UserPatch 1.5 spares them when their resource capacity is 1 (the
+Saboteur's was 2) and their hero status lacks its self-destruct flag (32; the
+Saboteur's is 1, a hero). He also gets the Militia's task for boarding Transport Ships (the
 Saboteur had none), and a Mangonel's room on the map: with a Wonder's, ships
 found no beach to unload him. His icon is Pac-Man's in red, added to the unit
 icon sheet just after Pac-Man's. The Saboteur
