@@ -182,7 +182,7 @@ next to your Town Center:
 | `furious the monkey boy` | **Pac-Man**, who chomps as he runs and attacks, and dies the arcade way |
 | `i love the monkey head` | a **ghost** in your team colour (red for player 2, like Blinky) |
 | `how do you turn this on` | the **Cobra Car**, built from blocks in your team colour, with white racing stripes |
-| `to smithereens` | a **giant red Pac-Man**, bigger than a Castle and a Wonder side by side: Pac-Man's bite and armour, 10000 hit points, and he no longer blows himself up. He needs open ground: he is too big to pass between buildings, trees or through gates |
+| `to smithereens` | a **giant red Pac-Man**, bigger than a Castle and a Wonder side by side: Pac-Man's bite and armour, 10000 hit points, and he no longer blows himself up. He boards Transport Ships. He needs open ground: he is too big to pass between buildings, trees or through gates, and a ship needs a clear beach to unload him |
 
 In a multiplayer game, cheats only work if "Allow cheats" is ticked in the
 game setup.

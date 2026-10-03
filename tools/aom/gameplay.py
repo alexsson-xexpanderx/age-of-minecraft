@@ -20,8 +20,8 @@ are left alone.
 
 The "to smithereens" cheat's unit, the Saboteur (706), becomes a giant red
 Pac-Man (`_giant`): Pac-Man's bite, armour, attack speed and sounds, no
-blast (the Saboteur blows itself up), 10000 hit points and a Wonder's room
-on the map. The Saboteur borrows the Petard's sprites, which stay the
+blast (the Saboteur blows itself up), 10000 hit points, a Wonder's room
+on the map, and the Militia's boarding task (`_giant_boarding`). The Saboteur borrows the Petard's sprites, which stay the
 Petard's: the giant gets a graphic no unit and no other graphic uses (an old
 piece of the Trade Cog, `GIANT_GRAPHICS`), pointed at a new SLP of his own
 (`giant_slp`: one picture per direction, he is far too big for animations).
@@ -120,6 +120,8 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
     # last, from the back of the file to the front: these grow the file, which moves everything after them
     if pac_done:
         notes.append(_boarding(data, civs))
+    if giant_gid is not None:  # his task list comes before Pac-Man's in the file: after it, so nothing moves under it
+        notes.append(_giant_boarding(data))
     if table is not None:
         _add_sounds(data, table, sounds)
     if not changed:
@@ -139,9 +141,12 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the giant Pac-Man did not read back as expected"]
     if pac_done:
         try:
-            DU.read_unit_headers(bytes(data), check)
+            heads = DU.read_unit_headers(bytes(data), check)
         except DU.DatLayoutError:
             return None, notes + ["not changed: the patched task lists did not read back as expected"]
+        if giant_gid is not None and not any(t[3] == DU.GARRISON and t[4] == DU.TRANSPORT
+                                             for t in heads.tasks[SABOTEUR] or []):
+            return None, notes + ["not changed: the giant Pac-Man's boarding task did not read back as expected"]
     packed = DU.compress(bytes(data))
     if table is not None:
         try:
@@ -297,6 +302,25 @@ def _boarding(data: bytearray, civs) -> str:
         return "Pac-Man on ships: infantry now; no boarding task to copy from the Militia"
     DU.add_task(data, heads, PACMAN_UNIT, (board[0], len(tasks)) + board[2:])
     return "Pac-Man on ships: infantry now, and the Militia's boarding task added, so Transport Ships take him"
+
+
+def _giant_boarding(data: bytearray) -> str:
+    """Give the giant the Militia's boarding task (the Saboteur has none), read afresh: the file may have grown."""
+    try:
+        civs = DU.read_units(bytes(data))
+        heads = DU.read_unit_headers(bytes(data), civs)
+    except DU.DatLayoutError as exc:
+        return f"Giant Pac-Man on ships: his task list was not checked ({exc})"
+    tasks = heads.tasks[SABOTEUR] if len(heads.tasks) > SABOTEUR else None
+    if tasks is None:
+        return "Giant Pac-Man on ships: he has no task list to add boarding to"
+    if any(t[3] == DU.GARRISON and t[4] == DU.TRANSPORT for t in tasks):
+        return "Giant Pac-Man on ships: he already has the boarding task"
+    board = next((t for t in heads.tasks[MILITIA] or [] if t[3] == DU.GARRISON and t[4] == DU.TRANSPORT), None)
+    if board is None:
+        return "Giant Pac-Man on ships: no boarding task to copy from the Militia"
+    DU.add_task(data, heads, SABOTEUR, (board[0], len(tasks)) + board[2:])
+    return "Giant Pac-Man on ships: the Militia's boarding task added, so Transport Ships take him"
 
 
 # which unit sound each of Pac-Man's sounds replaces; "chomp" and "death" go on his attack and death animations

@@ -512,6 +512,7 @@ def test_full_build(tmp: Path):
     heads = datunits.read_unit_headers(datunits.decompress((mod / "Data" / "empires2_x1_p1.dat").read_bytes()), units)
     assert [(t[1], t[3], t[4]) for t in heads.tasks[860]] == [(0, 7, -1), (1, 3, 20)]  # the Militia's boarding task
     assert len(heads.tasks[74]) == 2 and heads.tasks[861] is None
+    assert [(t[3], t[4]) for t in heads.tasks[706]] == [(3, 20)]  # the giant boards Transport Ships too
     assert "boarding task added" in report
     icons_before = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     icons_after = slp.decode(out.get(50730))
