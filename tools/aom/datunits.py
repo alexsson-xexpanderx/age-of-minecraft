@@ -64,8 +64,7 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "blast_width": "f", "reload": "f", "blast_level": "b", "line_of_sight": "f", "max_range": "f",
            "projectile": "h", "displacement": "fff", "displayed": "hhff", "displayed_pierce": "h",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h",
-           "resource_capacity": "h", "hero_status": "b", "placement_terrain": "hh", "obstruction": "bbb",
-           "foundation_terrain": "h"}
+           "resource_capacity": "h", "hero_status": "b", "placement_terrain": "hh"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -128,8 +127,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     f["hotkey"] = r.p
     r.one("i")
     r.take("bbbb")  # recyclable, auto gather, doppelganger on death, resource gather group
-    f["obstruction"] = r.p
-    v["obstruction"] = r.take("bbb")  # occlusion mode, obstruction type (0: others go over it), obstruction class
+    r.take("bbb")  # occlusion mode, obstruction type, obstruction class
     r.take("Bbh")  # trait, civilisation, nothing
     r.take("bB")  # selection effect, editor selection colour
     f["outline_size"] = r.p
@@ -228,10 +226,7 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         r.one("b")  # adjacent mode
         r.one("h")  # graphics angle
         r.one("b")  # disappears when built
-        r.one("h")  # stack unit
-        f["foundation_terrain"] = r.p
-        v["foundation_terrain"] = r.one("h")  # the terrain it leaves under it (-1: none)
-        r.take("hh")  # old overlay, tech
+        r.take("hhhh")  # stack unit, foundation terrain, old overlay, tech
         r.one("b")  # can burn
         r.skip(4 * 10)  # annexes
         r.take("hhh")  # head unit, transform unit, transform sound

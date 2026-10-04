@@ -200,13 +200,6 @@ def plan(graphics: dict, taken: set[int] = frozenset()) -> Plan:
         if re.match(r"^WCTWX1N0G$", name):
             blank(g, "outpost shadow")
             continue
-        # the unused Sea Wall, which becomes the rails (rails.py): drawn on its ground layer, under every unit
-        if name == "SWAL1N0":
-            add(g, {"model": "rail", "mode": "pieces", "shadow": False, "outline": False}, "rails")
-            continue
-        if re.match(r"^SWAL1N[1N]$", name):
-            blank(g, "rail layer", r"^SWAL")
-            continue
 
         # ---------------------------------------------------------------- building sites and rubble
         m = re.match(r"^CNST([1-8D])_NN$", name)

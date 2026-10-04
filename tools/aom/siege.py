@@ -6,7 +6,7 @@
     Bombard Cannon      -> TNT cannon with an obsidian barrel
     Trebuchet           -> Log-frame trebuchet with a team-colour counterweight
     War Wagon           -> Covered wagon with a team-colour wool canopy
-    Trade Cart          -> A train: a furnace minecart pulling a chest minecart (it runs on rails: rails.py)
+    Trade Cart          -> A train: a furnace minecart pulling a chest minecart, laying its own rails (rails.py)
 """
 from __future__ import annotations
 

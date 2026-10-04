@@ -40,10 +40,10 @@ files are not changed. It writes:
 
 ```
 Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
-Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, the lava, the rails, Pac-Man's and the Dragon's icons and sounds
-Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man and the Dragon at the Wonder, the lava, rails and trains, the Javelina's own look
+Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, the lava, the trains' rails, Pac-Man's and the Dragon's icons and sounds
+Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man and the Dragon at the Wonder, the lava, trains laying rails, the Javelina's own look
 Games\age_of_minecraft\Script.RM\Team Lava Islands.rms  the Team Lava Islands map
-Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's, the Dragon's, the Rail's and the Train's names, and "Age of Minecraft"
+Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's, the Dragon's and the Train's names, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
 Games\age_of_minecraft\menu_originals\         your game's main menu pictures (for a Minecraft menu)
 Games\age_of_minecraft\screen_originals\       your game's other screens (setup, loading, dialogues...)
@@ -92,7 +92,7 @@ each one backed up first, and **`restore_original.bat`** puts them back.
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs`, the farms into `Data\terrain.drs` and the panels into `Data\interfac.drs` (no mod exe needed); each file is backed up first as `<name>.aom-backup` |
 | `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file, the icons, the language files and the Team Lava Islands map) |
-| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man or Dragon at the Wonder, no lava, no rails: Trade Carts go anywhere, and the cheat unit keeps its name and icon) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man or Dragon at the Wonder, no lava, no rails behind the trains, and the cheat unit keeps its name and icon) |
 | `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man or Dragon at the Wonder, no lava, no rails, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
@@ -159,7 +159,7 @@ He has his own arcade sounds: click on him and he goes "waka-waka" (or
 boings, or giggles), orders get a "wakawakawaka" or a big CHOMP and
 "nom nom", the Wonder plays a little jingle when he is ready, every bite
 chomps, and he dies with a sad "wah wah wah waaah" and two pops. Listen to
-them in `previews/sounds/`. He, the Dragon, the lava and the rails below are
+them in `previews/sounds/`. He, the Dragon, the lava and the trains below are
 the mod's changes to the game's rules; `--no-wonder-pacman` leaves the rules
 alone.
 
@@ -195,20 +195,13 @@ can no longer be built in shallow fords (they can on lava instead). With
 `build_mod_direct.bat` the map goes into your game's `Random` folder, and
 `restore_original.bat` removes it again.
 
-**Trains and rails.** The Trade Cart is now a **Train**: a big Minecraft
-furnace minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade
-Cart did (from your Market to another player's Market and back, more gold the
-farther it goes), but only on rails. To lay them, select Villagers, open
-their second build page and pick **Rail** (between the Gate and the Castle,
-with a track for its icon): drag a line as you would drag a wall, from a tile
-next to your Market to a tile next to the other Market. Each tile costs 1 wood
-and 1 gold. Rails lie flat, with gravel under them, and everyone walks over
-them. Lines join up straight or corner to corner; their ends and bends are
-little plank platforms. Then build Trains at your Market and right-click the
-other Market, as with the Trade Cart. The game cannot give ground to one
-player, so another player's trains can use your rails too (in practice an
-ally's, trading with the same two Markets). The computer players never lay
-rails, so their trains cannot trade.
+**Trains.** The Trade Cart is now a **Train**: a big Minecraft furnace
+minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade
+Cart did: build it at your Market, then right-click another player's Market.
+It lays its own rails as it drives: they appear behind it all the way to the
+other Market, round buildings and trees as it goes round them. The rails stay
+while your trains keep running, and fade 2.5 minutes after the last train
+passed. Computer players' trains trade and lay rails too.
 
 His name lives in the game's language files (`language_x1_p1.dll`,
 `language_x1.dll`, `language.dll`, in the game's main folder). Age of

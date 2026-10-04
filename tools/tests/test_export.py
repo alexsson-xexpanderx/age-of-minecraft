@@ -82,13 +82,13 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
 
 
 def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0,
-              saboteur_graphic: int = 0, crossbow_graphic: int = 0, sea_wall_graphic: int = 0) -> bytes:
+              saboteur_graphic: int = 0, crossbow_graphic: int = 0) -> bytes:
     """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860) with his bite and
     armour, the Saboteur (706) with its blast, the Javelina (822) borrowing the Wild Boar's sprites, with its
     carcass (823) and the boar's (356), and the Advanced Heavy Crossbowman (493: graphics `crossbow_graphic` on,
     attack, dying, standing, walking) with its shot (508) and the shot Chemistry makes of it (520), a Dock (46),
-    which may stand on Water or Shallows next to a beach, the Trade Cart (128, and 204 loaded), the Sea Wall
-    (788, a wall no one builds, standing graphic `sea_wall_graphic`, in water) and the Palisade Wall (72, on land).
+    which may stand on Water or Shallows next to a beach, and the Trade Cart (128, and 204 loaded), which goes where
+    the restriction table's second row lets it.
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -128,11 +128,7 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
             elif u == 46:
                 out += _unit_bytes(u, 80, "DOCK", placement=(2, 35, 1, 4))
             elif u in (128, 204):
-                out += _unit_bytes(u, 70, "TCART" if u == 128 else "TCARTF", cls=19)
-            elif u == 788:  # it stands in water (the restriction table's first row stands in for that)
-                out += _unit_bytes(u, 80, "SWAL", sea_wall_graphic, cls=27, restriction=0)
-            elif u == 72:
-                out += _unit_bytes(u, 80, "WALL", cls=27, restriction=1)
+                out += _unit_bytes(u, 70, "TCART" if u == 128 else "TCARTF", cls=19, restriction=1)
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -144,8 +140,7 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
 
 FAKE_TERRAINS = {0: ("Grass", 15000), 7: ("Farm", 15004), 8: ("Farm (dead)", 15005), 29: ("Farm 1", 15021),
                  30: ("Farm 2", 15040), 31: ("Farm 3", 15023),  # Farm 2 on another id: it must come from the .dat
-                 1: ("Water", 15002), 15: ("Old Water", -1),  # the old water has no texture: it is drawn as the Water
-                 16: ("Old Grass", -1), 24: ("Road", 15018)}  # the old grass is drawn as the Grass
+                 1: ("Water", 15002), 15: ("Old Water", -1)}  # the old water has no texture: it is drawn as the Water
 
 
 def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
@@ -155,8 +150,7 @@ def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
     for i in range(42):
         name, slp_id = terrains.get(i, ("", -1))
         rec = bytearray(struct.pack("<bb13s13si", 1 if name else 0, 0, name.encode(), f"t{i}".encode(), slp_id))
-        rec += bytes(40 - len(rec)) + struct.pack("<ii", 70 + i, 2 if i == 24 else 1)  # how it blends
-        rec += bytes(192 - len(rec)) + struct.pack("<hhh", {15: 1, 16: 0}.get(i, -1), 3 if 29 <= i <= 31 else 6,
+        rec += bytes(192 - len(rec)) + struct.pack("<hhh", 1 if i == 15 else -1, 3 if 29 <= i <= 31 else 6,
                                                    3 if 29 <= i <= 31 else 6)
         b += rec + bytes(436 - len(rec))
     return bytes(b)
@@ -165,11 +159,12 @@ def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
 def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> bytes:
     """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and terrains and unit tables)."""
     b = bytearray(b"VER 5.7\0")
-    restrictions, terrains = 3, 41  # the first two let every unit everywhere; the last, which no unit uses, nowhere
-    b += struct.pack("<HH", restrictions, terrains)
+    restrictions, terrains = 3, 41  # the first lets units everywhere, the second on land (the first 30 terrains)
+    b += struct.pack("<HH", restrictions, terrains)  # and the last, which no unit uses, nowhere
     b += struct.pack(f"<{2 * restrictions}i", *([1] * 2 * restrictions))
     for k in range(restrictions):
-        b += struct.pack(f"<{terrains}f", *([1.0 if k < 2 else 0.0] * terrains)) + bytes(16 * terrains)
+        b += struct.pack(f"<{terrains}f", *[(1.0 if k == 0 or k == 1 and t < 30 else 0.0) for t in range(terrains)])
+        b += bytes(16 * terrains)
     b += struct.pack("<H", 2) + bytes(36 * 2)
     b += struct.pack("<H", 1) + struct.pack("<hhHi", 0, 0, 2, 300000)  # one sound, with two files
     b += struct.pack("<13sihhh", b"a.wav", 5001, 50, -1, -1) + struct.pack("<13sihhh", b"b.wav", 15501, 50, -1, -1)
@@ -266,8 +261,6 @@ def fake_game(root: Path) -> Path:
     interfac.put(53010, slp.encode([slp.SlpFrame(np.full((17, 22), 0, np.int16), (0, 0))]))  # UserPatch's steak
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
-    for sid in (50705, 50706, 50707, 50708):  # the building icon sheets, one per icon set
-        interfac.put(sid, slp.encode([icon] * 52))
     interfac.put(50189, fake_menu())  # the main menu, and its palette
     interfac.put(50589, fake_palette(), "bina")
     # screen files: the game setup (its big picture shown by two screens, in two palettes); a picture no screen file
@@ -316,9 +309,8 @@ def fake_game(root: Path) -> Path:
     (root / "language_x1.dll").write_bytes(langdll.build_dll({**monkey, 4: "Age of Empires II Expansion"}))
     (root / "language.dll").write_bytes(langdll.build_dll({  # and the Advanced Heavy Crossbowman's (5493, 6493, 26493)
         5079: "Militia", 5493: "Advanced Heavy Crossbowman", 6493: "not used 6493", 26493: "not used #26493",
-        5128: "Trade Cart", 6128: "Build Trade Cart",  # the Trade Cart's, and the Sea Wall's name and button (no help)
-        26128: "Build <b> Trade Cart<b> (<cost>) \nUsed to trade with other players by land. " + "x" * 310,
-        5788: "Sea Wall", 6788: "Build Sea Wall"}))
+        5128: "Trade Cart", 6128: "Build Trade Cart",  # and the Trade Cart's, its help as long as the real one
+        26128: "Build <b> Trade Cart<b> (<cost>) \nUsed to trade with other players by land. " + "x" * 310}))
     graphics = Drs()
     table = []
     # militia (5 sprites), archer (5), a battering ram with a separate swinging head and wheels
@@ -373,13 +365,6 @@ def fake_game(root: Path) -> Path:
         graphics.put(slp_id, build_mod.blank(frames * 5))
     table += [{"name": "M_SPEA_R", "slp": 3820, "frames": 10, "angles": 32, "mirror": 24},
               {"name": "TORCH2", "slp": 5283, "frames": 14, "angles": 1, "mirror": 0}]
-    sea_wall = len(table)  # the Sea Wall's pieces: on the ground (layer 5), and two more, its own the standing one
-    table += [{"name": "SWAL1N0", "slp": 4913, "frames": 1, "angles": 5, "mirror": 0},
-              {"name": "SWAL1NN", "slp": 4915, "frames": 1, "angles": 5, "mirror": 0},
-              {"name": "SWAL1N1", "slp": 4914, "frames": 9, "angles": 5, "mirror": 0,
-               "deltas": [sea_wall, sea_wall + 1, -1]}]
-    for slp_id, frames in ((4913, 5), (4914, 45), (4915, 5)):
-        graphics.put(slp_id, slp.encode([slp.SlpFrame(np.full((20, 30), 60, np.int16), (15, 10))] * frames))
     graphics.put(40000, b"not a sprite we touch")
     graphics.write(data / "graphics.drs")
     extra = Drs()  # some sprites only exist in gamedata_x1.drs
@@ -396,9 +381,10 @@ def fake_game(root: Path) -> Path:
     near[:3] = 7  # a near copy of team 1's mark
     patch.put(53301, slp.encode([slp.SlpFrame(near, marks[1].hotspot)]))
     patch.write(data / "gamedata_x1_p1.drs")
-    saboteur = len(table)  # the Saboteur borrows the Petard's sprites; an old Trade Cog piece no one uses
+    saboteur = len(table)  # the Saboteur borrows the Petard's sprites; old Trade Cog and Galley pieces no one uses
     table += [{"name": "HDSQD_FN", "slp": 4497, "frames": 10, "angles": 8, "mirror": 6},
-              {"name": "COGXX_F1", "slp": 2909, "frames": 1, "angles": 8, "mirror": 6}]
+              {"name": "COGXX_F1", "slp": 2909, "frames": 1, "angles": 8, "mirror": 6},
+              {"name": "GALLY_A1", "slp": 2937, "frames": 1, "angles": 8, "mirror": 6}]
     boar = len(table)
     table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
     for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
@@ -406,8 +392,7 @@ def fake_game(root: Path) -> Path:
         table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8})  # only 5157 has a file
     (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar,
                                                                          saboteur_graphic=saboteur,
-                                                                         crossbow_graphic=crossbow,
-                                                                         sea_wall_graphic=sea_wall + 2), FAKE_TERRAINS))
+                                                                         crossbow_graphic=crossbow), FAKE_TERRAINS))
     return root
 
 
@@ -621,34 +606,26 @@ def test_full_build(tmp: Path):
     rms = (mod / "Script.RM" / "Team Lava Islands.rms").read_bytes().decode("latin-1")  # in the mod's own maps
     assert "#const LAVA 15" in rms and "base_terrain LAVA" in rms and "FISH" not in rms
     assert "Lava: terrain 15 ('Old Water') is lava" in report and "Docks (units 46)" in report
-    # the rails: the Sea Wall (788), built by Villagers, leaves gravel (the old grass, 16), the only ground the trains
-    # (the Trade Cart, 128 and 204) may go on: the restriction row no unit used
+    # the trains: the Trade Cart (128, 204) goes where it went, on a row of its own (the one no unit used), which
+    # leaves rails behind it on every terrain it goes on: an old Galley piece, drawing the rails' own SLP
     from aom.datfile import restrictions
     after = (mod / "Data" / "empires2_x1_p1.dat").read_bytes()
-    bed = read_terrains(after)[16]
-    assert bed.to_draw == -1 and bed.slp == 15003  # after the lava's (15001; 15002 is the Water's)
-    gravel, grass = slp.decode(out.get(bed.slp)), slp.decode(Drs(game / "Data" / "terrain.drs").get(15000))
-    assert len(gravel) == 100 and all(np.array_equal(a.pixels >= 0, b.pixels >= 0) for a, b in zip(gravel, grass))
     rows = restrictions(datunits.decompress(after))
-    assert [k for k, x in enumerate(rows[2]) if x > 0] == [16] and rows[0][16] == rows[0][0] == 1.0
-    for civ in units.units:
-        r = civ[788]
-        assert r.values["train_location"] == 118 and r.values["button"] == 12 and r.values["enabled"] == 1
-        assert r.values["cost"] == (1, 1, 1, 3, 1, 1, -1, 0, 0) and r.values["foundation_terrain"] == 16
-        assert r.values["obstruction"][1] == 0 and r.values["class"] == 27 and r.values["icon"] == 52
-        assert r.values["terrain_restriction"] == civ[72].values["terrain_restriction"] == 1  # on land
-        assert civ[128].values["terrain_restriction"] == civ[204].values["terrain_restriction"] == 2
-    pieces = slp.decode(out.get(4913))  # the rails, on the ground; the Sea Wall's other pieces hidden
-    assert len(pieces) == 5 and len({f.pixels.tobytes() for f in pieces}) == 5
-    assert all((pieces[k].pixels != slp.SHADOW).all() for k in range(5))
-    for s in (4914, 4915):
-        assert all((f.pixels == slp.TRANSPARENT).all() for f in slp.decode(out.get(s)))
-        assert slp.info(out.get(s)).num_frames == slp.info(orig.get(s)).num_frames
-    for sid in (50705, 50706, 50707, 50708):  # its icon, in every building icon sheet
-        sheet = slp.decode(out.get(sid))
-        assert len(sheet) == 53 and sheet[52].pixels.shape == (36, 36) and len(np.unique(sheet[52].pixels)) >= 5
-    assert "Rails: unit 788 (SWAL) is the rail for 2 civilisations" in report and "the Palisade Wall's" in report
-    assert "the trains (units 128, 204) may only go on it (terrain restriction 2)" in report
+    assert all(c[128].values["terrain_restriction"] == c[204].values["terrain_restriction"] == 2 for c in units.units)
+    assert rows[2] == rows[1]
+    track = next(g for g in graphics_after.values() if g.name == "GALLY_A1")
+    assert (track.slp, track.layer, track.frame_count, track.angle_count, track.mirroring) == (15602, 10, 5, 16, 12)
+    assert track.frame_rate == 30.0 and track.sequence_type == 3
+    data = datunits.decompress(after)
+    at = 12 + 8 * 3 + 2 * 41 * 20 + 4 * 41  # the trains' row's pass graphics
+    left = [struct.unpack_from("<iiii", data, at + 16 * t) for t in range(41)]
+    assert left[:30] == [(-1, -1, track.id, 4)] * 30 and left[30:] == [(-1, -1, -1, 0)] * 11
+    rails = slp.decode(out.get(15602))
+    assert len(rails) == 9 * 5  # 16 directions, 9 drawn (the rest mirrored), 5 pictures each
+    drawn = [int((f.pixels >= 0).sum()) for f in rails[:5]]
+    assert drawn[0] == drawn[1] == drawn[2] > drawn[3] > drawn[4] > 0  # fading over the last two
+    assert "Trains: the Trade Carts (units 128, 204, 4 in all) go where they went (terrain restriction 2" in report
+    assert "graphic" in report and "(GALLY_A1) now draws SLP 15602" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -659,10 +636,8 @@ def test_full_build(tmp: Path):
     assert langdll.read_string(p1, 5706) == "Giant Pac-Man"
     assert [langdll.read_string(p1, i) for i in (5493, 6493)] == ["Dragon", "Create Dragon"]
     assert langdll.read_string(p1, 26493).startswith("Create <b> Dragon<b> (<cost>) \nA flying dragon")
-    assert [langdll.read_string(p1, i) for i in (5788, 6788, 5128, 6128)] == ["Rail", "Build Rail", "Train",
-                                                                              "Build Train"]
-    assert langdll.read_string(p1, 26788).startswith("Build <b> Rail<b> (<cost>) \nTracks for Trains")
-    assert langdll.read_string(p1, 26128).startswith("Build <b> Train<b> (<cost>) \nTrades with other players")
+    assert [langdll.read_string(p1, i) for i in (5128, 6128)] == ["Train", "Build Train"]
+    assert langdll.read_string(p1, 26128).startswith("Build <b> Train<b> (<cost>) \nTrades by land, laying its own")
     assert langdll.read_string(p1_before, 5860) == "Furious the Monkey Boy"
     assert langdll.read_string((game / "language_x1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()
@@ -851,10 +826,8 @@ def test_direct_mode_and_restore(tmp: Path):
     base = (game / "language.dll").read_bytes()  # nothing of his in it; the dragon's name and button where they fit
     assert [langdll.read_string(base, i) for i in (5079, 5493, 6493, 26493)] == [
         "Militia", "Dragon", "Create Dragon", "Create Dragon"]  # its long help does not fit: the button's text
-    assert [langdll.read_string(base, i) for i in (5788, 6788, 5128, 6128)] == ["Rail", "Build Rail", "Train",
-                                                                                "Build Train"]
-    assert langdll.read_string(base, 26128).startswith("Build <b> Train<b> (<cost>) \nTrades with other players")
-    assert len(slp.decode(Drs(game / "Data" / "interfac.drs").get(50705))) == 53  # the rail's icon, once
+    assert [langdll.read_string(base, i) for i in (5128, 6128)] == ["Train", "Build Train"]  # its help fits
+    assert langdll.read_string(base, 26128).startswith("Build <b> Train<b> (<cost>) \nTrades by land, laying its own")
     icons = slp.decode(Drs(game / "Data" / "interfac.drs").get(50730))
     assert len(icons) == 173  # Pac-Man's, the giant's and the dragon's icons added, not three per build
     assert Drs(game / "Data" / "interfac.drs").get(51141) != panel_before  # the panel too, in the same file
@@ -1017,25 +990,20 @@ def test_lava_map():
 
 
 def test_rails():
-    """The rail pieces lie flat and join their neighbours; the post is a platform any track meets."""
-    from aom import props, rails
-    from aom.render import fit_camera
-    from aom.voxel import BUILDING_HEADING
-    size = {}
-    for piece in ("x", "y", "post", "h", "v"):
-        root = props.build({"model": "rail", "piece": piece})
-        cam = fit_camera(root, BUILDING_HEADING)
-        size[piece] = (cam.width, cam.height)
-    assert size["x"] == size["y"]  # "/" and "\\": the same track, mirrored
-    assert size["h"][0] > 3 * size["h"][1] and size["v"][1] > size["v"][0] > size["h"][1]  # "--" and "|"
-    assert size["post"][0] >= 96 and size["post"][1] < 64  # the whole tile, flat
-    tex = rails.gravel_texture()
-    assert tex.shape == (16, 16, 5) and len(np.unique(tex[..., 0])) == len(rails.GRAVEL)
-    assert rails.ground(50, 30).shape == (30, 50, 4) and (rails.ground(50, 30)[..., 3] == 255).all()
-    icon = rails.rail_icon()
-    assert icon.shape == (36, 36) and set(np.unique(icon)) <= set(rails.ICON_COLOURS)
-    assert len(rails.rail_icon(30)) == 30
-    assert len(rails.TEXTS["train"]["help"]) <= 380  # it fits where the Trade Cart's help (380 long) was
+    """A piece of track lies behind where the train is (it never reaches ahead, so never round a corner into a
+    building or a tree), in every direction the train faces, and fades over its last two pictures."""
+    from aom import rails
+    from aom.export import headings
+    boxes = rails.track().boxes  # the train faces +y
+    assert max(b.hi[1] for b in boxes) <= 0 and min(b.lo[1] for b in boxes) == -rails.TRACK_LENGTH
+    assert max(b.hi[0] for b in boxes) > rails.GAUGE  # as wide as the train's wheels
+    pal = parse_jasc(fake_palette())
+    frames = rails.track_frames(Quantiser(pal))
+    assert len(frames) == len(headings(16, True)) * 5 == 45
+    for a in range(9):
+        drawn = [int((f.pixels >= 0).sum()) for f in frames[5 * a:5 * a + 5]]
+        assert drawn[0] == drawn[2] > drawn[3] > drawn[4] > 0
+    assert len(rails.TEXTS["help"]) <= 380  # it fits where the Trade Cart's help (380 long) was
 
 
 def test_language_files():

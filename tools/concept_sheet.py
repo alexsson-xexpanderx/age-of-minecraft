@@ -10,7 +10,7 @@ Writes into previews/ by default:
     battle.png          siege and cavalry assaulting a town, 2x zoom
     harbor.png          the fleet on the water, 2x zoom
     lava.png            Team Lava Islands: an island's beach with a Dock, and ships on the lava, 2x zoom
-    rails.png           trains on a rail line between two Markets, the rails on their gravel, 2x zoom
+    rails.png           trains between two Markets, round a wood, on the rails they lay as they go, 2x zoom
     village.png         a Dark Age village with fields, a forest and mines, 2x zoom
     buildings.png       every building in the five village styles
     wonders.png         the eighteen wonders and the scenario monuments
@@ -219,25 +219,24 @@ def tile_xy(i: float, j: float) -> tuple[int, int]:
 
 
 def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, margin: int = 24,
-            shore: float = None, fields=(), lava: bool = False, rails=()) -> tuple[int, int]:
+            shore: float = None, fields=(), lava: bool = False, ground_marks=()) -> tuple[int, int]:
     """Draw (frame, player, x, y) sprites with hotspots at map pixel (x, y), cropped to fit.
 
     With `shore`, map tiles whose i coordinate is at least `shore` are water, or with `lava` lava behind a tile of
     beach. `fields` are farms, which the game draws as terrain: (stage, tile i, tile j) of each farm's centre.
-    `rails` lie on the ground under everything: (frame, tile i, tile j) of each tile's centre, on gravel.
+    `ground_marks` lie on the ground under every sprite (the rails trains leave): (frame, x, y) like `placed`.
     Returns the map pixel of the image's corner.
     """
     items = [(f, player, x - f.hotspot[0], y - f.hotspot[1], y) for f, player, x, y in placed]
+    marks = [(f, x - f.hotspot[0], y - f.hotspot[1]) for f, x, y in ground_marks]
     patches = []
     for stage, i, j in fields:
         patch = farmland.preview(stage)
         x, y = tile_xy(i, j)
         patches.append((patch, x - patch.shape[1] // 2, y - patch.shape[0] // 2))
-    decals = [(f, tile_xy(i, j)[0] - f.hotspot[0], tile_xy(i, j)[1] - f.hotspot[1], tile_xy(i, j))
-              for f, i, j in rails]
     boxes = [(x, y, x + f.kind.shape[1], y + f.kind.shape[0]) for f, _, x, y, _ in items]
     boxes += [(x, y, x + p.shape[1], y + p.shape[0]) for p, x, y in patches]
-    boxes += [(x, y, x + f.kind.shape[1], y + f.kind.shape[0]) for f, x, y, _ in decals]
+    boxes += [(x, y, x + f.kind.shape[1], y + f.kind.shape[0]) for f, x, y in marks]
     x0 = min(b[0] for b in boxes) - margin
     y0 = min(b[1] for b in boxes) - margin
     x1 = max(b[2] for b in boxes) + margin
@@ -254,13 +253,7 @@ def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, ma
             canvas[wet] = ground(x1 - x0, y1 - y0, 5, water=True)[wet]
     for patch, x, y in patches:
         blend(canvas, patch, x - x0, y - y0)
-    if decals:  # the gravel the rails leave, one tile each
-        yy, xx = np.mgrid[y0:y1, x0:x1]
-        bed = np.zeros(canvas.shape[:2], bool)
-        for _, _, _, (cx, cy) in decals:
-            bed |= np.abs(xx - cx) / (TILE_W / 2) + np.abs(yy - cy) / (TILE_H / 2) <= 1
-        canvas[bed] = rail_map.ground(x1 - x0, y1 - y0, x0, y0)[..., :3][bed]
-    for f, x, y, _ in decals:
+    for f, x, y in marks:
         blend(canvas, f.to_rgba(1, shadow_alpha=0), x - x0, y - y0)
     for f, _, x, y, _ in items:  # shadows go under every sprite
         shadow = np.zeros((*f.kind.shape, 4), np.uint8)
@@ -383,11 +376,6 @@ def fortifications_sheet(out: Path) -> None:
 
 def wall_line(kind: str, style: str, tiles: list[tuple[float, float]]) -> list[tuple[dict, float, float]]:
     """Wall tiles along a path, with the piece the game picks for each: posts at the ends and corners."""
-    return [({"model": "wall", "kind": kind, "style": style, "piece": piece}, i, j) for piece, i, j in line(tiles)]
-
-
-def line(tiles: list[tuple[float, float]]) -> list[tuple[str, float, float]]:
-    """The piece the game picks for each tile of a wall's (or rails') path: posts at the ends and corners."""
     from aom.fortifications import PIECES
     spots = []
     for k, (i, j) in enumerate(tiles):
@@ -401,7 +389,7 @@ def line(tiles: list[tuple[float, float]]) -> list[tuple[str, float, float]]:
                 di, dj = -di, -dj
             # i runs along screen "\\" (the game's frame 1), j along "/" (frame 0); diagonals are frames 3 and 4
             piece = PIECES[{(1, 0): 1, (0, 1): 0, (1, -1): 3, (1, 1): 4}[(di, dj)]]
-        spots.append((piece, i, j))
+        spots.append(({"model": "wall", "kind": kind, "style": style, "piece": piece}, i, j))
     return spots
 
 
@@ -502,18 +490,36 @@ def lava_scene(out: Path, units: dict[str, Unit]) -> None:
 
 
 def rails_scene(out: Path, units: dict[str, Unit]) -> None:
-    """Trains on a rail line from a Market to another player's: straight, corner to corner, then straight again."""
+    """Trains between a Market and another player's, round a wood, on the rails they leave behind them: a piece every
+    quarter tile, in the nearest of the track's 16 directions (as the game draws it), behind where the train was."""
+    import math
     placed = place_buildings([(B("MRKT", "W", 2), 2.0, 2.0)])
-    placed += place_buildings([(B("MRKT", "E", 2), 8.0, 16.0)], player=2)
-    path = [(2.5, 4.5 + k) for k in range(5)] + [(3.5 + k, 9.5 + k) for k in range(4)] + [(6.5, 13.5)]
-    frames = {}
-    for piece in ("x", "y", "post", "h", "v"):  # as the build draws them: flat, no shadow, no dark edge
-        root = props.build({"model": "rail", "piece": piece})
-        frames[piece] = render(root, BUILDING_HEADING, camera=fit_camera(root, BUILDING_HEADING), shadow=False,
-                               outline=False)
-    trains = [("trade_cart", 1, 2.5, 6.6, 1, "walk", 0.3), ("trade_cart", 1, 4.5, 10.5, 4, "walk", 0.7),
-              ("villager_builder", 1, 1.6, 7.6, 7, "attack", 0.3)]
-    compose(placed + place_units(trains, units), out, rails=[(frames[p], i, j) for p, i, j in line(path)])
+    placed += place_buildings([(B("MRKT", "E", 2), 9.0, 16.0)], player=2)
+    for k, (i, j) in enumerate(((5.0, 8.4), (5.8, 8.9), (5.2, 9.7), (6.0, 9.9))):  # in the straight way
+        placed += place_buildings([({"model": "tree", "forest": "oak", "height": 100 + 12 * (k % 3)}, i, j, k)], 7)
+    route = [(3.0, 4.6), (6.4, 6.8), (8.4, 10.4), (8.2, 13.6)]  # the way round the wood
+    step, pieces, heading_at = 0.25, {}, []
+    for (i0, j0), (i1, j1) in zip(route, route[1:]):
+        dx, dy = (i1 - i0 - (j1 - j0)) * TILE_W / 2, (i1 - i0 + j1 - j0) * TILE_H / 2
+        heading = math.degrees(math.atan2(-2 * dy, dx))
+        snapped = round(heading / (360 / rail_map.TRACK_ANGLES)) * 360 / rail_map.TRACK_ANGLES
+        n = max(1, int(math.hypot(i1 - i0, j1 - j0) / step))
+        for s in range(1, n + 1):
+            heading_at.append((i0 + (i1 - i0) * s / n, j0 + (j1 - j0) * s / n, snapped, heading))
+    marks = []
+    for i, j, snapped, _ in heading_at:
+        if snapped not in pieces:
+            root = rail_map.track()
+            pieces[snapped] = render(root, snapped, camera=fit_camera(root, snapped), shadow=False, outline=False)
+        marks.append((pieces[snapped], *tile_xy(i, j)))
+    trains = []
+    for at, t in ((len(heading_at) // 4, 0.3), (len(heading_at) * 3 // 5, 0.7)):
+        i, j, _, heading = heading_at[at]
+        u = units["trade_cart"]
+        ps = pose(u, "walk", t)
+        cam = fit_camera(u.root, heading, ps, scale=BASE_SCALE * u.scale)
+        trains.append((render(u.root, heading, ps, cam), 1, *tile_xy(i, j)))
+    compose(placed + trains, out, ground_marks=marks)
 
 
 def village_scene(out: Path, units: dict[str, Unit]) -> None:
