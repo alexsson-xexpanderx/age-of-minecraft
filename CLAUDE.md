@@ -125,8 +125,8 @@ putting `tools/` on `sys.path`.
    - `rails.py` makes the Trade Cart (128, 204) a train that lays its own rails, in place: it gets the first restriction
      row no unit uses that lets nothing anywhere (`train_row`), made a copy of its old row whose pass graphics (what a
      unit leaves on the ground behind it, as carts leave tracks in the snow) are a track on every terrain it goes on.
-     The track is an unused graphic (`TRACK_GRAPHICS`, not the giant's or the fireball's) given 16 directions, 5
-     frames of 30 s, the ground layer, and a new SLP (`track_slp`, written after the giant's and the fireball's) of a
+     The track is an unused graphic (`TRACK_GRAPHICS`, not the giant's or the fireball's) given 16 directions, one
+     frame of a day (they stay all game), the ground layer, and a new SLP (`track_slp`, written after the giant's and the fireball's) of a
      straight piece of rails behind the train (never ahead: it only lies where the train went). The train is drawn
      `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds

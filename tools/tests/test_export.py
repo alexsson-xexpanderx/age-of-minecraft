@@ -614,16 +614,14 @@ def test_full_build(tmp: Path):
     assert all(c[128].values["terrain_restriction"] == c[204].values["terrain_restriction"] == 2 for c in units.units)
     assert rows[2] == rows[1]
     track = next(g for g in graphics_after.values() if g.name == "GALLY_A1")
-    assert (track.slp, track.layer, track.frame_count, track.angle_count, track.mirroring) == (15602, 10, 5, 16, 12)
-    assert track.frame_rate == 30.0 and track.sequence_type == 3
+    assert (track.slp, track.layer, track.frame_count, track.angle_count, track.mirroring) == (15602, 10, 1, 16, 12)
+    assert track.frame_rate == 86400.0 and track.sequence_type == 3  # a day of game time: they stay all game
     data = datunits.decompress(after)
     at = 12 + 8 * 3 + 2 * 41 * 20 + 4 * 41  # the trains' row's pass graphics
     left = [struct.unpack_from("<iiii", data, at + 16 * t) for t in range(41)]
     assert left[:30] == [(-1, -1, track.id, 4)] * 30 and left[30:] == [(-1, -1, -1, 0)] * 11
     rails = slp.decode(out.get(15602))
-    assert len(rails) == 9 * 5  # 16 directions, 9 drawn (the rest mirrored), 5 pictures each
-    drawn = [int((f.pixels >= 0).sum()) for f in rails[:5]]
-    assert drawn[0] == drawn[1] == drawn[2] > drawn[3] > drawn[4] > 0  # fading over the last two
+    assert len(rails) == 9 and all((f.pixels >= 0).sum() > 100 for f in rails)  # 16 directions, 9 drawn (mirrored)
     assert "Trains: the Trade Carts (units 128, 204, 4 in all) go where they went (terrain restriction 2" in report
     assert "graphic" in report and "(GALLY_A1) now draws SLP 15602" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
@@ -991,7 +989,7 @@ def test_lava_map():
 
 def test_rails():
     """A piece of track lies behind where the train is (it never reaches ahead, so never round a corner into a
-    building or a tree), in every direction the train faces, and fades over its last two pictures."""
+    building or a tree), in every direction the train faces."""
     from aom import rails
     from aom.export import headings
     boxes = rails.track().boxes  # the train faces +y
@@ -999,10 +997,8 @@ def test_rails():
     assert max(b.hi[0] for b in boxes) > rails.GAUGE  # as wide as the train's wheels
     pal = parse_jasc(fake_palette())
     frames = rails.track_frames(Quantiser(pal))
-    assert len(frames) == len(headings(16, True)) * 5 == 45
-    for a in range(9):
-        drawn = [int((f.pixels >= 0).sum()) for f in frames[5 * a:5 * a + 5]]
-        assert drawn[0] == drawn[2] > drawn[3] > drawn[4] > 0
+    assert len(frames) == len(headings(16, True)) == 9
+    assert len({f.pixels.tobytes() for f in frames}) == 9  # a different picture for each direction
     assert len(rails.TEXTS["help"]) <= 380  # it fits where the Trade Cart's help (380 long) was
 
 

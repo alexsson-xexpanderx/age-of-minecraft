@@ -198,9 +198,9 @@ place in the `.dat`:
   dark sleepers, as wide as the train's wheels, in the train's 16 directions,
   on the ground layer under every unit, building and tree. Each piece lies
   behind where the train is (never ahead of it), so rails only lie where the
-  train went, round buildings and trees as it went. Each stays 2.5 minutes
-  (five pictures of 30 seconds, the last two fading), so a route stays laid
-  while trains keep running and fades after the last one passed.
+  train went, round buildings and trees as it went. The rails stay all game
+  (a piece is shown for a day of game time). Pieces pile up where trains keep
+  passing, which may slow a long game with many trains.
 
 The game's texts call the unit **Train**, and its help text says it lays its
 own rails.

@@ -10,15 +10,16 @@ restriction table no unit uses and that lets no unit anywhere, made a copy of th
 Trade Cart went) that leaves a piece of track on every terrain it goes on. The track is an unused graphic (one of
 TRACK_GRAPHICS, an old piece of the Galley or the Trade Cog) pointed at a new SLP (`track_slp`): a straight piece of
 rails, iron on dark sleepers, as wide as the train's wheels, in 16 directions (the train's), on the ground under every
-unit, fading out over its last two pictures. Right-click another player's Market and the train lays rails all the way
-there; they stay while trains keep running and fade TRACK_FRAMES x TRACK_SECONDS after the last one passed.
+unit. Right-click another player's Market and the train lays rails all the way there, and they stay all game: a piece
+is one picture shown for TRACK_SECONDS, a day of game time (not more: the game may count it in milliseconds, which a
+far bigger number could overflow). The player chose that knowing pieces pile up where trains keep passing, which may
+slow a long game with many trains (then the trains should lay fewer: TRACK_SPACING).
 
 The trains still trade, and go, exactly where Trade Carts did, the computer players' too.
 """
 from __future__ import annotations
 
 import struct
-import zlib
 from typing import Optional
 
 import numpy as np
@@ -40,7 +41,7 @@ SLEEPER, IRON, IRON_EDGE = "#6b4a2b", "#c4c4c4", "#6e6e6e"
 # giant Pac-Man takes the first free one of gameplay.GIANT_GRAPHICS, which starts the other end)
 TRACK_GRAPHICS = ("GALLY_A1", "GALLY_F1", "COGXX_W1", "COGXX_A1")
 TRACK_ANGLES, TRACK_MIRRORING = 16, 12  # the train's 16 directions, the right half mirrored (a ship's wake's)
-TRACK_FRAMES, TRACK_SECONDS = 5, 30.0  # pictures, each shown this long: the last two fainter, then it is gone
+TRACK_FRAMES, TRACK_SECONDS = 1, 86400.0  # one picture, shown for a day of game time: the rails stay all game
 TRACK_LAYER = 10  # the ground, under every unit (the cart tracks')
 TRACK_SEQUENCE = 3  # played once (the cart tracks')
 TRACK_SPACING = 4  # how often a piece is left (the cart tracks' "replication")
@@ -74,30 +75,18 @@ def track(length: float = TRACK_LENGTH, sleepers: int = 3) -> Part:
     return Part("track", boxes=boxes)
 
 
-def _faded(frame: slp.SlpFrame, keep: float, seed: int) -> slp.SlpFrame:
-    """The picture with only about `keep` of its pixels left (the same ones in every direction's fading)."""
-    if keep >= 1:
-        return frame
-    rng = np.random.default_rng(zlib.crc32(f"track fade {seed}".encode()))
-    px = frame.pixels.copy()
-    px[rng.random(px.shape) >= keep] = slp.TRANSPARENT
-    return slp.SlpFrame(px, frame.hotspot)
-
-
 _TRACK_SLPS: dict[tuple, bytes] = {}
 
 
 def track_frames(quant, frames: int = TRACK_FRAMES, angles: int = TRACK_ANGLES,
                  mirroring: bool = True) -> list[slp.SlpFrame]:
-    """The track's pictures: for each stored direction, its frames (full, then fading over the last two)."""
+    """The track's pictures: for each stored direction, the piece of rails (the same in each of its frames)."""
     from .export import _crop, headings
     root, out = track(), []
-    keep = [1.0] * max(0, frames - 2) + [0.6, 0.3][-min(2, frames):]
     for heading in headings(angles, mirroring):
         cam = fit_camera(root, heading)
         f = render(root, heading, camera=cam, shadow=False, outline=False)
-        whole = _crop(quant.frame_codes(f, obstruction=False), cam.origin)
-        out += [_faded(whole, k, n) for n, k in enumerate(keep)]
+        out += [_crop(quant.frame_codes(f, obstruction=False), cam.origin)] * frames
     return out
 
 
@@ -186,5 +175,5 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int,
         strings["help"] = first.values["help_id"] - HELP_STRINGS
     return (gid, row, old), (f"Trains: the Trade Carts (units {', '.join(map(str, TRAINS))}, {len(trains)} in all) "
                              f"go where they went (terrain restriction {row}, a copy of {old}) and leave rails behind "
-                             f"them: graphic {gid} ({g.name}) now draws SLP {slp_id}, {TRACK_FRAMES} pictures of "
-                             f"{TRACK_SECONDS:g} s in {TRACK_ANGLES} directions"), strings
+                             f"them, which stay all game: graphic {gid} ({g.name}) now draws SLP {slp_id} in "
+                             f"{TRACK_ANGLES} directions, shown for {TRACK_SECONDS:g} s"), strings

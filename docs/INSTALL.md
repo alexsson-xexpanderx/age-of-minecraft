@@ -200,8 +200,9 @@ minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade
 Cart did: build it at your Market, then right-click another player's Market.
 It lays its own rails as it drives: they appear behind it all the way to the
 other Market, round buildings and trees as it goes round them. The rails stay
-while your trains keep running, and fade 2.5 minutes after the last train
-passed. Computer players' trains trade and lay rails too.
+all game. Computer players' trains trade and lay rails too. If a long game
+with many trains slows down when busy routes are on screen, say so: the trains
+can lay fewer pieces.
 
 His name lives in the game's language files (`language_x1_p1.dll`,
 `language_x1.dll`, `language.dll`, in the game's main folder). Age of
