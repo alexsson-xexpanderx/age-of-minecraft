@@ -59,6 +59,7 @@ python tools/concept_sheet.py        # writes previews/* and docs/UNITS.md
 | `previews/player_colors.png` | a unit in all 8 player colours |
 | `previews/roster_easter.png` | the easter eggs: Pac-Man, a ghost and a blocky Cobra Car in the cheat units' slots, and the Wonder's Dragon |
 | `previews/giant.png` | the "to smithereens" cheat's giant red Pac-Man by a Castle, a Wonder, Pac-Man and a knight |
+| `previews/lava.png` | Team Lava Islands: an island's beach with a Dock, and ships on the lava |
 | `previews/sounds/pacman_*.wav` | Pac-Man's sounds: clicking on him, orders, training, bites and his death |
 | `previews/sounds/dragon_*.wav` | the Dragon's sounds: growls, wing beats, roars, its fire and its death |
 
@@ -85,6 +86,7 @@ tools/aom/wonders.py     the eighteen wonders and scenario monuments
 tools/aom/nature.py      trees, stumps, mines, berry bushes, rocks and plants
 tools/aom/gaia.py        map decorations: yurts, ruins, graves, flags, torches, the relic
 tools/aom/farmland.py    farms, which are terrain: Minecraft farmland and wheat in terrain.drs
+tools/aom/lava.py        the lava (the unused terrain 15), Docks on it, and the Team Lava Islands map
 tools/aom/interface.py   the screen panels repainted: planks, inventory grey, slots and item icons
 tools/aom/menu.py        the main menu: a block village by day, every button a Minecraft thing, names on Minecraft buttons
 tools/aom/screens.py     the other screens: found by their screen files, redrawn as the deepslate hall

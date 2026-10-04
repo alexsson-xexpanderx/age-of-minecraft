@@ -9,6 +9,7 @@ Writes into previews/ by default:
     scene.png           two armies, in-game size, 2x zoom
     battle.png          siege and cavalry assaulting a town, 2x zoom
     harbor.png          the fleet on the water, 2x zoom
+    lava.png            Team Lava Islands: an island's beach with a Dock, and ships on the lava, 2x zoom
     village.png         a Dark Age village with fields, a forest and mines, 2x zoom
     buildings.png       every building in the five village styles
     wonders.png         the eighteen wonders and the scenario monuments
@@ -35,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from aom.animation import DIRECTIONS, pose  # noqa: E402
 from aom import farmland, interface, menu, props  # noqa: E402
+from aom import lava as lava_map  # noqa: E402
 from aom.voxel import BUILDING_HEADING  # noqa: E402
 from aom.colors import PLAYER_COLORS  # noqa: E402
 from aom.geometry import Pose  # noqa: E402
@@ -47,6 +49,7 @@ TILE_W, TILE_H = 96, 48  # AoE2 tile size at 1x
 BASE_SCALE = 1.5  # screen pixels per Minecraft pixel
 GRASS = [(84, 128, 52), (92, 138, 56), (78, 120, 48), (98, 144, 62)]
 WATER = [(38, 86, 150), (44, 96, 162), (34, 78, 140), (52, 106, 170)]
+SAND = [(218, 204, 146), (208, 194, 136), (226, 214, 160), (200, 186, 128)]
 INK, PAPER, MUTED = (32, 30, 28), (236, 232, 222), (110, 104, 96)
 STORED = DIRECTIONS[:5]  # S, SW, W, NW, N; the game mirrors the rest
 
@@ -55,9 +58,9 @@ def font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default(size=size)
 
 
-def ground(w: int, h: int, seed: int = 7, water: bool = False) -> np.ndarray:
+def ground(w: int, h: int, seed: int = 7, water: bool = False, pal=None) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    pal = np.array(WATER if water else GRASS, np.uint8)
+    pal = np.array(pal or (WATER if water else GRASS), np.uint8)
     return pal[rng.choice(len(pal), size=(h, w), p=[0.4, 0.25, 0.2, 0.15])]
 
 
@@ -214,11 +217,12 @@ def tile_xy(i: float, j: float) -> tuple[int, int]:
 
 
 def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, margin: int = 24,
-            shore: float = None, fields=()) -> tuple[int, int]:
+            shore: float = None, fields=(), lava: bool = False) -> tuple[int, int]:
     """Draw (frame, player, x, y) sprites with hotspots at map pixel (x, y), cropped to fit.
 
-    With `shore`, map tiles whose i coordinate is at least `shore` are water. `fields` are farms, which the game
-    draws as terrain: (stage, tile i, tile j) of each farm's centre. Returns the map pixel of the image's corner.
+    With `shore`, map tiles whose i coordinate is at least `shore` are water, or with `lava` lava behind a tile of
+    beach. `fields` are farms, which the game draws as terrain: (stage, tile i, tile j) of each farm's centre.
+    Returns the map pixel of the image's corner.
     """
     items = [(f, player, x - f.hotspot[0], y - f.hotspot[1], y) for f, player, x, y in placed]
     patches = []
@@ -237,7 +241,11 @@ def compose(placed: list[tuple[Frame, int, int, int]], out: Path, k: int = 2, ma
         yy, xx = np.mgrid[y0:y1, x0:x1]
         i = (xx / (TILE_W / 2) + yy / (TILE_H / 2)) / 2
         wet = i >= shore
-        canvas[wet] = ground(x1 - x0, y1 - y0, 5, water=True)[wet]
+        if lava:
+            canvas[(i >= shore - 1) & ~wet] = ground(x1 - x0, y1 - y0, 6, pal=SAND)[(i >= shore - 1) & ~wet]
+            canvas[wet] = lava_map.ground(x1 - x0, y1 - y0, x0, y0)[..., :3][wet]
+        else:
+            canvas[wet] = ground(x1 - x0, y1 - y0, 5, water=True)[wet]
     for patch, x, y in patches:
         blend(canvas, patch, x - x0, y - y0)
     for f, _, x, y, _ in items:  # shadows go under every sprite
@@ -459,6 +467,19 @@ def harbor_scene(out: Path, units: dict[str, Unit]) -> None:
         ("marlin", 7, 11.0, 10.4, 1, "idle", 0.7), ("fish_tuna", 7, 7.4, 10.2, 1, "idle", 0.2),
     ]
     compose(placed + place_units(fleet, units), out, shore=3.0)
+
+
+def lava_scene(out: Path, units: dict[str, Unit]) -> None:
+    """Team Lava Islands: an island's beach with a Dock, and ships on the lava (tiles with i >= 3)."""
+    placed = place_buildings([(B("DOCK", "W", 3), 3.5, 4.5), (B("HOUS", "W", 2), 0.0, 2.0),
+                              (B("HOUS", "W", 2), 0.0, 7.0, 1)])
+    fleet = [
+        ("villager", 1, 1.6, 4.6, 7, "idle", 0), ("transport_ship", 1, 5.0, 7.4, 3, "idle", 0.2),
+        ("galley", 1, 6.4, 2.0, 7, "walk", 0.1), ("war_galley", 1, 7.4, 5.4, 7, "attack", 0.5),
+        ("galleon", 2, 10.6, 2.6, 3, "attack", 0.4), ("fire_ship", 2, 9.0, 8.4, 3, "walk", 0.3),
+        ("demolition_ship", 2, 11.6, 6.2, 2, "walk", 0.6),
+    ]
+    compose(placed + place_units(fleet, units), out, shore=3.0, lava=True)
 
 
 def village_scene(out: Path, units: dict[str, Unit]) -> None:
@@ -720,6 +741,7 @@ def main() -> None:
     army_scene(out / "scene.png", units)
     battle_scene(out / "battle.png", units)
     harbor_scene(out / "harbor.png", units)
+    lava_scene(out / "lava.png", units)
     village_scene(out / "village.png", units)
     buildings_sheet(out / "buildings.png")
     wonders_sheet(out / "wonders.png")

@@ -64,7 +64,7 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "blast_width": "f", "reload": "f", "blast_level": "b", "line_of_sight": "f", "max_range": "f",
            "projectile": "h", "displacement": "fff", "displayed": "hhff", "displayed_pierce": "h",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h",
-           "resource_capacity": "h", "hero_status": "b"}
+           "resource_capacity": "h", "hero_status": "b", "placement_terrain": "hh"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -106,7 +106,9 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     f["enabled"] = r.p
     v["enabled"] = r.one("b")
     r.one("b")  # disabled
-    r.take("hhhh")  # placement side terrain, placement terrain
+    r.take("hh")  # placement side terrains: one of them must be next to it (a Dock's: the beach)
+    f["placement_terrain"] = r.p
+    v["placement_terrain"] = r.take("hh")  # it may only be placed on these (a Dock's: Water and Shallows)
     r.take("ff")  # clearance size
     r.take("bb")  # hill mode, fog visibility
     f["terrain_restriction"] = r.p

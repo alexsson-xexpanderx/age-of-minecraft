@@ -99,6 +99,7 @@ class DatPatch:
     dragon_strings: Optional[dict[str, int]] = None  # the dragon's text ids, if it was patched (its SLP must be written)
     fire_layout: Optional[tuple[int, int, bool]] = None  # its fireball's frames, angles and mirroring
     dragon_sounds_added: bool = False  # the sound table has the dragon's sounds: their WAV files must be written too
+    lava: bool = False  # terrain 15 is lava (its texture and the map must be written)
 
 
 def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
@@ -110,11 +111,13 @@ def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
 def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = True, icon: Optional[int] = None,
               sounds: Optional[dict[str, list[int]]] = None, giant: Optional[int] = None,
               giant_icon: Optional[int] = None, fire: Optional[int] = None, dragon_icon: Optional[int] = None,
-              dragon_sounds: Optional[dict[str, list[int]]] = None) -> tuple[Optional[DatPatch], list[str]]:
+              dragon_sounds: Optional[dict[str, list[int]]] = None,
+              lava: Optional[tuple[int, int]] = None) -> tuple[Optional[DatPatch], list[str]]:
     """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), the giant red Pac-Man
     drawn from SLP `giant` (if given; with Pac-Man only), the dragon at the Wonder with its fireballs drawn from SLP
-    `fire` (if given, with `dragon_sounds`), and the Javelina's own sprites. `sounds` maps a sound name (see
-    SOUND_USES) to the resource ids of its WAV files; `dragon_sounds` the same for DRAGON_SOUND_USES.
+    `fire` (if given, with `dragon_sounds`), the lava (if given: its texture's SLP and minimap colour; lava.py), and
+    the Javelina's own sprites. `sounds` maps a sound name (see SOUND_USES) to the resource ids of its WAV files;
+    `dragon_sounds` the same for DRAGON_SOUND_USES.
 
     Returns (patch, notes)."""
     try:
@@ -154,6 +157,12 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         notes.append(msg)
         if fire_gid is None:
             roar_ids = None
+    lava_done = False
+    if lava is not None:  # in place too
+        from . import lava as lava_map
+        lava_done, msg = lava_map.patch(data, civs, *lava)
+        changed |= lava_done
+        notes.append(msg)
     # last, from the back of the file to the front: these grow the file, which moves everything after them
     if pac_done:
         notes.append(_boarding(data, civs))
@@ -209,9 +218,13 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         if g.slp != fire or g.layer != FIRE_LAYER:
             return None, notes + ["not changed: the dragon's fireball did not read back as expected"]
         fire_layout = (g.frame_count, g.angle_count, bool(g.mirroring))
+    if lava_done:
+        t = datfile.read_terrains(packed)[lava_map.LAVA]
+        if t.slp != lava[0] or t.to_draw != -1:
+            return None, notes + ["not changed: the lava did not read back as expected"]
     return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, sounds_added=table is not None,
                     giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout,
-                    dragon_sounds_added=roar_ids is not None), notes
+                    dragon_sounds_added=roar_ids is not None, lava=lava_done), notes
 
 
 def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple[str, Optional[dict[str, int]]]:

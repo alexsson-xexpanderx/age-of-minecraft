@@ -45,6 +45,7 @@ from aom import spritemap  # noqa: E402
 
 # --only also accepts these groups of buildings and scenery
 STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface"}
+LAVA = "lava"  # and this: the lava, its Dock rule and the Team Lava Islands map
 
 
 def static_group(spec: dict) -> str:
@@ -443,8 +444,8 @@ def main(argv=None) -> int:
     log(f"palette: {len(game.palette)} colours")
 
     only = set(args.only.split(",")) if args.only else None
-    if only and not only <= set(ROSTER) | STATIC_GROUPS:
-        raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER) - STATIC_GROUPS))}")
+    if only and not only <= set(ROSTER) | STATIC_GROUPS | {LAVA}:
+        raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER) - STATIC_GROUPS - {LAVA}))}")
     targets = list(TARGETS) + game.name_targets({t.slp for t in TARGETS})
     targets = [t for t in targets if only is None or t.unit in only]
 
@@ -628,9 +629,10 @@ def main(argv=None) -> int:
                          "(right-click > Run as administrator) and try again.")
     pacman = not args.no_wonder_pacman and (only is None or "pacman" in only)
     dragon = not args.no_wonder_pacman and (only is None or "dragon" in only)
+    lava = not args.no_wonder_pacman and (only is None or LAVA in only)
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
-    if not args.no_dat and (pacman or javelina or dragon):
-        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon)
+    if not args.no_dat and (pacman or javelina or dragon or lava):
+        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon, lava=lava)
     exe_ok = False
     if args.mode == "upmod":
         mod_archive(game, log)
@@ -1081,11 +1083,13 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log, folder: 
 
 
 GIANT_SLP = 15600  # the first id tried for the giant Pac-Man's SLP
+LAVA_SLP = 15000  # the first id tried for the lava's texture (the terrain textures' ids start there)
 
 
 def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True,
-                   dragon: bool = True) -> None:
-    """The .dat changes (Pac-Man and the dragon at the Wonder, the Javelina's own sprites), their icons and names."""
+                   dragon: bool = True, lava: bool = True) -> None:
+    """The .dat changes (Pac-Man and the dragon at the Wonder, the Javelina's own sprites, the lava), their icons,
+    names, sounds, textures and the lava's map."""
     from aom import gameplay
     if game.dat_path is None:
         log(".dat changes: no empires2_x1_p1.dat found, skipped")
@@ -1144,14 +1148,25 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
     pictures = free_resource_ids(game, raw, 2, start=GIANT_SLP)
     giant = next(pictures) if pacman else None  # the giant's own SLP
     fire = next(pictures) if dragon else None  # the dragon's fireball's
+    lava_dat = lava_tiles = None
+    if lava:  # in the Water's tile shapes: the old water that becomes the lava was drawn with the Water's texture
+        from aom import lava as lava_map
+        water = next((t for t in game.terrains or [] if t.id == lava_map.WATER), None)
+        original = game.original(water.slp) if water is not None and water.slp > 0 else None
+        if original is None:
+            log("Lava: not added, the Water's texture is not in your game files")
+        else:
+            lava_tiles = lava_map.encode(original, quant)
+            colour = int(quant.indices(np.array([lava_map.MINIMAP]))[0])
+            lava_dat = (next(free_resource_ids(game, raw, 1, start=LAVA_SLP)), colour)
     patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon,
-                                      fire, dragon_icon, roar_ids)
+                                      fire, dragon_icon, roar_ids, lava_dat)
     for note in notes:
         log(note)
     if patch is None:
         return
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
-    if not patch.pacman_strings and not patch.dragon_strings:
+    if not patch.pacman_strings and not patch.dragon_strings and not patch.lava:
         return
     touched: dict[str, Drs] = {}
     if patch.dragon_strings and dragon_icon is not None:
@@ -1184,6 +1199,12 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         touched[sound_name] = sound_drs
         log(f"Dragon's sounds: {sum(len(v) for v in roars.values())} WAV files in {sound_name} "
             f"(ids {min(min(v) for v in roar_ids.values())}-{max(max(v) for v in roar_ids.values())})")
+    if patch.lava:  # its texture with the other terrain textures
+        terrain_name, terrain_drs = (("terrain.drs", game.terrain) if game.terrain is not None
+                                     else (game.graphics_path.name, game.graphics))
+        terrain_drs.put(lava_dat[0], lava_tiles)
+        touched[terrain_name] = terrain_drs
+        log(f"Lava: its texture is SLP {lava_dat[0]} in {terrain_name} ({slp.info(lava_tiles).num_frames} tiles)")
     if patch.giant_name is not None:  # the giant red Pac-Man's picture, where the game finds new files
         sound_drs.put(giant, gameplay.giant_slp(quant))
         touched[sound_name] = sound_drs
@@ -1198,6 +1219,26 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         rename_pacman(game, mode, patch.pacman_strings, log)
     if patch.dragon_strings:  # last: in direct mode it adds to the language files as the lines above left them
         name_dragon(game, mode, patch.dragon_strings, log)
+    if patch.lava:
+        write_map(game, mode, lava_map.MAP_FILE, lava_map.script(), lava_map.MARK, log)
+
+
+def write_map(game: Game, mode: str, name: str, text: str, mark: str, log) -> None:
+    """A random map: into the mod's Script.RM folder, where the game lists the mod's custom maps, or (direct mode)
+    the game's Random folder, where `restore` removes it again (any file there of that name without `mark` is the
+    player's own, and stays)."""
+    if mode == "upmod":
+        mod = (pick(game.root, "Games") or game.root / "Games") / MOD
+        folder = pick(mod, "Script.RM") or mod / "Script.RM"
+    else:
+        folder = pick(game.root, "Random") or game.root / "Random"
+    path = pick(folder, name) or folder / name
+    if mode != "upmod" and path.exists() and mark not in path.read_text("latin-1"):
+        log(f"{name}: not written, your Random folder has a map of that name")
+        return
+    folder.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text.encode("latin-1"))
+    log(f"wrote {path}")
 
 
 def name_giant(game: Game, mode: str, sid: int, log) -> None:
@@ -1298,6 +1339,7 @@ def rename_pacman(game: Game, mode: str, strings: dict[str, int], log) -> None:
 
 
 def restore(root: Path) -> int:
+    from aom import lava as lava_map
     data = pick(root, "Data")
     restored = 0
     for p in [*(data.iterdir() if data else []), *root.iterdir()]:  # Data files, and the language files
@@ -1307,6 +1349,12 @@ def restore(root: Path) -> int:
             p.unlink()
             restored += 1
             print(f"restored {live}")
+    maps = pick(root, "Random")
+    ours = pick(maps, lava_map.MAP_FILE) if maps else None
+    if ours is not None and lava_map.MARK in ours.read_text("latin-1"):  # the map the build added
+        ours.unlink()
+        restored += 1
+        print(f"removed {ours}")
     print("nothing to restore" if not restored else "original files are back")
     return 0
 

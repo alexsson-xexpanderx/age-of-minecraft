@@ -46,13 +46,13 @@ def fake_palette() -> bytes:
 
 def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1, attacks=(), armours=(),
                 blast: float = 0.0, blast_level: int = 0, reload: float = 0.0, walking: int = -1, dying: int = -1,
-                attack_graphic: int = -1, projectile: int = -1) -> bytes:
+                attack_graphic: int = -1, projectile: int = -1, placement=(-1, -1, -1, -1)) -> bytes:
     """One unit record in the Conquerors layout (mirrors aom.datunits)."""
     nb = name.encode()
     b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 10 if uid == 860 else 0))
     b += struct.pack("<hhhhbhfb", standing, -1, dying, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
-    b += struct.pack("<hhhhffbbhbhfbbbbbfb", -1, -1, -1, -1, 0.5, 0.5, 0, 0, 1 if uid == 860 else 7,  # no beaches
+    b += struct.pack("<hhhhffbbhbhfbbbbbfb", *placement, 0.5, 0.5, 0, 0, 1 if uid == 860 else 7,  # no beaches
                      0, 2 if uid == 706 else 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)  # the Saboteur's carry blows him up
     b += struct.pack("<iiibbbbbbbBbhbBfff", 105000 + uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
     b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
@@ -83,7 +83,8 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860) with his bite and
     armour, the Saboteur (706) with its blast, the Javelina (822) borrowing the Wild Boar's sprites, with its
     carcass (823) and the boar's (356), and the Advanced Heavy Crossbowman (493: graphics `crossbow_graphic` on,
-    attack, dying, standing, walking) with its shot (508) and the shot Chemistry makes of it (520).
+    attack, dying, standing, walking) with its shot (508) and the shot Chemistry makes of it (520), and a Dock (46),
+    which may stand on Water or Shallows next to a beach.
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -120,6 +121,8 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
             elif u in (508, 520):
                 out += _unit_bytes(u, 60, "MRAHX" if u == 508 else "MFAHX", crossbow_graphic + 5,
                                    walking=crossbow_graphic + 5)
+            elif u == 46:
+                out += _unit_bytes(u, 80, "DOCK", placement=(2, 35, 1, 4))
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -130,7 +133,8 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
 
 
 FAKE_TERRAINS = {0: ("Grass", 15000), 7: ("Farm", 15004), 8: ("Farm (dead)", 15005), 29: ("Farm 1", 15021),
-                 30: ("Farm 2", 15040), 31: ("Farm 3", 15023)}  # Farm 2 on another id: it must come from the .dat
+                 30: ("Farm 2", 15040), 31: ("Farm 3", 15023),  # Farm 2 on another id: it must come from the .dat
+                 1: ("Water", 15002), 15: ("Old Water", -1)}  # the old water has no texture: it is drawn as the Water
 
 
 def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
@@ -140,7 +144,8 @@ def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
     for i in range(42):
         name, slp_id = terrains.get(i, ("", -1))
         rec = bytearray(struct.pack("<bb13s13si", 1 if name else 0, 0, name.encode(), f"t{i}".encode(), slp_id))
-        rec += bytes(192 - len(rec)) + struct.pack("<hhh", -1, 3 if 29 <= i <= 31 else 6, 3 if 29 <= i <= 31 else 6)
+        rec += bytes(192 - len(rec)) + struct.pack("<hhh", 1 if i == 15 else -1, 3 if 29 <= i <= 31 else 6,
+                                                   3 if 29 <= i <= 31 else 6)
         b += rec + bytes(436 - len(rec))
     return bytes(b)
 
@@ -148,7 +153,7 @@ def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
 def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> bytes:
     """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and terrains and unit tables)."""
     b = bytearray(b"VER 5.7\0")
-    restrictions, terrains = 2, 3
+    restrictions, terrains = 2, 41  # every restriction lets every unit everywhere
     b += struct.pack("<HH", restrictions, terrains)
     b += struct.pack(f"<{2 * restrictions}i", *([1] * 2 * restrictions))
     for _ in range(restrictions):
@@ -356,8 +361,8 @@ def fake_game(root: Path) -> Path:
     extra = Drs()  # some sprites only exist in gamedata_x1.drs
     extra.put(5157, build_mod.blank(17 * 5))
     extra.write(data / "gamedata_x1.drs")
-    terrain = Drs()  # grass, and the farms: 6x6 tiles for the farm and the dead farm, 3x3 for the stages
-    for slp_id, tiles in ((15000, 100), (15004, 36), (15005, 36), (15021, 9), (15040, 9), (15023, 9)):
+    terrain = Drs()  # grass, the farms (6x6 tiles for the farm and the dead farm, 3x3 for the stages), the water
+    for slp_id, tiles in ((15000, 100), (15004, 36), (15005, 36), (15021, 9), (15040, 9), (15023, 9), (15002, 36)):
         terrain.put(slp_id, slp.encode([diamond(60 + k % 7) for k in range(tiles)]))
     terrain.write(data / "terrain.drs")
     patch = Drs()  # UserPatch's own archive, already holding a sound, and a copy of the "no team" mark
@@ -582,6 +587,15 @@ def test_full_build(tmp: Path):
     assert graphics_after[d.values["attack_graphic"]].sound == 11 and graphics_after[d.values["dying"][0]].sound == 12
     assert "its own sounds: select, move, attack, train, fire, death (sounds 7-12)" in report
     assert "Dragon's sounds: 11 WAV files in gamedata_x1_p1.drs (ids 15511-15521)" in report
+    # the lava: the old water (15) drawn from its own texture, in the Water's tile shapes; Docks may stand on it
+    lava_ground = read_terrains((mod / "Data" / "empires2_x1_p1.dat").read_bytes())[15]
+    assert lava_ground.to_draw == -1 and lava_ground.slp > 0
+    tiles, water = slp.decode(out.get(lava_ground.slp)), slp.decode(Drs(game / "Data" / "terrain.drs").get(15002))
+    assert len(tiles) == 36 and all(np.array_equal(a.pixels >= 0, b.pixels >= 0) for a, b in zip(tiles, water))
+    assert all(c[46].values["placement_terrain"] == (1, 15) for c in units.units)
+    rms = (mod / "Script.RM" / "Team Lava Islands.rms").read_bytes().decode("latin-1")  # in the mod's own maps
+    assert "#const LAVA 15" in rms and "base_terrain LAVA" in rms and "FISH" not in rms
+    assert "Lava: terrain 15 ('Old Water') is lava" in report and "Docks (units 46)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -766,7 +780,7 @@ def test_direct_mode_and_restore(tmp: Path):
     panel_before = Drs(game / "Data" / "interfac.drs").get(51141)
     for _ in range(2):  # building twice starts from the originals again
         assert build_mod.main(["--game", str(game), "--mode", "direct", "--only",
-                               "militia,pacman,dragon,farms,interface", "--jobs", "1"]) == 0
+                               "militia,pacman,dragon,farms,interface,lava", "--jobs", "1"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() != before
     assert (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).read_bytes() == before
     assert (game / "Data" / "terrain.drs").read_bytes() != ground_before
@@ -784,7 +798,10 @@ def test_direct_mode_and_restore(tmp: Path):
     assert len(icons) == 173  # Pac-Man's, the giant's and the dragon's icons added, not three per build
     assert Drs(game / "Data" / "interfac.drs").get(51141) != panel_before  # the panel too, in the same file
     assert Drs(game / "Data" / "gamedata_x1_p1.drs").ids("wav") == {15500} | set(range(15502, 15522))
+    assert (game / "Random" / "Team Lava Islands.rms").exists()  # the map, where the game lists custom maps
+    (game / "Random" / "Mine.rms").write_text("a map of the player's own")
     assert build_mod.main(["--game", str(game), "--restore"]) == 0
+    assert not (game / "Random" / "Team Lava Islands.rms").exists() and (game / "Random" / "Mine.rms").exists()
     assert (game / "Data" / "graphics.drs").read_bytes() == before
     assert (game / "Data" / "terrain.drs").read_bytes() == ground_before
     assert (game / "Data" / "empires2_x1_p1.dat").read_bytes() == dat_before
@@ -917,6 +934,22 @@ def test_dragon_sounds():
     gameplay._graphic_sound(data, attack, 516)
     gameplay._sound_frame(data, attack, 516, 5)
     assert struct.unpack_from("<12h", data, 2) == (5, 516, -1, -1, -1, -1) * 2
+
+
+def test_lava_map():
+    from aom import lava
+    text = lava.script()
+    assert text.count("\r\n") == text.count("\n") and text.count("{") == text.count("}")
+    lines = [line.strip() for line in text.splitlines()]
+    assert sum(line.startswith("if ") for line in lines) == lines.count("endif")
+    for section in ("<PLAYER_SETUP>", "<LAND_GENERATION>", "<TERRAIN_GENERATION>", "<OBJECTS_GENERATION>",
+                    "<ELEVATION_GENERATION>", "<CLIFF_GENERATION>", "<CONNECTION_GENERATION>"):
+        assert lines.count(section) == 1
+    assert not any(fish in text for fish in ("FISH", "MARLIN", "DORADO", "SALMON", "SNAPPER", "TUNA"))
+    assert "Age of Minecraft" in text.splitlines()[1] and text.encode("latin-1")
+    tex = lava.lava_texture()
+    assert tex.shape == (16, 16, 5) and len(np.unique(tex[..., 0])) >= 4
+    assert lava.ground(50, 30).shape == (30, 50, 4) and (lava.ground(50, 30)[..., 3] == 255).all()
 
 
 def test_language_files():

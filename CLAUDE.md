@@ -117,6 +117,11 @@ putting `tools/` on `sys.path`.
      the never-used Advanced Heavy Crossbowman's slot (493): its own sprites (slpmap), every terrain, its shots
      (508, and 520 after Chemistry) drawn by an unused graphic (`FIRE_GRAPHICS`) pointed at a new fireball SLP
      (`fireball_slp`), its texts by `name_dragon`.
+   - `lava.py` makes terrain 15 ("Old Water": no texture of its own, drawn as the Water, passable as water) lava, in
+     place: its own texture (the Water's tile shapes, cut by `farmland.cut`), minimap colour and the Water's blending;
+     the Docks' placement terrains (Water, Shallows) become (Water, lava). Its map, `Team Lava Islands.rms` (written
+     from scratch, `lava.script`), goes into the mod's `Script.RM` (`write_map`), or in direct mode the game's
+     `Random`, which `restore` empties of it (only a file carrying `lava.MARK`). `--only lava` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
      come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,

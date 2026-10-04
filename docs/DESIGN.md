@@ -145,6 +145,32 @@ The game picks one texture tile per map tile, so the pattern repeats every
 tile and the tiles always join up. Each tile keeps the original tile's exact
 shape, so a farm's edges still blend into the grass as before.
 
+### Lava
+
+![lava](../previews/lava.png)
+
+The game has no lava, but it has a leftover terrain no map uses: terrain 15,
+"Old Water". It has no texture of its own (the game draws it with the
+Water's), and every unit treats it exactly as the medium water: ships sail on
+it, Fish Traps work in it, soldiers cannot walk on it. `lava.py` makes it the
+lava, in place in the `.dat`: its own texture (Minecraft's still lava, hot
+yellow blobs in orange with a darker crust between them, 2 blocks to a tile
+like the farms, cut into the Water texture's tile shapes), orange on the
+minimap, and blended into the ground around it the way the Water is. A Dock
+may only stand on Water or Shallows next to a beach, so the Shallows in that
+rule becomes the lava (no standard map has a Dock in a ford).
+
+The **Team Lava Islands** map is a random map script written from scratch,
+close to the game's Team Islands: the whole map is lava, each player's land
+starts as sand, and each team's lands are joined into one island. The
+islands are then filled with ground all but one tile at the lava (the way the
+game's own Moats map fills its land), so every island has a beach to build
+Docks on. There are no fish; each island gets another patch of berries, more
+deer and boar, and sheep. The build writes the map into the mod's
+`Script.RM` folder, where the game lists a mod's custom maps (with
+`build_mod_direct.bat`, into the game's `Random` folder, which
+`restore_original.bat` empties of it again).
+
 ### The panels
 
 ![interface](../previews/interface.png)

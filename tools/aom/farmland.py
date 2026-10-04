@@ -119,7 +119,13 @@ def texture(stage: str, per_tile: int = PER_TILE) -> tuple[Frame, tuple[int, int
 
 def tiles(stage: str, original: bytes, quant: Quantiser) -> list[slp.SlpFrame]:
     """Every frame of an original farm texture, redrawn in the same pixels."""
-    frame, (ox, oy) = texture(stage)
+    return cut(*texture(stage), original, quant, f"farm texture '{stage}'")
+
+
+def cut(frame: Frame, origin: tuple[int, int], original: bytes, quant: Quantiser, what: str) -> list[slp.SlpFrame]:
+    """A ground rendered around one tile (its centre at `origin`), cut into every frame of an original terrain
+    texture: each frame filled exactly where the original's is, the tile's centre on the rendered one's."""
+    ox, oy = origin
     codes = quant.frame_codes(frame, obstruction=False)
     out = []
     for f in slp.decode(original):
@@ -131,7 +137,7 @@ def tiles(stage: str, original: bytes, quant: Quantiser) -> list[slp.SlpFrame]:
         px = np.full(f.pixels.shape, slp.TRANSPARENT, np.int16)
         px[ys, xs] = codes[oy + ys - cy, ox + xs - cx]
         if (px[ys, xs] < 0).any():
-            raise ValueError(f"farm texture '{stage}' does not cover a {f.pixels.shape[1]}x{f.pixels.shape[0]} tile")
+            raise ValueError(f"{what} does not cover a {f.pixels.shape[1]}x{f.pixels.shape[0]} tile")
         out.append(slp.SlpFrame(px, f.hotspot))
     return out
 

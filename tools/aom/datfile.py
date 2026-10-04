@@ -100,6 +100,20 @@ def _to_sounds(data: bytes) -> Reader:
     return r
 
 
+def restrictions(data: bytes) -> list[tuple[float, ...]]:
+    """The terrain restriction table of a decompressed .dat: per restriction (the units' `terrain_restriction`), a
+    number per terrain, above 0 where those units may go."""
+    r = Reader(data)
+    r.skip(8)
+    rows, terrains = r.take("HH")
+    r.skip(4 * rows * 2)
+    out = []
+    for _ in range(rows):
+        out.append(r.take(f"{terrains}f"))
+        r.skip(16 * terrains)  # pass graphics
+    return out
+
+
 def sound_table(data: bytes) -> SoundTable:
     """Where the sounds are in the decompressed file. A sound: id, play delay, file count, cache time, files."""
     r = _to_sounds(data)
@@ -184,6 +198,10 @@ def _check(g: Graphic) -> None:
 TERRAIN_HEAD = 6 * 4 + 19 * 3 * 2 + 2
 TERRAIN_SLOTS = 42
 TERRAIN_SIZE = 436  # enabled, random, 2 names, SLP, ..., 19 frame data, 42 borders, 30 terrain units, phantom
+# offsets in a terrain record: its texture, its blending with its neighbours (priority, mask type: int32 each), its
+# minimap colours (3 palette indices: high, medium and low ground), the terrain whose texture it draws instead (-1 its
+# own), then its tiles across and down
+TERRAIN_SLP, TERRAIN_BLEND, TERRAIN_COLOURS, TERRAIN_TO_DRAW = 28, 40, 48, 192
 
 
 @dataclass
@@ -195,10 +213,16 @@ class Terrain:
     slp: int  # the texture in terrain.drs: one diamond-shaped frame per tile
     rows: int
     cols: int
+    to_draw: int = -1  # the terrain whose texture the game draws for this one (-1: its own)
+    at: int = -1  # offset of the record in the decompressed file
 
 
 def read_terrains(raw_or_path) -> list[Terrain]:
-    data = decompress(_raw(raw_or_path))
+    return terrains_in(decompress(_raw(raw_or_path)))
+
+
+def terrains_in(data: bytes) -> list[Terrain]:
+    """The terrain table of a decompressed .dat."""
     at = _graphics(data)[1]
     sizes = struct.unpack_from("<57h", data, at + 24)
     if not all(0 <= v <= 512 for v in sizes[0::3] + sizes[1::3]):
@@ -207,8 +231,8 @@ def read_terrains(raw_or_path) -> list[Terrain]:
     for i in range(TERRAIN_SLOTS):
         base = at + TERRAIN_HEAD + i * TERRAIN_SIZE
         enabled, _random, name, filename, slp_id = struct.unpack_from("<bb13s13si", data, base)
-        _to_draw, rows, cols = struct.unpack_from("<hhh", data, base + 192)
-        t = Terrain(i, bool(enabled), _cstr(name), _cstr(filename), slp_id, rows, cols)
+        to_draw, rows, cols = struct.unpack_from("<hhh", data, base + TERRAIN_TO_DRAW)
+        t = Terrain(i, bool(enabled), _cstr(name), _cstr(filename), slp_id, rows, cols, to_draw, base)
         printable = all(32 <= ord(c) < 127 for c in t.name + t.filename)
         if not printable or not (-1 <= t.slp < 100000) or not (-1 <= rows <= 100 and -1 <= cols <= 100):
             raise ValueError(f"terrain table looks wrong at terrain {i}: {t}")
