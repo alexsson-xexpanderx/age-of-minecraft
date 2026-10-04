@@ -46,13 +46,16 @@ def fake_palette() -> bytes:
 
 def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int = -1, attacks=(), armours=(),
                 blast: float = 0.0, blast_level: int = 0, reload: float = 0.0, walking: int = -1, dying: int = -1,
-                attack_graphic: int = -1, projectile: int = -1, placement=(-1, -1, -1, -1), cls: int = 0) -> bytes:
+                attack_graphic: int = -1, projectile: int = -1, placement=(-1, -1, -1, -1), cls: int = 0,
+                restriction: int = None) -> bytes:
     """One unit record in the Conquerors layout (mirrors aom.datunits)."""
     nb = name.encode()
     b = bytearray(struct.pack("<bHhHHh", utype, len(nb), uid, 5000 + uid, 6000 + uid, 10 if uid == 860 else cls))
     b += struct.pack("<hhhhbhfb", standing, -1, dying, -1, 0, 30, 4.0, 0)
     b += struct.pack("<fffhhhbbhbhbb", 0.2, 0.2, 2.0, -1, -1, dead, 0, 0, 159 if uid == 860 else 1, 0, -1, 0, 0)
-    b += struct.pack("<hhhhffbbhbhfbbbbbfb", *placement, 0.5, 0.5, 0, 0, 1 if uid == 860 else 7,  # no beaches
+    if restriction is None:
+        restriction = 1 if uid == 860 else 7  # the Monkey Boy's has no beaches
+    b += struct.pack("<hhhhffbbhbhfbbbbbfb", *placement, 0.5, 0.5, 0, 0, restriction,
                      0, 2 if uid == 706 else 0, 0.0, 0, 0, 0, 0, 0, 0.0, 0)  # the Saboteur's carry blows him up
     b += struct.pack("<iiibbbbbbbBbhbBfff", 105000 + uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0)
     b += bytes(21) + struct.pack("<B", 0) + struct.pack("<hhbb", -1, -1, 0, 0) + nb + struct.pack("<hh", uid, uid)
@@ -84,8 +87,8 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     armour, the Saboteur (706) with its blast, the Javelina (822) borrowing the Wild Boar's sprites, with its
     carcass (823) and the boar's (356), and the Advanced Heavy Crossbowman (493: graphics `crossbow_graphic` on,
     attack, dying, standing, walking) with its shot (508) and the shot Chemistry makes of it (520), a Dock (46),
-    which may stand on Water or Shallows next to a beach, the Trade Cart (128, and 204 loaded) and the Sea Wall
-    (788, a wall no one builds, standing graphic `sea_wall_graphic`).
+    which may stand on Water or Shallows next to a beach, the Trade Cart (128, and 204 loaded), the Sea Wall
+    (788, a wall no one builds, standing graphic `sea_wall_graphic`, in water) and the Palisade Wall (72, on land).
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -126,8 +129,10 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
                 out += _unit_bytes(u, 80, "DOCK", placement=(2, 35, 1, 4))
             elif u in (128, 204):
                 out += _unit_bytes(u, 70, "TCART" if u == 128 else "TCARTF", cls=19)
-            elif u == 788:
-                out += _unit_bytes(u, 80, "SWAL", sea_wall_graphic, cls=27)
+            elif u == 788:  # it stands in water (the restriction table's first row stands in for that)
+                out += _unit_bytes(u, 80, "SWAL", sea_wall_graphic, cls=27, restriction=0)
+            elif u == 72:
+                out += _unit_bytes(u, 80, "WALL", cls=27, restriction=1)
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -631,6 +636,7 @@ def test_full_build(tmp: Path):
         assert r.values["train_location"] == 118 and r.values["button"] == 12 and r.values["enabled"] == 1
         assert r.values["cost"] == (1, 1, 1, 3, 1, 1, -1, 0, 0) and r.values["foundation_terrain"] == 16
         assert r.values["obstruction"][1] == 0 and r.values["class"] == 27 and r.values["icon"] == 52
+        assert r.values["terrain_restriction"] == civ[72].values["terrain_restriction"] == 1  # on land
         assert civ[128].values["terrain_restriction"] == civ[204].values["terrain_restriction"] == 2
     pieces = slp.decode(out.get(4913))  # the rails, on the ground; the Sea Wall's other pieces hidden
     assert len(pieces) == 5 and len({f.pixels.tobytes() for f in pieces}) == 5
@@ -641,7 +647,7 @@ def test_full_build(tmp: Path):
     for sid in (50705, 50706, 50707, 50708):  # its icon, in every building icon sheet
         sheet = slp.decode(out.get(sid))
         assert len(sheet) == 53 and sheet[52].pixels.shape == (36, 36) and len(np.unique(sheet[52].pixels)) >= 5
-    assert "Rails: unit 788 (SWAL) is the rail for 2 civilisations" in report
+    assert "Rails: unit 788 (SWAL) is the rail for 2 civilisations" in report and "the Palisade Wall's" in report
     assert "the trains (units 128, 204) may only go on it (terrain restriction 2)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
@@ -1021,8 +1027,8 @@ def test_rails():
         cam = fit_camera(root, BUILDING_HEADING)
         size[piece] = (cam.width, cam.height)
     assert size["x"] == size["y"]  # "/" and "\\": the same track, mirrored
-    assert size["h"][0] > 4 * size["h"][1] and size["v"][1] > 1.5 * size["v"][0]  # "--" and "|"
-    assert size["post"][0] >= 96 and size["post"][1] < 60  # the whole tile, flat
+    assert size["h"][0] > 3 * size["h"][1] and size["v"][1] > size["v"][0] > size["h"][1]  # "--" and "|"
+    assert size["post"][0] >= 96 and size["post"][1] < 64  # the whole tile, flat
     tex = rails.gravel_texture()
     assert tex.shape == (16, 16, 5) and len(np.unique(tex[..., 0])) == len(rails.GRAVEL)
     assert rails.ground(50, 30).shape == (30, 50, 4) and (rails.ground(50, 30)[..., 3] == 255).all()

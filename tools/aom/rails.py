@@ -3,8 +3,9 @@
 The game has no rails, so they are made of three leftovers in the .dat (`patch`):
 
 - the rail is the Sea Wall (unit 788), a wall no one can build: Villagers build it (second page, next to the Gate),
-  dragging a line as they drag a wall, for 1 wood and 1 gold a tile. It stays a wall to the game (so the dragging,
-  and the pieces of a line), but nothing is stopped by it, as nothing is by a farm: its obstruction type is 0;
+  dragging a line as they drag a wall, for 1 wood and 1 gold a tile, on land, where a Palisade Wall may stand (a Sea
+  Wall stood in water). It stays a wall to the game (so the dragging, and the pieces of a line), but nothing is
+  stopped by it, as nothing is by a farm: its obstruction type is 0;
 - under each rail it leaves gravel (its foundation terrain): terrain 16, "Old Grass", which no map uses and which
   the game draws with the Grass's texture. It gets its own, Minecraft gravel cut into the Grass's tile shapes
   (`encode`), the Road's blending and a grey on the minimap. Everyone walks and builds on it as on grass;
@@ -39,6 +40,7 @@ from .textures import Painter, parse
 RAIL_BED = 16  # "Old Grass": the gravel under the rails
 GRASS, ROAD = 0, 24  # the terrain it is drawn as (its tile shapes), and the one it blends like
 RAIL = 788  # the Sea Wall
+PALISADE = 72  # the Palisade Wall: where it may stand (on land), the rail may too (the Sea Wall's own: water)
 RAIL_NAME = "SWAL"  # its graphics' names: SWAL1N0 (layer 5), SWAL1N1 and SWAL1NN
 WALL = 27  # unit class: Villagers drag walls out in lines
 TRAINS = (128, 204)  # the Trade Cart, empty and loaded
@@ -52,6 +54,8 @@ NO_PASS = (-1, -1, -1, 0)  # pass graphics: no tracks left on the gravel
 MINIMAP = (132, 128, 124)
 GRAVEL = ("#837f7d", "#6e6a68", "#9a9593", "#5c5856", "#8a7f74")  # Minecraft's gravel: greys and a brown
 PLANKS, SLEEPER, IRON, IRON_EDGE = "#a0814f", "#6b4a2b", "#c4c4c4", "#6e6e6e"
+TRAIN_SCALE = 1.6  # the train's size (siege.trade_cart), which the track is as wide as
+GAUGE = 6.5 * TRAIN_SCALE  # from the track's middle to each rail: under the train's wheels (6.5 out, scaled)
 BUILDING_ICONS = (50705, 50706, 50707, 50708)  # the building icon sheets in interfac.drs, one per icon set
 ICON_COLOURS = {0: (110, 106, 104), 1: (140, 135, 132), 2: (84, 80, 78), 3: (107, 74, 43), 4: (72, 48, 26),
                 5: (200, 200, 200), 6: (100, 100, 100)}
@@ -110,11 +114,13 @@ def ground(w: int, h: int, x0: int = 0, y0: int = 0) -> np.ndarray:
 def _track(p: Painter, name: str, length: float, sleepers: int, angle: float) -> Part:
     """A straight track through the tile's centre, `length` long, at `angle` degrees from model x: sleepers across
     it, two iron rails on them, ending just past the tile so the next tile's joins it."""
-    wood = p.skin((2.5, 14, 1), p.speckle(SLEEPER, ("#5a3c22", 0.3)))
-    rail = p.skin((length + 2, 1.5, 1.2), p.bands((1, IRON_EDGE)), top=IRON)
+    reach = GAUGE + 3.5  # a sleeper sticks out past each rail
+    wood = p.skin((3.5, 2 * reach, 1), p.speckle(SLEEPER, ("#5a3c22", 0.3)))
+    rail = p.skin((length + 2, 2, 1.5), p.bands((1, IRON_EDGE)), top=IRON)
     step = length / sleepers
-    boxes = [cuboid((-length / 2 + (k + 0.5) * step - 1.25, -7, 0), (2.5, 14, 1), wood) for k in range(sleepers)]
-    boxes += [cuboid((-length / 2 - 1, w - 0.75, 1), (length + 2, 1.5, 1.2), rail) for w in (-5, 5)]
+    boxes = [cuboid((-length / 2 + (k + 0.5) * step - 1.75, -reach, 0), (3.5, 2 * reach, 1), wood)
+             for k in range(sleepers)]
+    boxes += [cuboid((-length / 2 - 1, w - 1, 1), (length + 2, 2, 1.5), rail) for w in (-GAUGE, GAUGE)]
     return Part(name, rot=(0, 0, angle), boxes=boxes)
 
 
@@ -131,8 +137,8 @@ def rail_piece(piece: str) -> Part:
              for k in range(16)], {"P": PLANKS, "d": "#6f5530"}))
         return Part("rail_post", boxes=[cuboid((-t / 2, -t / 2, 0), (t, t, 1.5), deck)])
     if piece in ("x", "y"):
-        return _track(p, f"rail_{piece}", t, 8, 0 if piece == "x" else 90)
-    return _track(p, f"rail_{piece}", t * 2 ** 0.5, 11, -45 if piece == "h" else 45)
+        return _track(p, f"rail_{piece}", t, 6, 0 if piece == "x" else 90)
+    return _track(p, f"rail_{piece}", t * 2 ** 0.5, 8, -45 if piece == "h" else 45)
 
 
 def rail_icon(size: int = 36) -> np.ndarray:
@@ -227,10 +233,12 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int, colour: int,
         if (u is None or u.type != 80 or u.values["class"] != WALL or u.values["train_location"] != -1
                 or stand is None or not stand.name.upper().startswith(RAIL_NAME)):
             continue  # not the leftover this build knows
-        carts = [units[k] for k in TRAINS]
+        carts, wall = [units[k] for k in TRAINS], units[PALISADE]
         if any(c is None or c.type != 70 or c.values["class"] != TRADE_CART for c in carts):
             continue
-        rails.append(u)
+        if wall is None or wall.type != 80 or wall.values["class"] != WALL:
+            continue
+        rails.append((u, wall.values["terrain_restriction"]))
         trains += carts
     if not rails:
         return False, f"Rails: not added, unit {RAIL} is not the unused Sea Wall here", None
@@ -244,8 +252,9 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int, colour: int,
     at = _row_at(bytes(data), row)
     struct.pack_into("<f", data, at + 4 * RAIL_BED, 1.0)  # the trains' row: the gravel, nothing else
     struct.pack_into("<iiii", data, at + 4 * terrains + 16 * RAIL_BED, *NO_PASS)
-    for u in rails:
+    for u, land in rails:
         DU.patch(data, u, enabled=1, train_location=VILLAGER, button=RAIL_BUTTON, cost=RAIL_COST,
+                 terrain_restriction=land,  # on land, as a Palisade Wall (as the Sea Wall, it was water only)
                  obstruction=(0, OVER, u.values["obstruction"][2]), foundation_terrain=RAIL_BED,
                  collision_size=(*u.values["collision_size"][:2], 0.0),
                  outline_size=(*u.values["outline_size"][:2], 0.0))
@@ -254,12 +263,13 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int, colour: int,
     for u in trains:
         DU.patch(data, u, terrain_restriction=row)
     strings = {}
-    for key, u in (("rail", rails[0]), ("train", trains[0])):
+    for key, u in (("rail", rails[0][0]), ("train", trains[0])):
         strings[key] = {"name": u.values["name_id"], "creation": u.values["creation_id"]}
         if u.values["help_id"] > HELP_STRINGS:
             strings[key]["help"] = u.values["help_id"] - HELP_STRINGS
-    return True, (f"Rails: unit {RAIL} ({rails[0].name}) is the rail for {len(rails)} civilisations, built by "
-                  f"Villagers (button {RAIL_BUTTON}) for 1 wood and 1 gold, leaving terrain {RAIL_BED} ({bed.name!r}) "
+    return True, (f"Rails: unit {RAIL} ({rails[0][0].name}) is the rail for {len(rails)} civilisations, built by "
+                  f"Villagers (button {RAIL_BUTTON}) for 1 wood and 1 gold on land (terrain restriction {rails[0][1]}, "
+                  f"the Palisade Wall's), leaving terrain {RAIL_BED} ({bed.name!r}) "
                   f"under it: gravel, its texture SLP {slp_id}, minimap colour {colour}"
                   + (f", icon {icon}" if icon is not None else "")
                   + f"; the trains (units {', '.join(map(str, TRAINS))}) may only go on it (terrain restriction "

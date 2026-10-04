@@ -195,8 +195,8 @@ can no longer be built in shallow fords (they can on lava instead). With
 `build_mod_direct.bat` the map goes into your game's `Random` folder, and
 `restore_original.bat` removes it again.
 
-**Trains and rails.** The Trade Cart is now a **Train**: a Minecraft furnace
-minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade
+**Trains and rails.** The Trade Cart is now a **Train**: a big Minecraft
+furnace minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade
 Cart did (from your Market to another player's Market and back, more gold the
 farther it goes), but only on rails. To lay them, select Villagers, open
 their second build page and pick **Rail** (between the Gate and the Castle,

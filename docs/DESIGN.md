@@ -49,7 +49,7 @@ and an animation sample in `previews/anim_<group>.gif`.
 | Cavalry Archers | Skeleton horsemen |
 | Monk / Missionary | Cleric villager in a hooded team robe with a book (the Missionary rides a donkey) |
 | Siege | Ravager rams (bare → iron-capped → netherite). Dispenser minecarts as mangonels. Crossbow turrets as scorpions. A TNT cannon with an obsidian barrel. A log-frame trebuchet that packs flat. |
-| Wagons | War Wagon as a covered wagon with a team canopy; Trade Cart as a train: a furnace minecart with a chimney, smoking as it goes, pulling a chest minecart |
+| Wagons | War Wagon as a covered wagon with a team canopy; Trade Cart as a big train: a furnace minecart with a chimney, smoking as it goes, pulling a chest minecart |
 | Ships | Minecraft boats scaled up, twice the size they were first drawn, with team wool sails. The Fire Ship carries a campfire (soul fire when upgraded), the Demolition Ship is loaded with TNT, and the Cannon Galleon mounts a TNT cannon. |
 | Unique units | Longbowman → Stray · Woad Raider → Zombie · Chu Ko Nu → Illusioner · Throwing Axeman → Piglin · Huskarl → Piglin Brute · Samurai → Wither Skeleton · War Elephant → Iron Golem · Teutonic Knight → netherite knight · Janissary → Blaze · Berserk → Vindicator · Jaguar Warrior → ocelot-hooded warrior · Plumed Archer → Bogged · Cataphract → netherite-barded horseman · Mangudai → Pillager on horseback · Mameluke → Husk on a llama · Tarkan → Zombie on a zombie horse · Conquistador → firework rider · War Wagon → armoured wagon · Longboat → spruce longship with shields · Turtle Ship → turtle-shell ship |
 | Animals | Sheep (dyed wool) · Turkey → Chicken · Deer → Goat · Wild Boar → Hoglin · Javelina → Pig · Wolf |
@@ -185,13 +185,15 @@ rails, so `rails.py` makes them from three leftovers in the `.dat`, in place:
 - **The rail** is the Sea Wall (unit 788), a wall the game has but no one can
   build. Villagers build it now, on their second build page between the Gate
   and the Castle, for 1 wood and 1 gold a tile, and drag a line of it as they
-  drag a wall (it stays a wall to the game). Nothing is stopped by it, as
+  drag a wall (it stays a wall to the game). It may stand wherever a Palisade
+  Wall may (the Sea Wall could only stand in water). Nothing is stopped by it, as
   nothing is by a farm (its obstruction type is 0). It is drawn flat on the
   ground under every unit (the Sea Wall's ground layer; its other two layers
   are blanked): Minecraft rails, iron on dark wooden sleepers, one piece per
   wall direction, so a line joins up straight or corner to corner. The ends
   and bends of a line (a wall's posts) are plank platforms, like little
-  stations, which a track from any side or corner meets. Its icon is a track
+  stations, which a track from any side or corner meets. The track is as wide
+  as the train, which is drawn 1.6 times a Trade Cart's size. Its icon is a track
   on gravel, added to the four building icon sheets.
 - **The gravel** under each rail is the rail's foundation terrain: terrain 16,
   "Old Grass", which no map uses and which the game draws with the Grass's

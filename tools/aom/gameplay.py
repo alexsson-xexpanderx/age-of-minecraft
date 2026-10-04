@@ -204,7 +204,8 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         rail = units[rail_map.RAIL] if rail_strings is not None and len(units) > rail_map.RAIL else None
         if rail is not None and rail.type == 80 and rail.values["train_location"] == rail_map.VILLAGER and (
                 rail.values["foundation_terrain"] != rail_map.RAIL_BED
-                or rail.values["obstruction"][1] != rail_map.OVER or rail.values["cost"] != rail_map.RAIL_COST):
+                or rail.values["obstruction"][1] != rail_map.OVER or rail.values["cost"] != rail_map.RAIL_COST
+                or rail.values["terrain_restriction"] != units[rail_map.PALISADE].values["terrain_restriction"]):
             return None, notes + ["not changed: the rail did not read back as expected"]
     if pac_done:
         try:

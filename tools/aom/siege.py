@@ -18,6 +18,7 @@ from . import items
 from .geometry import Part, cuboid
 from .items import held
 from .mounted import horse
+from .rails import TRAIN_SCALE
 from .textures import PC, Painter, layered, parse
 from .units import ARMOUR, Unit, rows_only, solid
 
@@ -297,7 +298,7 @@ def trade_cart(key: str = "trade_cart") -> Unit:
     root = Part("root").add(engine, *_wheels(p, [(6.5, 13, 2.5), (-6.5, 13, 2.5), (6.5, 5, 2.5), (-6.5, 5, 2.5),
                                                  (6.5, -5, 2.5), (-6.5, -5, 2.5), (6.5, -13, 2.5),
                                                  (-6.5, -13, 2.5)], 2.5, rim="#2e2e2e", wood="#5a5a5a"))
-    return _siege(key, "Minecart Train", "Trade Cart", root, attack="none")
+    return _siege(key, "Minecart Train", "Trade Cart", root, attack="none", scale=TRAIN_SCALE)
 
 
 SIEGE = {

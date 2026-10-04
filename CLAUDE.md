@@ -124,8 +124,10 @@ putting `tools/` on `sys.path`.
      `Random`, which `restore` empties of it (only a file carrying `lava.MARK`). `--only lava` builds just this.
    - `rails.py` makes the Trade Cart (128, 204) a train that only goes on rails, in place: the rail is the unused
      Sea Wall (788, still a wall, so Villagers drag it out in lines; obstruction type 0, so nothing is stopped by
-     it), leaving terrain 16 ("Old Grass", drawn as the Grass) under it as its foundation terrain, which becomes
-     gravel (own texture in the Grass's tile shapes, the Road's blending); the trains' terrain restriction becomes
+     it; the Palisade Wall's terrain restriction, as its own lets it only into water), leaving terrain 16 ("Old
+     Grass", drawn as the Grass) under it as its foundation terrain, which becomes gravel (own texture in the
+     Grass's tile shapes, the Road's blending); the train is drawn `TRAIN_SCALE` big, the track as wide (`GAUGE`);
+     the trains' terrain restriction becomes
      the first row no unit uses that lets nothing anywhere (`train_row`), now open on terrain 16 alone. The rails are
      drawn into the Sea Wall's layer 5 piece (spritemap's `SWAL1N0`, model "rail", wall-piece order), its other
      pieces blanked; its icon is added to the four building icon sheets (`BUILDING_ICONS`), its and the train's
