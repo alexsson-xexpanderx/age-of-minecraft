@@ -199,10 +199,10 @@ can no longer be built in shallow fords (they can on lava instead). With
 minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade
 Cart did: build it at your Market, then right-click another player's Market.
 It lays its own rails as it drives: they appear behind it all the way to the
-other Market, round buildings and trees as it goes round them. The rails stay
-while your trains keep running, and fade 5 minutes after the last train passed
-(rails that stayed all game crashed the game). Computer players' trains trade
-and lay rails too.
+other Market, round buildings and trees as it goes round them. Like wheel
+tracks in the snow, they fade 30 seconds after a train passed (rails that
+lasted longer crashed the game when a train was blocked). Computer players'
+trains trade and lay rails too.
 
 His name lives in the game's language files (`language_x1_p1.dll`,
 `language_x1.dll`, `language.dll`, in the game's main folder). Age of

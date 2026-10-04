@@ -126,10 +126,10 @@ putting `tools/` on `sys.path`.
      restriction row (20), whose pass graphics (what a unit leaves on the ground behind it) become the cart tracks
      (CARTSTPS) on every terrain it goes on, not only snow; the siege weapons that shared row 20 move to the row
      exactly like it that most units use (`siege_row`: 7), so the cart tracks are the trains' alone. Their graphic
-     keeps every setting but its SLP (`track_slp`, written after the giant's and the fireball's: a straight piece of
-     rails behind the train, never ahead, so it only lies where the train went) and its frame count (50 of 6 s).
-     Three builds crashed whenever a train was blocked: the train on a row of its own (an unused one, then the sea
-     buildings'), the track a borrowed graphic (GALLY_A1, with the Galley's drawing flags). The train is drawn
+     keeps every setting (5 frames of 6 s) but its SLP (`track_slp`, written after the giant's and the fireball's:
+     a straight piece of rails behind the train, never ahead, so it only lies where the train went; frame properties
+     16, as the original's). Four builds whose pieces lasted longer (a day, then 5 minutes) crashed whenever a train
+     was blocked by units, whatever else they changed. The train is drawn
      `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
      come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.

@@ -9,14 +9,15 @@ So `patch` keeps the train (the Trade Cart, empty 128 and loaded 204) on its own
 round things exactly as the Trade Cart did, and makes that row leave the cart tracks on every terrain it goes on, not
 only snow. The siege weapons that shared the row move to the one foot soldiers and cavalry use, which lets units onto
 exactly the same ground (in snow they leave footprints instead of wheel tracks). The cart tracks' graphic then belongs
-to the trains alone: every setting as the game has it, but a new SLP (`track_slp`: a straight piece of rails, iron on
-dark sleepers, as wide as the train's wheels, in the train's 8 directions) and more pictures (TRACK_FRAMES of 6 s:
-5 minutes, the last 30 s fading). Each piece lies behind the train, never ahead, so rails only lie where the train
-went, round buildings and trees as it went; they stay while trains keep running.
+to the trains alone: every setting as the game has it, its 5 pictures of 6 s included, but a new SLP (`track_slp`: a
+straight piece of rails, iron on dark sleepers, as wide as the train's wheels, in the train's 8 directions, the last
+two pictures fainter, each frame marked as the cart tracks' are). Each piece lies behind the train, never ahead, so
+rails only lie where the train went, round buildings and trees as it went. Like the snow tracks, a piece is gone
+30 s after the train passed.
 
-What crashed the game whenever a train was blocked by units, before this: a row of the trains' own (one no unit
-used, then the sea buildings'), each time with the track drawn by a borrowed graphic (an old Galley piece, which
-keeps the Galley's drawing flags: transparent selection, old colours).
+The game crashed whenever a train was blocked by units in every build whose pieces lasted longer (a day, then
+5 minutes: a blocked train keeps nudging to and fro, leaving piece after piece where it stands, and they pile up),
+whatever else changed: a row of the trains' own, the track drawn by a borrowed graphic (an old Galley piece).
 """
 from __future__ import annotations
 
@@ -41,11 +42,11 @@ GAUGE = 6.5 * TRAIN_SCALE  # from the track's middle to each rail: under the tra
 SLEEPER, IRON, IRON_EDGE = "#6b4a2b", "#c4c4c4", "#6e6e6e"
 TRACK = "CARTSTPS"  # the cart tracks' graphic: 8 directions (mirrored), 6 s a picture, the ground layer
 TRACK_ANGLES = 8
-TRACK_FRAMES = 50  # pictures of 6 s: 5 minutes (the game's tracks have 5: 30 s)
-TRACK_FADING = 5  # the last pictures, fainter and fainter
+TRACK_FRAMES = 5  # pictures of 6 s, as the game's tracks have: 30 s (longer crashed the game)
+TRACK_FADING = 2  # the last pictures, fainter and fainter
+TRACK_PROPERTIES = 16  # each frame's properties, as in the cart tracks' own SLP
 TRACK_SPACING = 4  # how often a piece is left (the cart tracks' "replication")
 TRACK_LENGTH = 0.6 * TILE  # one piece, behind the train: longer than the cart tracks', so the next one overlaps it
-FRAMES_AT = 23  # where a graphic's frame count is, after its SLP id (datfile.Graphic.slp_at)
 TEXTS = {"name": "Train", "creation": "Build Train",
          "help": "Build <b> Train<b> (<cost>) \nTrades by land, laying its own rails as it goes: carries goods from "
                  "your Market to another player's Market and brings back gold. The farther the Market, the higher "
@@ -102,7 +103,8 @@ def _faded(frame: slp.SlpFrame, keep: float, seed: int) -> slp.SlpFrame:
 def track_slp(quant, frames: int = TRACK_FRAMES, angles: int = TRACK_ANGLES, mirroring: bool = True) -> bytes:
     key = (np.asarray(quant.palette).tobytes(), frames, angles, bool(mirroring))
     if key not in _TRACK_SLPS:
-        _TRACK_SLPS[key] = slp.encode(track_frames(quant, frames, angles, mirroring))
+        pictures = track_frames(quant, frames, angles, mirroring)
+        _TRACK_SLPS[key] = slp.encode(pictures, props=[(0, TRACK_PROPERTIES)] * len(pictures))
     return _TRACK_SLPS[key]
 
 
@@ -127,11 +129,12 @@ def _row_at(data: bytes, row: int) -> int:
 
 
 def track_graphic(data: bytes, graphics: dict, row: int) -> Optional[int]:
-    """The cart tracks' graphic, if it is as this build knows it (8 directions, mirrored, no deltas, no per-direction
-    sounds) and no row but the trains' (`row`) leaves it behind."""
+    """The cart tracks' graphic, if it is as this build knows it (5 pictures in 8 directions, mirrored, no deltas) and
+    no row but the trains' (`row`) leaves it behind."""
     gid = next((gid for gid, g in graphics.items() if g.name.upper() == TRACK), None)
     g = graphics.get(gid)
-    if g is None or g.deltas or g.slp <= 0 or g.angle_count != TRACK_ANGLES or not g.mirroring or g.slp_at < 0:
+    if (g is None or g.deltas or g.slp <= 0 or g.angle_count != TRACK_ANGLES or not g.mirroring or g.slp_at < 0
+            or g.frame_count != TRACK_FRAMES):
         return None
     rows, terrains = struct.unpack_from("<HH", data, 8)
     for k in range(rows):
@@ -170,8 +173,7 @@ def patch(data: bytearray, civs, graphics: dict,
         if passable > 0:
             struct.pack_into("<iiii", data, at + 4 * terrains + 16 * t, -1, -1, gid, TRACK_SPACING)
     g = graphics[gid]
-    struct.pack_into("<i", data, g.slp_at, slp_id)  # the rails, and more of them: everything else as it was
-    struct.pack_into("<H", data, g.slp_at + FRAMES_AT, TRACK_FRAMES)
+    struct.pack_into("<i", data, g.slp_at, slp_id)  # the rails: everything else as it was
     first = trains[0]
     strings = {"name": first.values["name_id"], "creation": first.values["creation_id"]}
     if first.values["help_id"] > HELP_STRINGS:

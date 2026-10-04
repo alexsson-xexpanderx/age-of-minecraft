@@ -619,20 +619,22 @@ def test_full_build(tmp: Path):
     track = next(g for g in graphics_after.values() if g.name == "CARTSTPS")
     before = next(g for g in read_graphics((game / "Data" / "empires2_x1_p1.dat").read_bytes()).values()
                   if g.name == "CARTSTPS")
-    assert (track.slp, track.frame_count) == (15602, 50)  # the rails, more pictures; every other setting as it was
-    assert (track.layer, track.angle_count, track.mirroring, track.frame_rate, track.sequence_type) == (
-        before.layer, before.angle_count, before.mirroring, before.frame_rate, before.sequence_type)
+    assert track.slp == 15602  # the rails; every other setting as it was
+    assert (track.layer, track.frame_count, track.angle_count, track.mirroring, track.frame_rate,
+            track.sequence_type) == (before.layer, 5, before.angle_count, before.mirroring, before.frame_rate,
+                                     before.sequence_type)
     assert next(g for g in graphics_after.values() if g.name == "GALLY_A1").slp == 2937  # the Galley piece is left alone
     data = datunits.decompress(after)
     at = 12 + 8 * 8 + 2 * 41 * 20 + 4 * 41  # the trains' row's pass graphics
     left = [struct.unpack_from("<iiii", data, at + 16 * t) for t in range(41)]
     assert left[:30] == [(-1, -1, track.id, 4)] * 30 and left[30:] == [(0, 0, 0, 0)] * 11  # the rest as it was
     rails = slp.decode(out.get(15602))
-    assert len(rails) == 5 * 50  # 8 directions, 5 drawn (the rest mirrored), 50 pictures each
-    drawn = [int((f.pixels >= 0).sum()) for f in rails[:50]]
-    assert drawn[0] == drawn[44] > drawn[45] > drawn[49] > 0  # the last five fainter and fainter
+    assert len(rails) == 5 * 5  # 8 directions, 5 drawn (the rest mirrored), 5 pictures each
+    drawn = [int((f.pixels >= 0).sum()) for f in rails[:5]]
+    assert drawn[0] == drawn[2] > drawn[3] > drawn[4] > 0  # the last two fainter and fainter
+    assert {p for _, p in slp.frame_props(out.get(15602))} == {16}  # marked as the cart tracks' own frames are
     assert "Trains: the Trade Carts (units 128, 204, 4 in all) keep their terrain restriction 2, which now" in report
-    assert "CARTSTPS) draw SLP 15602, 50 pictures" in report and "(BCANN) use 7, exactly like it" in report
+    assert "CARTSTPS) draw SLP 15602, 5 pictures" in report and "(BCANN) use 7, exactly like it" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -1006,8 +1008,8 @@ def test_rails():
     assert max(b.hi[0] for b in boxes) > rails.GAUGE  # as wide as the train's wheels
     pal = parse_jasc(fake_palette())
     frames = rails.track_frames(Quantiser(pal))
-    assert len(frames) == len(headings(8, True)) * 50
-    assert len({frames[50 * a].pixels.tobytes() for a in range(5)}) == 5  # a different picture for each direction
+    assert len(frames) == len(headings(8, True)) * 5
+    assert len({frames[5 * a].pixels.tobytes() for a in range(5)}) == 5  # a different picture for each direction
     assert len(rails.TEXTS["help"]) <= 380  # it fits where the Trade Cart's help (380 long) was
 
 

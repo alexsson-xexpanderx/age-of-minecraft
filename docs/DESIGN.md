@@ -197,16 +197,16 @@ place in the `.dat`:
   of its own crashed the game whenever a train was blocked by units. The
   computer players' trains trade as before.
 - **The track** is the game's own cart tracks (which only the trains leave
-  now), every setting as the game has it, with a new picture and more of them:
-  a short straight piece of Minecraft rails, iron on
-  dark sleepers, as wide as the train's wheels, in the train's 8 directions,
-  on the ground layer under every unit, building and tree. Each piece lies
-  behind where the train is (never ahead of it), so rails only lie where the
-  train went, round buildings and trees as it went. A piece stays 5 minutes
-  (50 pictures of 6 seconds, the cart tracks' timing, the last five fading),
-  so rails stay while trains keep running. Before this, the track was a
-  borrowed graphic (an old Galley piece, with the Galley's drawing settings),
-  and the game crashed whenever a train was blocked by units.
+  now), every setting as the game has it, with a new picture: a short
+  straight piece of Minecraft rails, iron on dark sleepers, as wide as the
+  train's wheels, in the train's 8 directions, on the ground layer under every
+  unit, building and tree. Each piece lies behind where the train is (never
+  ahead of it), so rails only lie where the train went, round buildings and
+  trees as it went. Like the wheel tracks in the snow, a piece fades and is
+  gone 30 seconds after the train passed. Pieces that lasted longer (a day,
+  then 5 minutes) crashed the game whenever a train was blocked by units: a
+  blocked train keeps nudging to and fro, leaving piece after piece where it
+  stands.
 
 The game's texts call the unit **Train**, and its help text says it lays its
 own rails.
