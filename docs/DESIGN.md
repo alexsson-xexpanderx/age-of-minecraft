@@ -49,7 +49,7 @@ and an animation sample in `previews/anim_<group>.gif`.
 | Cavalry Archers | Skeleton horsemen |
 | Monk / Missionary | Cleric villager in a hooded team robe with a book (the Missionary rides a donkey) |
 | Siege | Ravager rams (bare → iron-capped → netherite). Dispenser minecarts as mangonels. Crossbow turrets as scorpions. A TNT cannon with an obsidian barrel. A log-frame trebuchet that packs flat. |
-| Wagons | War Wagon as a covered wagon with a team canopy; Trade Cart as a chest minecart pulled by a donkey |
+| Wagons | War Wagon as a covered wagon with a team canopy; Trade Cart as a train: a furnace minecart with a chimney, smoking as it goes, pulling a chest minecart |
 | Ships | Minecraft boats scaled up, twice the size they were first drawn, with team wool sails. The Fire Ship carries a campfire (soul fire when upgraded), the Demolition Ship is loaded with TNT, and the Cannon Galleon mounts a TNT cannon. |
 | Unique units | Longbowman → Stray · Woad Raider → Zombie · Chu Ko Nu → Illusioner · Throwing Axeman → Piglin · Huskarl → Piglin Brute · Samurai → Wither Skeleton · War Elephant → Iron Golem · Teutonic Knight → netherite knight · Janissary → Blaze · Berserk → Vindicator · Jaguar Warrior → ocelot-hooded warrior · Plumed Archer → Bogged · Cataphract → netherite-barded horseman · Mangudai → Pillager on horseback · Mameluke → Husk on a llama · Tarkan → Zombie on a zombie horse · Conquistador → firework rider · War Wagon → armoured wagon · Longboat → spruce longship with shields · Turtle Ship → turtle-shell ship |
 | Animals | Sheep (dyed wool) · Turkey → Chicken · Deer → Goat · Wild Boar → Hoglin · Javelina → Pig · Wolf |
@@ -174,6 +174,41 @@ deer and boar, and sheep. The build writes the map into the mod's
 `Script.RM` folder, where the game lists a mod's custom maps (with
 `build_mod_direct.bat`, into the game's `Random` folder, which
 `restore_original.bat` empties of it again).
+
+### Rails and trains
+
+![rails](../previews/rails.png)
+
+The Trade Cart is a train, and a train only goes on rails. The game has no
+rails, so `rails.py` makes them from three leftovers in the `.dat`, in place:
+
+- **The rail** is the Sea Wall (unit 788), a wall the game has but no one can
+  build. Villagers build it now, on their second build page between the Gate
+  and the Castle, for 1 wood and 1 gold a tile, and drag a line of it as they
+  drag a wall (it stays a wall to the game). Nothing is stopped by it, as
+  nothing is by a farm (its obstruction type is 0). It is drawn flat on the
+  ground under every unit (the Sea Wall's ground layer; its other two layers
+  are blanked): Minecraft rails, iron on dark wooden sleepers, one piece per
+  wall direction, so a line joins up straight or corner to corner. The ends
+  and bends of a line (a wall's posts) are plank platforms, like little
+  stations, which a track from any side or corner meets. Its icon is a track
+  on gravel, added to the four building icon sheets.
+- **The gravel** under each rail is the rail's foundation terrain: terrain 16,
+  "Old Grass", which no map uses and which the game draws with the Grass's
+  texture. It gets its own (Minecraft gravel, cut into the Grass's tile
+  shapes), the Road's blending and a grey on the minimap. Everyone walks and
+  builds on it as on grass.
+- **The train** (the Trade Cart, empty and loaded) may only stand on the
+  gravel: its terrain restriction becomes a row of the restriction table that
+  no unit used and that let no unit anywhere, now letting it onto terrain 16
+  alone. It trades as the Trade Cart did, from its Market to another
+  player's and back.
+
+The game cannot give ground to one player, so any player's train can use any
+rail (in practice an ally's, trading with the same two Markets). The computer
+players never lay rails, so their trains cannot trade. The game's texts call
+the rail **Rail** and the train **Train**, with help texts that say how to use
+them.
 
 ### The panels
 

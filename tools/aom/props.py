@@ -23,6 +23,7 @@ from . import fortifications as FT
 from . import gaia as GA
 from . import nature as NA
 from . import projectiles as PR
+from . import rails as RL
 from . import slp
 from . import structures as ST
 from . import wonders as WO
@@ -91,6 +92,8 @@ def build(spec: dict, variant: int = 0, count: int = 1, t: float = 0.0, fit: Opt
     if m == "wall":
         piece = spec.get("piece") or FT.PIECES[variant % 5]
         return _part(FT.wall_piece(spec["kind"], style, piece, spec.get("damage", 0), spec.get("progress", 1.0)))
+    if m == "rail":
+        return RL.rail_piece(spec.get("piece") or FT.PIECES[variant % 5])
     if m == "gate":
         return FT.gate_section(style, age, spec["direction"], spec["open"], spec.get("half"))
     if m == "gate_tower":
@@ -145,12 +148,12 @@ def build(spec: dict, variant: int = 0, count: int = 1, t: float = 0.0, fit: Opt
 
 # --------------------------------------------------------------------------- rendering
 
-SHADOWS = {"on": True}
+SHADOWS = {"on": True, "outline": True}
 
 
 def _render(root: Part, heading: float, pad: int = 6) -> tuple[Frame, Camera]:
     cam = fit_camera(root, heading, pad=pad)
-    return render(root, heading, camera=cam, shadow=SHADOWS["on"]), cam
+    return render(root, heading, camera=cam, shadow=SHADOWS["on"], outline=SHADOWS["outline"]), cam
 
 
 def _codes(frame: Frame, quant: Quantiser) -> np.ndarray:
@@ -204,6 +207,7 @@ def render_static(spec: dict, num_frames: int, frames_per_angle: int, angle_coun
     orig = slp.decode(original) if original and spec.get("fit") else None
     shift = spec.get("shift")
     SHADOWS["on"] = spec.get("shadow", True)  # projectiles fly: the game draws their shadows separately
+    SHADOWS["outline"] = spec.get("outline", True)  # rails lie on the ground: no dark edge where tiles meet
     out: list[slp.SlpFrame] = []
     cache: dict = {}
 

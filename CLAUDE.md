@@ -122,6 +122,14 @@ putting `tools/` on `sys.path`.
      the Docks' placement terrains (Water, Shallows) become (Water, lava). Its map, `Team Lava Islands.rms` (written
      from scratch, `lava.script`), goes into the mod's `Script.RM` (`write_map`), or in direct mode the game's
      `Random`, which `restore` empties of it (only a file carrying `lava.MARK`). `--only lava` builds just this.
+   - `rails.py` makes the Trade Cart (128, 204) a train that only goes on rails, in place: the rail is the unused
+     Sea Wall (788, still a wall, so Villagers drag it out in lines; obstruction type 0, so nothing is stopped by
+     it), leaving terrain 16 ("Old Grass", drawn as the Grass) under it as its foundation terrain, which becomes
+     gravel (own texture in the Grass's tile shapes, the Road's blending); the trains' terrain restriction becomes
+     the first row no unit uses that lets nothing anywhere (`train_row`), now open on terrain 16 alone. The rails are
+     drawn into the Sea Wall's layer 5 piece (spritemap's `SWAL1N0`, model "rail", wall-piece order), its other
+     pieces blanked; its icon is added to the four building icon sheets (`BUILDING_ICONS`), its and the train's
+     texts by `name_rails`. `--only rails` builds just this (sprites and `.dat`).
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
      come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,

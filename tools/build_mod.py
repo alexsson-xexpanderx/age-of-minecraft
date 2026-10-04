@@ -44,14 +44,18 @@ from aom.slpmap import BLANK, NAME_PREFIXES, SHARED, SUFFIX_ACTIONS, TARGETS, Ta
 from aom import spritemap  # noqa: E402
 
 # --only also accepts these groups of buildings and scenery
-STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface"}
+STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface",
+                 "rails"}
 LAVA = "lava"  # and this: the lava, its Dock rule and the Team Lava Islands map
+RAILS = "rails"  # the rails' sprites (a group above), and the rails and trains in the .dat
 
 
 def static_group(spec: dict) -> str:
     m = spec["model"]
     if m in ("wall", "gate", "gate_tower", "gate_site"):
         return "walls"
+    if m == "rail":
+        return "rails"
     if m in ("wonder", "monument"):
         return "wonders"
     if m in ("tree", "stump", "ore", "berry_bush", "rock", "plants", "cactus"):
@@ -65,8 +69,9 @@ def static_group(spec: dict) -> str:
 
 def blank_group(why: str) -> str:
     """The --only group a hidden layer belongs to, from the reason the sprite map gives."""
-    for words, group in (("wall gate", "walls"), ("wonder monument", "wonders"), ("tree forest mine", "nature"),
-                         ("javelin", "projectiles"), ("flag decoration", "decorations")):
+    for words, group in (("rail", "rails"), ("wall gate", "walls"), ("wonder monument", "wonders"),
+                         ("tree forest mine", "nature"), ("javelin", "projectiles"),
+                         ("flag decoration", "decorations")):
         if any(w in why for w in words.split()):
             return group
     return "buildings"
@@ -630,9 +635,10 @@ def main(argv=None) -> int:
     pacman = not args.no_wonder_pacman and (only is None or "pacman" in only)
     dragon = not args.no_wonder_pacman and (only is None or "dragon" in only)
     lava = not args.no_wonder_pacman and (only is None or LAVA in only)
+    rails = not args.no_wonder_pacman and (only is None or RAILS in only)
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
-    if not args.no_dat and (pacman or javelina or dragon or lava):
-        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon, lava=lava)
+    if not args.no_dat and (pacman or javelina or dragon or lava or rails):
+        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon, lava=lava, rails=rails)
     exe_ok = False
     if args.mode == "upmod":
         mod_archive(game, log)
@@ -1083,13 +1089,13 @@ def write_game_file(game: Game, mode: str, name: str, data: bytes, log, folder: 
 
 
 GIANT_SLP = 15600  # the first id tried for the giant Pac-Man's SLP
-LAVA_SLP = 15000  # the first id tried for the lava's texture (the terrain textures' ids start there)
+GROUND_SLP = 15000  # the first id tried for the lava's and the gravel's textures (the terrain textures' start there)
 
 
 def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True,
-                   dragon: bool = True, lava: bool = True) -> None:
-    """The .dat changes (Pac-Man and the dragon at the Wonder, the Javelina's own sprites, the lava), their icons,
-    names, sounds, textures and the lava's map."""
+                   dragon: bool = True, lava: bool = True, rails: bool = True) -> None:
+    """The .dat changes (Pac-Man and the dragon at the Wonder, the Javelina's own sprites, the lava, the rails and
+    trains), their icons, names, sounds, textures and the lava's map."""
     from aom import gameplay
     if game.dat_path is None:
         log(".dat changes: no empires2_x1_p1.dat found, skipped")
@@ -1129,6 +1135,21 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
                 log(f"Dragon icon in {n}: {msg}")
             if all(sheet is not None for _, _, (sheet, _) in added):
                 dragon_sheets, dragon_icon = [(n, d, sheet) for n, d, (sheet, _) in added], index
+    rail_icon, rail_sheets = None, []  # the rail's, in every building icon sheet (one per icon set), at one index
+    if rails:
+        from aom import rails as rail_map
+        current = [(n, d, sid, d.get(sid)) for sid in rail_map.BUILDING_ICONS for n, d in archives
+                   if d is not None and sid in d.ids()]
+        if current:
+            index = max(slp.info(sheet).num_frames for _, _, _, sheet in current)
+            added = [(n, d, sid, rail_map.add_icon(sheet, index, quant)) for n, d, sid, sheet in current]
+            for n, _, sid, (_, msg) in added:
+                log(f"Rail icon in {n} (sheet {sid}): {msg}")
+            if all(sheet is not None for _, _, _, (sheet, _) in added):
+                rail_sheets, rail_icon = [(n, d, sid, sheet) for n, d, sid, (sheet, _) in added], index
+        else:
+            log(f"Rail icon: no building icon sheet ({', '.join(map(str, rail_map.BUILDING_ICONS))}); it keeps the "
+                "Sea Wall's")
     raw = game.dat_path.read_bytes()
     waves, sound_ids, sound_drs, roars, roar_ids = {}, None, None, {}, None
     if pacman or dragon:  # their sounds go where the game finds new files: the patch archive if there is one
@@ -1149,6 +1170,7 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
     giant = next(pictures) if pacman else None  # the giant's own SLP
     fire = next(pictures) if dragon else None  # the dragon's fireball's
     lava_dat = lava_tiles = None
+    ground_ids = free_resource_ids(game, raw, 2, start=GROUND_SLP)  # the new terrain textures: lava's, gravel's
     if lava:  # in the Water's tile shapes: the old water that becomes the lava was drawn with the Water's texture
         from aom import lava as lava_map
         water = next((t for t in game.terrains or [] if t.id == lava_map.WATER), None)
@@ -1158,15 +1180,25 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         else:
             lava_tiles = lava_map.encode(original, quant)
             colour = int(quant.indices(np.array([lava_map.MINIMAP]))[0])
-            lava_dat = (next(free_resource_ids(game, raw, 1, start=LAVA_SLP)), colour)
+            lava_dat = (next(ground_ids), colour)
+    rails_dat = gravel = None
+    if rails:  # in the Grass's tile shapes: the old grass that becomes the gravel was drawn with the Grass's texture
+        grass = next((t for t in game.terrains or [] if t.id == rail_map.GRASS), None)
+        original = game.original(grass.slp) if grass is not None and grass.slp > 0 else None
+        if original is None:
+            log("Rails: not added, the Grass's texture is not in your game files")
+        else:
+            gravel = rail_map.encode(original, quant)
+            colour = int(quant.indices(np.array([rail_map.MINIMAP]))[0])
+            rails_dat = (next(ground_ids), colour, rail_icon)
     patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon,
-                                      fire, dragon_icon, roar_ids, lava_dat)
+                                      fire, dragon_icon, roar_ids, lava_dat, rails_dat)
     for note in notes:
         log(note)
     if patch is None:
         return
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
-    if not patch.pacman_strings and not patch.dragon_strings and not patch.lava:
+    if not patch.pacman_strings and not patch.dragon_strings and not patch.lava and not patch.rail_strings:
         return
     touched: dict[str, Drs] = {}
     if patch.dragon_strings and dragon_icon is not None:
@@ -1205,6 +1237,16 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         terrain_drs.put(lava_dat[0], lava_tiles)
         touched[terrain_name] = terrain_drs
         log(f"Lava: its texture is SLP {lava_dat[0]} in {terrain_name} ({slp.info(lava_tiles).num_frames} tiles)")
+    if patch.rail_strings:  # the gravel's texture with the other terrain textures, and the rail's icon
+        terrain_name, terrain_drs = (("terrain.drs", game.terrain) if game.terrain is not None
+                                     else (game.graphics_path.name, game.graphics))
+        terrain_drs.put(rails_dat[0], gravel)
+        touched[terrain_name] = terrain_drs
+        log(f"Rails: the gravel's texture is SLP {rails_dat[0]} in {terrain_name} ({slp.info(gravel).num_frames} "
+            "tiles)")
+        for name, drs, sid, sheet in rail_sheets:
+            drs.put(sid, sheet)
+            touched[name] = drs
     if patch.giant_name is not None:  # the giant red Pac-Man's picture, where the game finds new files
         sound_drs.put(giant, gameplay.giant_slp(quant))
         touched[sound_name] = sound_drs
@@ -1219,6 +1261,8 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         rename_pacman(game, mode, patch.pacman_strings, log)
     if patch.dragon_strings:  # last: in direct mode it adds to the language files as the lines above left them
         name_dragon(game, mode, patch.dragon_strings, log)
+    if patch.rail_strings:
+        name_rails(game, mode, patch.rail_strings, log)
     if patch.lava:
         write_map(game, mode, lava_map.MAP_FILE, lava_map.script(), lava_map.MARK, log)
 
@@ -1277,6 +1321,30 @@ def name_dragon(game: Game, mode: str, strings: dict[str, int], log) -> None:
                     break
                 except (langdll.DllError, struct.error) as exc:
                     log(f"Dragon's texts: string {sid} in {name} not set to {attempt[:30]!r} ({exc})")
+        if new != data:
+            write_game_file(game, mode, name, new, log, folder=game.root)
+
+
+def name_rails(game: Game, mode: str, strings: dict[str, dict[str, int]], log) -> None:
+    """The rail's and the train's names, buttons and help texts: in the mod's own language file, or in the game's
+    where they fit (a help text too long for its place gets a short one; the Sea Wall has none to replace)."""
+    from aom import langdll, rails as rail_map
+    texts = {sid: (rail_map.TEXTS[unit][key], rail_map.SHORT_HELP[unit] if key == "help" else None)
+             for unit, ids in strings.items() for key, sid in ids.items()}
+    if mode == "upmod":
+        game.mod_strings.update({sid: text for sid, (text, _) in texts.items()})
+        return
+    for name in game.language_files():
+        path = pick(game.root, name)  # as the texts before them left it
+        data = new = path.read_bytes()
+        for sid, (text, short) in texts.items():
+            for attempt in (text, short) if short else (text,):
+                try:
+                    if langdll.read_string(new, sid):
+                        new = langdll.set_string(new, sid, attempt)
+                    break
+                except (langdll.DllError, struct.error) as exc:
+                    log(f"Rails' texts: string {sid} in {name} not set to {attempt[:30]!r} ({exc})")
         if new != data:
             write_game_file(game, mode, name, new, log, folder=game.root)
 

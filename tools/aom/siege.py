@@ -6,7 +6,7 @@
     Bombard Cannon      -> TNT cannon with an obsidian barrel
     Trebuchet           -> Log-frame trebuchet with a team-colour counterweight
     War Wagon           -> Covered wagon with a team-colour wool canopy
-    Trade Cart          -> Chest minecart pulled by a donkey
+    Trade Cart          -> A train: a furnace minecart pulling a chest minecart (it runs on rails: rails.py)
 """
 from __future__ import annotations
 
@@ -265,20 +265,39 @@ def war_wagon(key: str = "war_wagon") -> Unit:
     return _siege(key, "Armoured Wagon", "War Wagon", root, civ="Koreans")
 
 
+def _furnace(p: Painter) -> dict:
+    """Minecraft's lit furnace: cobblestone, its mouth at the front glowing with fire."""
+    stone = p.speckle("#7c7c7c", ("#5e5e5e", 0.3), ("#9a9a9a", 0.15))
+    mouth = p.grid(["SSSSSSSSSS", "SDDDDDDDDS", "SSSSSSSSSS", "SSSSSSSSSS", "SSKKKKKKSS", "SSKOYYOKSS",
+                    "SSKYOOYKSS", "SSKKKKKKSS", "SSSSSSSSSS", "SDDDDDDDDS"],
+                   {"S": "#7c7c7c", "D": "#5a5a5a", "K": "#2a2a2a", "O": "#f08a1c", "Y": "#ffd23a"})
+    return p.skin((10, 10, 10), stone, top=p.speckle("#6e6e6e", ("#8a8a8a", 0.25)), front=mouth)
+
+
 def trade_cart(key: str = "trade_cart") -> Unit:
+    """A Minecraft train: a furnace minecart, smoking as it goes, pulling the chest minecart of goods."""
     p = Painter(key)
     chest = p.skin((9, 8, 8), p.bands((3, "#9a6a34"), (1, "#3a2410"), (4, "#8a5a2a")), top="#a87438",
                    front=p.grid(["wwwwwwwww", "wwwwwwwww", "wwwwwwwww", "KKKKGKKKK", "wwwwGwwww", "wwwwwwwww",
                                  "wwwwwwwww", "wwwwwwwww"], {"w": "#8a5a2a", "K": "#3a2410", "G": "#c8c8c8"}))
-    body = Part("body", boxes=_cart(p, -6, -8, 4, 12, 16, 6, "#8a8a8a", "#5a5a5a", "#3e3e3e")
-                + [cuboid((-4.5, -5, 5.5), (9, 8, 8), chest),
-                   cuboid((-1, -2, 13.5), (2, 2, 2), solid("#3ad06a")),  # an emerald on top
-                   cuboid((4.5, 8, 7), (1, 12, 1), solid(items.STICK)),
-                   cuboid((-5.5, 8, 7), (1, 12, 1), solid(items.STICK))])
-    body.add(flag(p, (-4.5, -7, 10), height=12))
-    root = Part("root").add(body, _draught(p, "grey", 24, donkey=True),
-                            *_wheels(p, [(7, 4, 3.5), (-7, 4, 3.5), (7, -4, 3.5), (-7, -4, 3.5)], 3.5))
-    return _siege(key, "Trader Minecart", "Trade Cart", root, attack="none")
+    iron = solid("#3a3a3a")
+    engine = Part("body", boxes=_cart(p, -6, 2, 2.5, 12, 14, 6, "#8a8a8a", "#5a5a5a", "#3e3e3e")
+                  + [cuboid((-5, 4, 4), (10, 10, 10), _furnace(p)),
+                     cuboid((-1.5, 9, 14), (3, 3, 6), p.skin((3, 3, 6), p.bands((1, "#2a2a2a"), (5, "#4a4a4a")),
+                                                            top="#1a1a1a")),  # a chimney
+                     cuboid((-1, -3, 4.5), (2, 6, 1.5), iron)])  # the coupling
+    puff = p.speckle("#d8d8d8", ("#b4b4b4", 0.3))
+    for k in (1, 2):  # smoke from the chimney (it rises as the train goes: animation.SMOKE)
+        engine.add(Part(f"smoke_{k}", boxes=[cuboid((-2.5, 8, 20), (5, 5, 5), p.skin((5, 5, 5), puff))]))
+    wagon = Part("wagon", boxes=_cart(p, -6, -16, 2.5, 12, 14, 6, "#8a8a8a", "#5a5a5a", "#3e3e3e")
+                 + [cuboid((-4.5, -13, 4), (9, 8, 8), chest),
+                    cuboid((-1, -10, 12), (2, 2, 2), solid("#3ad06a"))])  # an emerald on top
+    wagon.add(flag(p, (-4.5, -15, 8.5), height=12))
+    engine.add(wagon)
+    root = Part("root").add(engine, *_wheels(p, [(6.5, 13, 2.5), (-6.5, 13, 2.5), (6.5, 5, 2.5), (-6.5, 5, 2.5),
+                                                 (6.5, -5, 2.5), (-6.5, -5, 2.5), (6.5, -13, 2.5),
+                                                 (-6.5, -13, 2.5)], 2.5, rim="#2e2e2e", wood="#5a5a5a"))
+    return _siege(key, "Minecart Train", "Trade Cart", root, attack="none")
 
 
 SIEGE = {

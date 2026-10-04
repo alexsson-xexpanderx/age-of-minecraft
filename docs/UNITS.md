@@ -74,7 +74,7 @@ The Conquerors) and its Minecraft-style replacement. Previews: `previews/roster_
 | Heavy Scorpion | Iron Crossbow Turret |  |
 | Bombard Cannon | TNT Cannon |  |
 | Trebuchet | Trebuchet |  |
-| Trade Cart | Trader Minecart |  |
+| Trade Cart | Minecart Train |  |
 
 ## Ships (12)
 

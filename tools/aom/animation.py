@@ -16,7 +16,8 @@ from .geometry import Pose
 DIRECTIONS = [("S", -90), ("SW", -135), ("W", 180), ("NW", 135), ("N", 90),
               ("NE", 45), ("E", 0), ("SE", -45)]
 ACTIONS = ("idle", "walk", "attack", "die")
-WHEELS = [f"wheel_{i}" for i in range(1, 7)]
+WHEELS = [f"wheel_{i}" for i in range(1, 9)]
+SMOKE = ("smoke_1", "smoke_2")  # puffs from the train's chimney, only while it moves
 QUAD_LEGS = (("leg_fr", 1), ("leg_bl", 1), ("leg_fl", -1), ("leg_br", -1))
 DRAGON_FALL = 0.8  # the part of its dying animation the dragon takes to hit the ground (its death sound thuds then)
 
@@ -163,6 +164,7 @@ def pose(unit, action: str, t: float) -> Pose:
         elif rig in ("wheeled", "trebuchet"):
             _add(p, "root", ry=25 * fall)
             _move(p, "root", dz=-2 * fall)
+            p.hidden |= set(SMOKE)
             p.tint = (0.1, 0.08, 0.06, 0.5 * min(1.0, t * 3))  # burnt
         else:
             _add(p, "root", ry=90 * fall)
@@ -251,12 +253,17 @@ def pose(unit, action: str, t: float) -> Pose:
         else:
             _add(p, "head", breathe / 2)
     elif rig == "wheeled":
+        if action != "walk":
+            p.hidden |= set(SMOKE)
         if action == "walk":
             for w in WHEELS:
                 _add(p, w, -360 * t)
             _move(p, "body", dz=0.3 * abs(s))
             _quad(p, t, 25)  # draught animals, if any
             _add(p, "horse_head", 4 * s)
+            for k, puff in enumerate(SMOKE):  # each rises and drifts back, then starts again at the chimney
+                rise = (t + k / len(SMOKE)) % 1
+                _move(p, puff, dy=-7 * rise, dz=8 * rise)
         elif action == "attack":
             kick = _pulse(t, 0.3, 0.6)
             _add(p, "weapon", 8 * kick)

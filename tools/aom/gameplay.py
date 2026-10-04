@@ -100,6 +100,7 @@ class DatPatch:
     fire_layout: Optional[tuple[int, int, bool]] = None  # its fireball's frames, angles and mirroring
     dragon_sounds_added: bool = False  # the sound table has the dragon's sounds: their WAV files must be written too
     lava: bool = False  # terrain 15 is lava (its texture and the map must be written)
+    rail_strings: Optional[dict[str, dict[str, int]]] = None  # the rail's and the train's text ids, if there are rails
 
 
 def wonder_pacman(raw: bytes, graphics: dict) -> tuple[Optional[DatPatch], str]:
@@ -112,10 +113,12 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
               sounds: Optional[dict[str, list[int]]] = None, giant: Optional[int] = None,
               giant_icon: Optional[int] = None, fire: Optional[int] = None, dragon_icon: Optional[int] = None,
               dragon_sounds: Optional[dict[str, list[int]]] = None,
-              lava: Optional[tuple[int, int]] = None) -> tuple[Optional[DatPatch], list[str]]:
+              lava: Optional[tuple[int, int]] = None,
+              rails: Optional[tuple[int, int, Optional[int]]] = None) -> tuple[Optional[DatPatch], list[str]]:
     """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), the giant red Pac-Man
     drawn from SLP `giant` (if given; with Pac-Man only), the dragon at the Wonder with its fireballs drawn from SLP
-    `fire` (if given, with `dragon_sounds`), the lava (if given: its texture's SLP and minimap colour; lava.py), and
+    `fire` (if given, with `dragon_sounds`), the lava (if given: its texture's SLP and minimap colour; lava.py), the
+    rails and trains (if given: the gravel's texture SLP, its minimap colour and the rail's icon; rails.py), and
     the Javelina's own sprites. `sounds` maps a sound name (see SOUND_USES) to the resource ids of its WAV files;
     `dragon_sounds` the same for DRAGON_SOUND_USES.
 
@@ -163,6 +166,12 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         lava_done, msg = lava_map.patch(data, civs, *lava)
         changed |= lava_done
         notes.append(msg)
+    rail_strings = None
+    if rails is not None:  # in place too
+        from . import rails as rail_map
+        rails_done, msg, rail_strings = rail_map.patch(data, civs, graphics, *rails)
+        changed |= rails_done
+        notes.append(msg)
     # last, from the back of the file to the front: these grow the file, which moves everything after them
     if pac_done:
         notes.append(_boarding(data, civs))
@@ -192,6 +201,11 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         if drake is not None and drake.type == 70 and drake.values["hit_points"] == DRAGON_HP and (
                 drake.values["train_location"] != WONDER_UNIT or drake.values["terrain_restriction"] != FLYING):
             return None, notes + ["not changed: the dragon did not read back as expected"]
+        rail = units[rail_map.RAIL] if rail_strings is not None and len(units) > rail_map.RAIL else None
+        if rail is not None and rail.type == 80 and rail.values["train_location"] == rail_map.VILLAGER and (
+                rail.values["foundation_terrain"] != rail_map.RAIL_BED
+                or rail.values["obstruction"][1] != rail_map.OVER or rail.values["cost"] != rail_map.RAIL_COST):
+            return None, notes + ["not changed: the rail did not read back as expected"]
     if pac_done:
         try:
             heads = DU.read_unit_headers(bytes(data), check)
@@ -222,9 +236,13 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         t = datfile.read_terrains(packed)[lava_map.LAVA]
         if t.slp != lava[0] or t.to_draw != -1:
             return None, notes + ["not changed: the lava did not read back as expected"]
+    if rail_strings is not None:
+        t = datfile.read_terrains(packed)[rail_map.RAIL_BED]
+        if t.slp != rails[0] or t.to_draw != -1:
+            return None, notes + ["not changed: the rails' gravel did not read back as expected"]
     return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, sounds_added=table is not None,
                     giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout,
-                    dragon_sounds_added=roar_ids is not None, lava=lava_done), notes
+                    dragon_sounds_added=roar_ids is not None, lava=lava_done, rail_strings=rail_strings), notes
 
 
 def _pacman(data: bytearray, civs, graphics: dict, icon: Optional[int]) -> tuple[str, Optional[dict[str, int]]]:
