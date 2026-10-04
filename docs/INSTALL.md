@@ -90,6 +90,8 @@ each one backed up first, and **`restore_original.bat`** puts them back.
 | `build_mod.bat "<game>" --only buildings,farms,walls,wonders,nature,decorations,projectiles` | build only buildings and scenery (any of these groups; `buildings` includes the farms) |
 | `build_mod.bat "<game>" --only interface` | build only the Minecraft-style panels at the top and bottom of the screen |
 | `build_mod.bat "<game>" --dry-run` | only plan and write `aom_report.txt` |
+| `test_1_rails_only.bat` | a test build with only the trains' rails (the Trade Cart keeps its horse cart look): double-click, then `build_mod.bat` for the whole mod again |
+| `test_2_train_look_only.bat` | a test build with only the train's look (no rails): double-click, then `build_mod.bat` for the whole mod again |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs`, the farms into `Data\terrain.drs` and the panels into `Data\interfac.drs` (no mod exe needed); each file is backed up first as `<name>.aom-backup` |
 | `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file, the icons, the language files and the Team Lava Islands map) |
 | `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man or Dragon at the Wonder, no lava, no rails behind the trains, and the cheat unit keeps its name and icon) |
