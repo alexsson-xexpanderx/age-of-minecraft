@@ -386,7 +386,8 @@ def fake_game(root: Path) -> Path:
     saboteur = len(table)  # the Saboteur borrows the Petard's sprites; old Trade Cog and Galley pieces no one uses
     table += [{"name": "HDSQD_FN", "slp": 4497, "frames": 10, "angles": 8, "mirror": 6},
               {"name": "COGXX_F1", "slp": 2909, "frames": 1, "angles": 8, "mirror": 6},
-              {"name": "GALLY_A1", "slp": 2937, "frames": 1, "angles": 8, "mirror": 6}]
+              {"name": "GALLY_A1", "slp": 2937, "frames": 1, "angles": 8, "mirror": 6},
+              {"name": "CARTSTPS", "slp": 4710, "frames": 5, "angles": 8, "mirror": 6}]  # the cart tracks
     boar = len(table)
     table.append({"name": "BOARX_FN", "slp": 2557, "frames": 10, "angles": 8})
     for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
@@ -609,15 +610,19 @@ def test_full_build(tmp: Path):
     assert "#const LAVA 15" in rms and "base_terrain LAVA" in rms and "FISH" not in rms
     assert "Lava: terrain 15 ('Old Water') is lava" in report and "Docks (units 46)" in report
     # the trains: the Trade Cart (128, 204) keeps its row, which now leaves rails behind it on every terrain it goes
-    # on (an old Galley piece, drawing the rails' own SLP); the Bombard Cannon, which shared it, takes one just like it
+    # on (the cart tracks, drawing the rails' own SLP); the Bombard Cannon, which shared it, takes one just like it
     from aom.datfile import restrictions
     after = (mod / "Data" / "empires2_x1_p1.dat").read_bytes()
     rows = restrictions(datunits.decompress(after))
     assert all(c[128].values["terrain_restriction"] == c[204].values["terrain_restriction"] == 2 for c in units.units)
     assert all(c[36].values["terrain_restriction"] == 7 for c in units.units) and rows[2] == rows[7]
-    track = next(g for g in graphics_after.values() if g.name == "GALLY_A1")
-    assert (track.slp, track.layer, track.frame_count, track.angle_count, track.mirroring) == (15602, 10, 50, 8, 6)
-    assert track.frame_rate == 6.0 and track.sequence_type == 3  # the cart tracks' timing, 5 minutes in all
+    track = next(g for g in graphics_after.values() if g.name == "CARTSTPS")
+    before = next(g for g in read_graphics((game / "Data" / "empires2_x1_p1.dat").read_bytes()).values()
+                  if g.name == "CARTSTPS")
+    assert (track.slp, track.frame_count) == (15602, 50)  # the rails, more pictures; every other setting as it was
+    assert (track.layer, track.angle_count, track.mirroring, track.frame_rate, track.sequence_type) == (
+        before.layer, before.angle_count, before.mirroring, before.frame_rate, before.sequence_type)
+    assert next(g for g in graphics_after.values() if g.name == "GALLY_A1").slp == 2937  # the Galley piece is left alone
     data = datunits.decompress(after)
     at = 12 + 8 * 8 + 2 * 41 * 20 + 4 * 41  # the trains' row's pass graphics
     left = [struct.unpack_from("<iiii", data, at + 16 * t) for t in range(41)]
@@ -627,7 +632,7 @@ def test_full_build(tmp: Path):
     drawn = [int((f.pixels >= 0).sum()) for f in rails[:50]]
     assert drawn[0] == drawn[44] > drawn[45] > drawn[49] > 0  # the last five fainter and fainter
     assert "Trains: the Trade Carts (units 128, 204, 4 in all) keep their terrain restriction 2, which now" in report
-    assert "(GALLY_A1) draws SLP 15602" in report and "(BCANN) use 7, exactly like it" in report
+    assert "CARTSTPS) draw SLP 15602, 50 pictures" in report and "(BCANN) use 7, exactly like it" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()

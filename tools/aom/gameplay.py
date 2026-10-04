@@ -169,7 +169,7 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
     trains = train_strings = None
     if rails is not None:  # in place too
         from . import rails as rail_map
-        trains, msg, train_strings = rail_map.patch(data, civs, graphics, rails, {giant_gid, fire_gid} - {None})
+        trains, msg, train_strings = rail_map.patch(data, civs, graphics, rails)
         changed |= trains is not None
         notes.append(msg)
     # last, from the back of the file to the front: these grow the file, which moves everything after them
@@ -241,8 +241,7 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the lava did not read back as expected"]
     if trains is not None:
         g = datfile.read_graphics(packed)[trains[0]]
-        if (g.slp, g.layer, g.frame_count, g.angle_count) != (rails, rail_map.TRACK_LAYER, rail_map.TRACK_FRAMES,
-                                                              rail_map.TRACK_ANGLES):
+        if (g.slp, g.frame_count, g.angle_count) != (rails, rail_map.TRACK_FRAMES, rail_map.TRACK_ANGLES):
             return None, notes + ["not changed: the trains' rails did not read back as expected"]
     return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, sounds_added=table is not None,
                     giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout,

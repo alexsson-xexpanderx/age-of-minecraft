@@ -3,22 +3,20 @@
 The game cannot place rails for a unit (only Villagers place buildings, and only where the player drags them), but
 it can leave something on the ground behind a moving unit: its terrain restriction row says, per terrain, which
 picture a unit walking there leaves behind (a row's "pass graphics"). That is how carts leave wheel tracks and soldiers
-footprints in the snow (CARTSTPS: a few pictures on the ground layer, each fainter, for some seconds each, then gone).
+footprints in the snow (CARTSTPS and FOOTSTPS: a few pictures on the ground layer, 6 s each, then gone).
 
-So the train keeps the Trade Cart's own row of the terrain restriction table (its route-finding exactly the game's),
-and `patch` makes that row leave a piece of track on every terrain it goes on. The siege weapons that shared it move to
-the row foot soldiers and cavalry use, which lets units onto exactly the same ground (in snow they now leave footprints
-instead of wheel tracks). Giving the train a row of its own crashed the game when a train was blocked by units, twice:
-a row no unit used, then the sea buildings' (no one builds those; the game's route-finding seems to know only the rows
-moving units have). The track is an unused graphic (one of
-TRACK_GRAPHICS, an old piece of the Galley or the Trade Cog) pointed at a new SLP (`track_slp`): a straight piece of
-rails, iron on dark sleepers, as wide as the train's wheels, in 8 directions (the train's), on the ground under every
-unit. Right-click another player's Market and the train lays rails all the way there. The player wanted them to stay
-all game, but a piece shown for a day (one picture of 86400 s) went with that crash, so a piece now keeps the cart
-tracks' timing, which the game is known to handle (6 s a picture), over TRACK_FRAMES pictures: 5 minutes, the last
-30 s fading. Rails stay while trains keep running; pieces pile up where they pass (TRACK_SPACING sets how many).
+So `patch` keeps the train (the Trade Cart, empty 128 and loaded 204) on its own row, so it goes and finds its way
+round things exactly as the Trade Cart did, and makes that row leave the cart tracks on every terrain it goes on, not
+only snow. The siege weapons that shared the row move to the one foot soldiers and cavalry use, which lets units onto
+exactly the same ground (in snow they leave footprints instead of wheel tracks). The cart tracks' graphic then belongs
+to the trains alone: every setting as the game has it, but a new SLP (`track_slp`: a straight piece of rails, iron on
+dark sleepers, as wide as the train's wheels, in the train's 8 directions) and more pictures (TRACK_FRAMES of 6 s:
+5 minutes, the last 30 s fading). Each piece lies behind the train, never ahead, so rails only lie where the train
+went, round buildings and trees as it went; they stay while trains keep running.
 
-The trains still trade, and go, exactly where Trade Carts did, the computer players' too.
+What crashed the game whenever a train was blocked by units, before this: a row of the trains' own (one no unit
+used, then the sea buildings'), each time with the track drawn by a borrowed graphic (an old Galley piece, which
+keeps the Galley's drawing flags: transparent selection, old colours).
 """
 from __future__ import annotations
 
@@ -41,20 +39,13 @@ HELP_STRINGS = 79000  # the .dat stores help text ids 79000 above the string's i
 TRAIN_SCALE = 1.6  # the train's size (siege.trade_cart), which the track is as wide as
 GAUGE = 6.5 * TRAIN_SCALE  # from the track's middle to each rail: under the train's wheels (6.5 out, scaled)
 SLEEPER, IRON, IRON_EDGE = "#6b4a2b", "#c4c4c4", "#6e6e6e"
-# graphics no unit and no other graphic uses, with an SLP of their own: old pieces of the Galley and the Trade Cog (the
-# giant Pac-Man takes the first free one of gameplay.GIANT_GRAPHICS, which starts the other end)
-TRACK_GRAPHICS = ("GALLY_A1", "GALLY_F1", "COGXX_W1", "COGXX_A1")
-TRACK_ANGLES, TRACK_MIRRORING = 8, 6  # the train's 8 directions, the right half mirrored (as the cart tracks)
-TRACK_FRAMES, TRACK_SECONDS = 50, 6.0  # pictures, each shown as long as a cart track's: 5 minutes in all
+TRACK = "CARTSTPS"  # the cart tracks' graphic: 8 directions (mirrored), 6 s a picture, the ground layer
+TRACK_ANGLES = 8
+TRACK_FRAMES = 50  # pictures of 6 s: 5 minutes (the game's tracks have 5: 30 s)
 TRACK_FADING = 5  # the last pictures, fainter and fainter
-TRACK_LAYER = 10  # the ground, under every unit (the cart tracks')
-TRACK_SEQUENCE = 3  # played once (the cart tracks')
 TRACK_SPACING = 4  # how often a piece is left (the cart tracks' "replication")
 TRACK_LENGTH = 0.6 * TILE  # one piece, behind the train: longer than the cart tracks', so the next one overlaps it
-NO_PASS = (-1, -1, -1, 0)  # pass graphics: nothing left behind
-# where a graphic's fields are, after its SLP id (datfile.Graphic.slp_at): frame count, angle count, seconds per
-# frame, replay delay, sequence type, mirroring (datfile._graphics reads them in this order)
-FRAMES_AT, ANGLES_AT, RATE_AT, REPLAY_AT, SEQUENCE_AT, MIRROR_AT = 23, 25, 31, 35, 39, 42
+FRAMES_AT = 23  # where a graphic's frame count is, after its SLP id (datfile.Graphic.slp_at)
 TEXTS = {"name": "Train", "creation": "Build Train",
          "help": "Build <b> Train<b> (<cost>) \nTrades by land, laying its own rails as it goes: carries goods from "
                  "your Market to another player's Market and brings back gold. The farther the Market, the higher "
@@ -135,37 +126,26 @@ def _row_at(data: bytes, row: int) -> int:
     return 12 + 8 * rows + row * terrains * 20
 
 
-def track_graphic(graphics: dict, civs, taken: set[int]) -> Optional[int]:
-    """A graphic for the track: one of TRACK_GRAPHICS that no unit, no other graphic and no flame on a damaged
-    building uses, with an SLP of its own, no deltas and no per-direction sounds (so its directions may change), not
-    `taken` (by the giant or the fireball)."""
-    used = set(taken)
-    for units in civs.units:
-        for u in units:
-            if u is not None:
-                used |= {g for k in ("standing", "dying", "walking") for g in u.values.get(k, ())}
-                used |= set(u.values.get("damage_graphics", ()))
-                used.add(u.values.get("attack_graphic", -1))
-    used |= {d.graphic_id for g in graphics.values() for d in g.deltas}
-    sharing = {}
-    for g in graphics.values():
-        sharing[g.slp] = sharing.get(g.slp, 0) + 1
-    for name in TRACK_GRAPHICS:
-        for gid, g in graphics.items():
-            if (g.name.upper() == name and gid not in used and not g.deltas and g.slp > 0 and sharing[g.slp] == 1
-                    and g.angle_sounds_at < 0 and g.slp_at >= 0):
-                return gid
-    return None
+def track_graphic(data: bytes, graphics: dict, row: int) -> Optional[int]:
+    """The cart tracks' graphic, if it is as this build knows it (8 directions, mirrored, no deltas, no per-direction
+    sounds) and no row but the trains' (`row`) leaves it behind."""
+    gid = next((gid for gid, g in graphics.items() if g.name.upper() == TRACK), None)
+    g = graphics.get(gid)
+    if g is None or g.deltas or g.slp <= 0 or g.angle_count != TRACK_ANGLES or not g.mirroring or g.slp_at < 0:
+        return None
+    rows, terrains = struct.unpack_from("<HH", data, 8)
+    for k in range(rows):
+        at = _row_at(data, k) + 4 * terrains
+        if k != row and any(struct.unpack_from("<iiii", data, at + 16 * t)[:3].count(gid) for t in range(terrains)):
+            return None
+    return gid
 
 
-def patch(data: bytearray, civs, graphics: dict, slp_id: int,
-          taken: set[int] = frozenset()) -> tuple[Optional[tuple[int, int, int]], str, Optional[dict[str, int]]]:
+def patch(data: bytearray, civs, graphics: dict,
+          slp_id: int) -> tuple[Optional[tuple[int, int, int]], str, Optional[dict[str, int]]]:
     """The trains (in place): the Trade Cart leaves rails behind it, drawn from SLP `slp_id`; the units that shared its
     terrain restriction row move to one exactly like it. Returns ((the track's graphic, the trains' row, the others')
     or None, what happened, the train's text ids)."""
-    gid = track_graphic(graphics, civs, taken)
-    if gid is None:
-        return None, f"Trains: not changed, none of {', '.join(TRACK_GRAPHICS)} is free for their rails", None
     trains = [u for units in civs.units if len(units) > max(TRAINS) for u in (units[k] for k in TRAINS)
               if u is not None and u.type == 70 and u.values["class"] == TRADE_CART]
     if not trains:
@@ -177,6 +157,9 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int,
     other = siege_row(bytes(data), civs, row)
     if other is None:
         return None, f"Trains: not changed, no other units' row is exactly like theirs ({row})", None
+    gid = track_graphic(bytes(data), graphics, row)
+    if gid is None:
+        return None, f"Trains: not changed, the cart tracks' graphic ({TRACK}) is not the one this build knows", None
     moved = [u for units in civs.units for u in units if u is not None and u.values["terrain_restriction"] == row
              and u not in trains]
     for u in moved:
@@ -187,19 +170,15 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int,
         if passable > 0:
             struct.pack_into("<iiii", data, at + 4 * terrains + 16 * t, -1, -1, gid, TRACK_SPACING)
     g = graphics[gid]
-    struct.pack_into("<i", data, g.slp_at, slp_id)
-    struct.pack_into("<b", data, g.layer_at, TRACK_LAYER)
-    struct.pack_into("<HH", data, g.slp_at + FRAMES_AT, TRACK_FRAMES, TRACK_ANGLES)
-    struct.pack_into("<ff", data, g.slp_at + RATE_AT, TRACK_SECONDS, 0.0)
-    struct.pack_into("<b", data, g.slp_at + SEQUENCE_AT, TRACK_SEQUENCE)
-    struct.pack_into("<b", data, g.slp_at + MIRROR_AT, TRACK_MIRRORING)
+    struct.pack_into("<i", data, g.slp_at, slp_id)  # the rails, and more of them: everything else as it was
+    struct.pack_into("<H", data, g.slp_at + FRAMES_AT, TRACK_FRAMES)
     first = trains[0]
     strings = {"name": first.values["name_id"], "creation": first.values["creation_id"]}
     if first.values["help_id"] > HELP_STRINGS:
         strings["help"] = first.values["help_id"] - HELP_STRINGS
     names = sorted({u.name for u in moved})
     return (gid, row, other), (f"Trains: the Trade Carts (units {', '.join(map(str, TRAINS))}, {len(trains)} in all) "
-                               f"keep their terrain restriction {row}, which now leaves rails behind them: graphic "
-                               f"{gid} ({g.name}) draws SLP {slp_id} in {TRACK_ANGLES} directions, {TRACK_FRAMES} "
-                               f"pictures of {TRACK_SECONDS:g} s; the units that shared it ({', '.join(names)}) "
+                               f"keep their terrain restriction {row}, which now leaves rails behind them: the cart "
+                               f"tracks (graphic {gid}, {g.name}) draw SLP {slp_id}, {TRACK_FRAMES} pictures of "
+                               f"{g.frame_rate:g} s; the units that shared it ({', '.join(names)}) "
                                f"use {other}, exactly like it"), strings
