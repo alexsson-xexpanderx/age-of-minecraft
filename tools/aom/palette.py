@@ -36,9 +36,11 @@ def _lab(rgb: np.ndarray) -> np.ndarray:
 
 
 class Quantiser:
-    def __init__(self, palette: np.ndarray):
+    def __init__(self, palette: np.ndarray, extra: tuple[int, ...] = ()):
+        """`extra`: player-colour indices allowed as plain colours too (in an SLP a plain pixel there keeps its colour
+        whoever owns the sprite)."""
         self.palette = palette
-        banned = {i for r in PLAYER_RANGES for i in r}
+        banned = {i for r in PLAYER_RANGES for i in r} - set(extra)
         self.allowed = np.array([i for i in range(len(palette)) if i not in banned])
         self.lab = _lab(palette[self.allowed])
         self.cache: dict[int, int] = {}

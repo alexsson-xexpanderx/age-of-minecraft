@@ -153,10 +153,14 @@ The game has no lava, but it has a leftover terrain no map uses: terrain 15,
 "Old Water". It has no texture of its own (the game draws it with the
 Water's), and every unit treats it exactly as the medium water: ships sail on
 it, Fish Traps work in it, soldiers cannot walk on it. `lava.py` makes it the
-lava, in place in the `.dat`: its own texture (Minecraft's still lava, hot
-yellow blobs in orange with a darker crust between them, 2 blocks to a tile
-like the farms, cut into the Water texture's tile shapes), orange on the
-minimap, and blended into the ground around it the way the Water is. A Dock
+lava, in place in the `.dat`: its own texture (dark lava, plates of dark red
+crust with glowing cracks between them, orange round a yellow-hot middle, 2
+blocks to a tile like the farms, cut into the Water texture's tile shapes),
+orange on the minimap, and blended into the ground around it the way the
+Water is. The game's palette has no red among its plain colours (dark lava
+came out brown), so the lava also uses the red and the yellow player's
+shades, as plain colours that stay the same in every game, as the giant red
+Pac-Man does. A Dock
 may only stand on Water or Shallows next to a beach, so the Shallows in that
 rule becomes the lava (no standard map has a Dock in a ford).
 

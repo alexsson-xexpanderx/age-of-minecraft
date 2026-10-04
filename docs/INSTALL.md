@@ -182,8 +182,8 @@ game's own language file: hovering over its button there says only "Create
 Dragon".
 
 **Team Lava Islands.** A new map, like Team Islands but with a sea of
-Minecraft lava instead of water: each team shares an island, and the lava
-around it shows orange on the minimap. In the game setup, set the map style
+lava instead of water (dark red crust with glowing cracks): each team shares
+an island, and the lava around it shows orange on the minimap. In the game setup, set the map style
 to **Custom** and pick **Team Lava Islands**. Ships sail on the lava as they
 would on water: build your Docks on the lava by your island's beach (every
 island has one, all round), then Transport Ships, warships and Fish Traps.

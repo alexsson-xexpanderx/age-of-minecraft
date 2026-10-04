@@ -949,6 +949,9 @@ def test_lava_map():
     assert "Age of Minecraft" in text.splitlines()[1] and text.encode("latin-1")
     tex = lava.lava_texture()
     assert tex.shape == (16, 16, 5) and len(np.unique(tex[..., 0])) >= 4
+    pal = parse_jasc(fake_palette())  # the red player's shades as plain colours, for the lava only
+    assert Quantiser(pal, lava.SHADES).indices(pal[32:33].astype(int))[0] == 32
+    assert Quantiser(pal).indices(pal[32:33].astype(int))[0] != 32
     assert lava.ground(50, 30).shape == (30, 50, 4) and (lava.ground(50, 30)[..., 3] == 255).all()
 
 

@@ -4,8 +4,11 @@ The game has no lava. Its terrain 15, "Old Water", is a leftover no map uses: it
 draws it with the Water's, `to_draw` 1), and every unit treats it exactly as it treats Water 3, the medium water:
 ships sail on it, fish and fish traps live in it, soldiers cannot walk on it. So it becomes the lava (`patch`):
 
-- its own texture, Minecraft's still lava (hot yellow blobs in orange, a darker crust between them), 2 blocks to a
-  tile like the farms, cut into the tile shapes of the Water's texture, which it was drawn with (`encode`);
+- its own texture, dark lava: plates of dark red crust with glowing cracks between them, orange round a yellow-hot
+  middle, 2 blocks to a tile like the farms, cut into the tile shapes of the Water's texture, which it was drawn with
+  (`encode`). The palette's plain colours have no red (they turn dark lava brown), so the red player's shades and the
+  yellow player's are used as plain colours too (`SHADES`), as the giant red Pac-Man's are: a plain pixel there keeps
+  its colour, and terrain has no owner anyway;
 - orange on the minimap, and blended into the ground around it the way the Water is;
 - Docks may be built on it. A Dock may only stand on Water or Shallows (its placement terrains) next to a beach,
   so its Shallows becomes the lava: no standard map has a Dock in shallow water (the fords are a tile wide).
@@ -37,7 +40,8 @@ from .textures import parse
 LAVA = 15  # "Old Water"
 MEDIUM_WATER = 23  # the terrain it must behave like
 WATER, SHALLOWS = 1, 4  # where a Dock may stand: (Water, Shallows) becomes (Water, lava)
-COLOURS = ("#9c2c08", "#c8420a", "#e2620e", "#f58a18", "#fdb52e", "#ffe070")  # crust to the hottest
+COLOURS = ("#410000", "#5a0800", "#690b00", "#a01500", "#d06010", "#ffc700")  # the crust, then a crack's glow
+SHADES = tuple(range(32, 40)) + tuple(range(64, 72))  # the red and the yellow player's colours, as plain colours
 MINIMAP = (226, 98, 14)
 MAP_NAME = "Team Lava Islands"
 MAP_FILE = MAP_NAME + ".rms"
@@ -46,20 +50,20 @@ MARK = "Age of Minecraft"  # in the map's first lines: --restore removes only a 
 
 # --------------------------------------------------------------------------- the look
 
-def lava_texture(seed: str = "lava", blobs: int = 6) -> np.ndarray:
-    """16x16 still lava: a hot blob round each of a few points, bright in the middle, a darker crust where blobs
-    meet. The distances wrap round the block's edges, so the blocks join up."""
+def lava_texture(seed: str = "lava", plates: int = 5) -> np.ndarray:
+    """16x16 lava: a plate of dark crust round each of a few points, cracked where plates meet, the cracks glowing red
+    to yellow-hot. The distances wrap round the block's edges, so the blocks join up."""
     rng = np.random.default_rng(zlib.crc32(seed.encode()))
-    points = rng.uniform(0, 16, (blobs, 2))
+    points = rng.uniform(0, 16, (plates, 2))
     yy, xx = np.mgrid[0:16, 0:16] + 0.5
     dist = []
     for py, px in points:
         dy, dx = np.abs(yy - py), np.abs(xx - px)
         dist.append(np.hypot(np.minimum(dy, 16 - dy), np.minimum(dx, 16 - dx)))
     near = np.sort(np.array(dist), axis=0)
-    edge = near[1] - near[0]  # 0 where two blobs meet
-    heat = (edge / edge.max()) ** 0.7 + rng.normal(0, 0.05, edge.shape)
-    return np.array([parse(c) for c in COLOURS])[np.digitize(heat, [0.1, 0.28, 0.48, 0.68, 0.86])]
+    edge = near[1] - near[0]  # 0 where two plates meet
+    heat = 1 - (edge / edge.max()) ** 0.6 + rng.normal(0, 0.06, edge.shape)  # 1 on the cracks
+    return np.array([parse(c) for c in COLOURS])[np.digitize(heat, [0.35, 0.55, 0.7, 0.8, 0.9])]
 
 
 @lru_cache(maxsize=None)
@@ -77,8 +81,9 @@ def texture(per_tile: int = farmland.PER_TILE) -> tuple[Frame, tuple[int, int]]:
 
 
 def encode(water: bytes, quant: Quantiser) -> bytes:
-    """The lava's texture: the Water's SLP `water`, every tile redrawn as lava."""
-    return slp.encode(farmland.cut(*texture(), water, quant, "the lava"), props=slp.frame_props(water))
+    """The lava's texture: the Water's SLP `water`, every tile redrawn as lava (in `quant`'s palette)."""
+    reds = Quantiser(quant.palette, SHADES)
+    return slp.encode(farmland.cut(*texture(), water, reds, "the lava"), props=slp.frame_props(water))
 
 
 def ground(w: int, h: int, x0: int = 0, y0: int = 0) -> np.ndarray:
