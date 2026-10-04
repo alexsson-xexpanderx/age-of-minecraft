@@ -122,13 +122,15 @@ putting `tools/` on `sys.path`.
      the Docks' placement terrains (Water, Shallows) become (Water, lava). Its map, `Team Lava Islands.rms` (written
      from scratch, `lava.script`), goes into the mod's `Script.RM` (`write_map`), or in direct mode the game's
      `Random`, which `restore` empties of it (only a file carrying `lava.MARK`). `--only lava` builds just this.
-   - `rails.py` makes the Trade Cart (128, 204) a train that lays its own rails, in place: it gets the sea buildings' restriction
-     row (`train_row`; a row no unit used crashed the game when a train was blocked), made a copy of its old row whose pass graphics (what a
-     unit leaves on the ground behind it, as carts leave tracks in the snow) are a track on every terrain it goes on.
-     The track is an unused graphic (`TRACK_GRAPHICS`, not the giant's or the fireball's) given 16 directions, 50
-     frames of 6 s (the cart tracks' timing; a 1-frame day went with the crash), the ground layer, and a new SLP (`track_slp`, written after the giant's and the fireball's) of a
-     straight piece of rails behind the train (never ahead: it only lies where the train went). The train is drawn
-     `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
+   - `rails.py` makes the Trade Cart (128, 204) a train that lays its own rails, in place: it keeps its terrain
+     restriction row (20), whose pass graphics (what a unit leaves on the ground behind it, as carts leave tracks in
+     the snow) become a track on every terrain it goes on; the siege weapons that shared row 20 move to the row exactly
+     like it that most units use (`siege_row`: 7). A row of the train's own (an unused one, then the sea buildings')
+     crashed the game whenever a train was blocked. The track is an unused graphic (`TRACK_GRAPHICS`, not the giant's
+     or the fireball's) given 8 directions, 50 frames of 6 s (the cart tracks' timing), the ground layer, and a new SLP
+     (`track_slp`, written after the giant's and the fireball's) of a straight piece of rails behind the train (never
+     ahead: it only lies where the train went). The train is drawn `TRAIN_SCALE` big, the track as wide (`GAUGE`);
+     its texts by `name_train`. `--only rails` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
      come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,

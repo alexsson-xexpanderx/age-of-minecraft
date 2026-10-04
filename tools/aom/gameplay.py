@@ -205,7 +205,9 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         carts = [units[k] for k in rail_map.TRAINS if len(units) > k] if trains is not None else []
         if any(cart is not None and cart.type == 70 and cart.values["class"] == rail_map.TRADE_CART and (
                 cart.values["terrain_restriction"] != trains[1] or rows[trains[1]] != rows[trains[2]])
-               for cart in carts):
+               for cart in carts) or (trains is not None and any(  # alone on their row now
+                u is not None and u.values["terrain_restriction"] == trains[1] and u.id not in rail_map.TRAINS
+                for u in units)):
             return None, notes + ["not changed: the trains did not read back as expected"]
     if pac_done:
         try:

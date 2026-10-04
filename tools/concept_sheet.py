@@ -491,7 +491,7 @@ def lava_scene(out: Path, units: dict[str, Unit]) -> None:
 
 def rails_scene(out: Path, units: dict[str, Unit]) -> None:
     """Trains between a Market and another player's, round a wood, on the rails they leave behind them: a piece every
-    quarter tile, in the nearest of the track's 16 directions (as the game draws it), behind where the train was."""
+    quarter tile, in the nearest of the track's 8 directions (as the game draws it), behind where the train was."""
     import math
     placed = place_buildings([(B("MRKT", "W", 2), 2.0, 2.0)])
     placed += place_buildings([(B("MRKT", "E", 2), 9.0, 16.0)], player=2)

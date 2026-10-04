@@ -187,16 +187,18 @@ it can leave a picture on the ground behind a moving unit, as carts leave
 wheel tracks and soldiers footprints in the snow. `rails.py` uses that, in
 place in the `.dat`:
 
-- **The train's own ground rule.** Which terrains a unit may go on is one row
-  of the terrain restriction table, which also says, per terrain, what the
-  unit leaves behind it. The train gets the row of the sea buildings (the Sea
-  Wall and Sea Tower, which no one can build; a row no unit used crashed the
-  game when a train was blocked): a copy of the Trade Cart's, so it goes exactly where the
-  Trade Cart went, that leaves a piece of track on every terrain it goes on.
-  The computer players' trains trade as before.
+- **The train's ground rule.** Which terrains a unit may go on is one row of
+  the terrain restriction table, which also says, per terrain, what the unit
+  leaves behind it. The train keeps the Trade Cart's row, so it goes, and
+  finds its way round things, exactly as the Trade Cart did; the row now
+  leaves a piece of track on every terrain. The siege weapons that shared it
+  take the foot soldiers' and cavalry's row, which lets units onto exactly the
+  same ground (in snow they leave footprints instead of wheel tracks). A row
+  of its own crashed the game whenever a train was blocked by units. The
+  computer players' trains trade as before.
 - **The track** is a graphic no unit uses (an old piece of the Galley),
   pointed at a new picture: a short straight piece of Minecraft rails, iron on
-  dark sleepers, as wide as the train's wheels, in the train's 16 directions,
+  dark sleepers, as wide as the train's wheels, in the train's 8 directions,
   on the ground layer under every unit, building and tree. Each piece lies
   behind where the train is (never ahead of it), so rails only lie where the
   train went, round buildings and trees as it went. A piece stays 5 minutes
