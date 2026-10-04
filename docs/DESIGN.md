@@ -189,8 +189,9 @@ place in the `.dat`:
 
 - **The train's own ground rule.** Which terrains a unit may go on is one row
   of the terrain restriction table, which also says, per terrain, what the
-  unit leaves behind it. The train gets a row no unit used (and that let no
-  unit anywhere): a copy of the Trade Cart's, so it goes exactly where the
+  unit leaves behind it. The train gets the row of the sea buildings (the Sea
+  Wall and Sea Tower, which no one can build; a row no unit used crashed the
+  game when a train was blocked): a copy of the Trade Cart's, so it goes exactly where the
   Trade Cart went, that leaves a piece of track on every terrain it goes on.
   The computer players' trains trade as before.
 - **The track** is a graphic no unit uses (an old piece of the Galley),
@@ -198,9 +199,10 @@ place in the `.dat`:
   dark sleepers, as wide as the train's wheels, in the train's 16 directions,
   on the ground layer under every unit, building and tree. Each piece lies
   behind where the train is (never ahead of it), so rails only lie where the
-  train went, round buildings and trees as it went. The rails stay all game
-  (a piece is shown for a day of game time). Pieces pile up where trains keep
-  passing, which may slow a long game with many trains.
+  train went, round buildings and trees as it went. A piece stays 5 minutes
+  (50 pictures of 6 seconds, the cart tracks' timing, the last five fading),
+  so rails stay while trains keep running. Pieces shown for a whole game went
+  with the crash.
 
 The game's texts call the unit **Train**, and its help text says it lays its
 own rails.

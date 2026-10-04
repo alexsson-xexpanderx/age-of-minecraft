@@ -5,21 +5,23 @@ it can leave something on the ground behind a moving unit: its terrain restricti
 picture a unit walking there leaves behind (a row's "pass graphics"). That is how carts leave wheel tracks and soldiers
 footprints in the snow (CARTSTPS: a few pictures on the ground layer, each fainter, for some seconds each, then gone).
 
-So `patch` gives the train (the Trade Cart, empty 128 and loaded 204) a row of its own: the first row of the
-restriction table no unit uses and that lets no unit anywhere, made a copy of the Trade Cart's row (it goes where the
-Trade Cart went) that leaves a piece of track on every terrain it goes on. The track is an unused graphic (one of
+So `patch` gives the train (the Trade Cart, empty 128 and loaded 204) a row of its own, made a copy of the Trade Cart's
+row (it goes where the Trade Cart went) that leaves a piece of track on every terrain it goes on. That row is the one
+only the sea buildings use (the Sea Tower, Sea Wall and Sea Gates, 785-804, which no one can build): a row the game
+has always had units on. A row no unit used (the first try) crashed the game when a train was blocked by other units. The track is an unused graphic (one of
 TRACK_GRAPHICS, an old piece of the Galley or the Trade Cog) pointed at a new SLP (`track_slp`): a straight piece of
 rails, iron on dark sleepers, as wide as the train's wheels, in 16 directions (the train's), on the ground under every
-unit. Right-click another player's Market and the train lays rails all the way there, and they stay all game: a piece
-is one picture shown for TRACK_SECONDS, a day of game time (not more: the game may count it in milliseconds, which a
-far bigger number could overflow). The player chose that knowing pieces pile up where trains keep passing, which may
-slow a long game with many trains (then the trains should lay fewer: TRACK_SPACING).
+unit. Right-click another player's Market and the train lays rails all the way there. The player wanted them to stay
+all game, but a piece shown for a day (one picture of 86400 s) went with that crash, so a piece now keeps the cart
+tracks' timing, which the game is known to handle (6 s a picture), over TRACK_FRAMES pictures: 5 minutes, the last
+30 s fading. Rails stay while trains keep running; pieces pile up where they pass (TRACK_SPACING sets how many).
 
 The trains still trade, and go, exactly where Trade Carts did, the computer players' too.
 """
 from __future__ import annotations
 
 import struct
+import zlib
 from typing import Optional
 
 import numpy as np
@@ -32,6 +34,8 @@ from .textures import Painter
 from .voxel import TILE
 
 TRAINS = (128, 204)  # the Trade Cart, empty and loaded
+SEA_BUILDINGS = range(785, 805)  # the Sea Tower, Sea Wall and Sea Gates: no one can build them
+SEA_WALL = 788
 TRADE_CART = 19  # their unit class
 HELP_STRINGS = 79000  # the .dat stores help text ids 79000 above the string's id (as gameplay.HELP_STRINGS)
 TRAIN_SCALE = 1.6  # the train's size (siege.trade_cart), which the track is as wide as
@@ -41,7 +45,8 @@ SLEEPER, IRON, IRON_EDGE = "#6b4a2b", "#c4c4c4", "#6e6e6e"
 # giant Pac-Man takes the first free one of gameplay.GIANT_GRAPHICS, which starts the other end)
 TRACK_GRAPHICS = ("GALLY_A1", "GALLY_F1", "COGXX_W1", "COGXX_A1")
 TRACK_ANGLES, TRACK_MIRRORING = 16, 12  # the train's 16 directions, the right half mirrored (a ship's wake's)
-TRACK_FRAMES, TRACK_SECONDS = 1, 86400.0  # one picture, shown for a day of game time: the rails stay all game
+TRACK_FRAMES, TRACK_SECONDS = 50, 6.0  # pictures, each shown as long as a cart track's: 5 minutes in all
+TRACK_FADING = 5  # the last pictures, fainter and fainter
 TRACK_LAYER = 10  # the ground, under every unit (the cart tracks')
 TRACK_SEQUENCE = 3  # played once (the cart tracks')
 TRACK_SPACING = 4  # how often a piece is left (the cart tracks' "replication")
@@ -80,14 +85,27 @@ _TRACK_SLPS: dict[tuple, bytes] = {}
 
 def track_frames(quant, frames: int = TRACK_FRAMES, angles: int = TRACK_ANGLES,
                  mirroring: bool = True) -> list[slp.SlpFrame]:
-    """The track's pictures: for each stored direction, the piece of rails (the same in each of its frames)."""
+    """The track's pictures: for each stored direction, the piece of rails, fainter over its last TRACK_FADING."""
     from .export import _crop, headings
     root, out = track(), []
+    fading = min(TRACK_FADING, frames - 1)
+    keep = [1.0] * (frames - fading) + [1 - (k + 1) / (fading + 1) for k in range(fading)]
     for heading in headings(angles, mirroring):
         cam = fit_camera(root, heading)
         f = render(root, heading, camera=cam, shadow=False, outline=False)
-        out += [_crop(quant.frame_codes(f, obstruction=False), cam.origin)] * frames
+        whole = _crop(quant.frame_codes(f, obstruction=False), cam.origin)
+        out += [_faded(whole, k, n) for n, k in enumerate(keep)]
     return out
+
+
+def _faded(frame: slp.SlpFrame, keep: float, seed: int) -> slp.SlpFrame:
+    """The picture with only about `keep` of its pixels left (the same ones in every direction)."""
+    if keep >= 1:
+        return frame
+    rng = np.random.default_rng(zlib.crc32(f"track fade {seed}".encode()))
+    px = frame.pixels.copy()
+    px[rng.random(px.shape) >= keep] = slp.TRANSPARENT
+    return slp.SlpFrame(px, frame.hotspot)
 
 
 def track_slp(quant, frames: int = TRACK_FRAMES, angles: int = TRACK_ANGLES, mirroring: bool = True) -> bytes:
@@ -100,10 +118,13 @@ def track_slp(quant, frames: int = TRACK_FRAMES, angles: int = TRACK_ANGLES, mir
 # --------------------------------------------------------------------------- the .dat
 
 def train_row(data: bytes, civs) -> Optional[int]:
-    """The first row of the terrain restriction table that no unit uses and that lets no unit anywhere."""
-    used = {u.values["terrain_restriction"] for units in civs.units for u in units if u is not None}
-    rows = datfile.restrictions(data)
-    return next((k for k, row in enumerate(rows) if k not in used and not any(v > 0 for v in row)), None)
+    """The row of the terrain restriction table the Sea Wall uses, if only the sea buildings use it."""
+    row = next((units[SEA_WALL].values["terrain_restriction"] for units in civs.units
+                if len(units) > SEA_WALL and units[SEA_WALL] is not None), None)
+    if row is None or row >= len(datfile.restrictions(data)):
+        return None
+    users = {u.id for units in civs.units for u in units if u is not None and u.values["terrain_restriction"] == row}
+    return row if users <= set(SEA_BUILDINGS) else None
 
 
 def _row_at(data: bytes, row: int) -> int:
@@ -142,7 +163,7 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int,
     text ids)."""
     row = train_row(bytes(data), civs)
     if row is None:
-        return None, "Trains: not changed, the terrain restriction table has no empty row for them", None
+        return None, "Trains: not changed, the sea buildings' terrain restriction row is not theirs alone", None
     gid = track_graphic(graphics, civs, taken)
     if gid is None:
         return None, f"Trains: not changed, none of {', '.join(TRACK_GRAPHICS)} is free for their rails", None
@@ -175,5 +196,5 @@ def patch(data: bytearray, civs, graphics: dict, slp_id: int,
         strings["help"] = first.values["help_id"] - HELP_STRINGS
     return (gid, row, old), (f"Trains: the Trade Carts (units {', '.join(map(str, TRAINS))}, {len(trains)} in all) "
                              f"go where they went (terrain restriction {row}, a copy of {old}) and leave rails behind "
-                             f"them, which stay all game: graphic {gid} ({g.name}) now draws SLP {slp_id} in "
-                             f"{TRACK_ANGLES} directions, shown for {TRACK_SECONDS:g} s"), strings
+                             f"them: graphic {gid} ({g.name}) now draws SLP {slp_id} in {TRACK_ANGLES} directions, "
+                             f"{TRACK_FRAMES} pictures of {TRACK_SECONDS:g} s"), strings

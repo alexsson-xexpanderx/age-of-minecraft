@@ -129,6 +129,8 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
                 out += _unit_bytes(u, 80, "DOCK", placement=(2, 35, 1, 4))
             elif u in (128, 204):
                 out += _unit_bytes(u, 70, "TCART" if u == 128 else "TCARTF", cls=19, restriction=1)
+            elif u == 788:  # the Sea Wall, which no one can build, alone on the last row
+                out += _unit_bytes(u, 80, "SWAL", cls=27, restriction=2)
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -160,7 +162,7 @@ def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> by
     """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and terrains and unit tables)."""
     b = bytearray(b"VER 5.7\0")
     restrictions, terrains = 3, 41  # the first lets units everywhere, the second on land (the first 30 terrains)
-    b += struct.pack("<HH", restrictions, terrains)  # and the last, which no unit uses, nowhere
+    b += struct.pack("<HH", restrictions, terrains)  # and the last, which only the Sea Wall uses, nowhere
     b += struct.pack(f"<{2 * restrictions}i", *([1] * 2 * restrictions))
     for k in range(restrictions):
         b += struct.pack(f"<{terrains}f", *[(1.0 if k == 0 or k == 1 and t < 30 else 0.0) for t in range(terrains)])
@@ -606,7 +608,7 @@ def test_full_build(tmp: Path):
     rms = (mod / "Script.RM" / "Team Lava Islands.rms").read_bytes().decode("latin-1")  # in the mod's own maps
     assert "#const LAVA 15" in rms and "base_terrain LAVA" in rms and "FISH" not in rms
     assert "Lava: terrain 15 ('Old Water') is lava" in report and "Docks (units 46)" in report
-    # the trains: the Trade Cart (128, 204) goes where it went, on a row of its own (the one no unit used), which
+    # the trains: the Trade Cart (128, 204) goes where it went, on a row of its own (the Sea Wall's), which
     # leaves rails behind it on every terrain it goes on: an old Galley piece, drawing the rails' own SLP
     from aom.datfile import restrictions
     after = (mod / "Data" / "empires2_x1_p1.dat").read_bytes()
@@ -614,14 +616,16 @@ def test_full_build(tmp: Path):
     assert all(c[128].values["terrain_restriction"] == c[204].values["terrain_restriction"] == 2 for c in units.units)
     assert rows[2] == rows[1]
     track = next(g for g in graphics_after.values() if g.name == "GALLY_A1")
-    assert (track.slp, track.layer, track.frame_count, track.angle_count, track.mirroring) == (15602, 10, 1, 16, 12)
-    assert track.frame_rate == 86400.0 and track.sequence_type == 3  # a day of game time: they stay all game
+    assert (track.slp, track.layer, track.frame_count, track.angle_count, track.mirroring) == (15602, 10, 50, 16, 12)
+    assert track.frame_rate == 6.0 and track.sequence_type == 3  # the cart tracks' timing, 5 minutes in all
     data = datunits.decompress(after)
     at = 12 + 8 * 3 + 2 * 41 * 20 + 4 * 41  # the trains' row's pass graphics
     left = [struct.unpack_from("<iiii", data, at + 16 * t) for t in range(41)]
     assert left[:30] == [(-1, -1, track.id, 4)] * 30 and left[30:] == [(-1, -1, -1, 0)] * 11
     rails = slp.decode(out.get(15602))
-    assert len(rails) == 9 and all((f.pixels >= 0).sum() > 100 for f in rails)  # 16 directions, 9 drawn (mirrored)
+    assert len(rails) == 9 * 50  # 16 directions, 9 drawn (the rest mirrored), 50 pictures each
+    drawn = [int((f.pixels >= 0).sum()) for f in rails[:50]]
+    assert drawn[0] == drawn[44] > drawn[45] > drawn[49] > 0  # the last five fainter and fainter
     assert "Trains: the Trade Carts (units 128, 204, 4 in all) go where they went (terrain restriction 2" in report
     assert "graphic" in report and "(GALLY_A1) now draws SLP 15602" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
@@ -997,8 +1001,8 @@ def test_rails():
     assert max(b.hi[0] for b in boxes) > rails.GAUGE  # as wide as the train's wheels
     pal = parse_jasc(fake_palette())
     frames = rails.track_frames(Quantiser(pal))
-    assert len(frames) == len(headings(16, True)) == 9
-    assert len({f.pixels.tobytes() for f in frames}) == 9  # a different picture for each direction
+    assert len(frames) == len(headings(16, True)) * 50
+    assert len({frames[50 * a].pixels.tobytes() for a in range(9)}) == 9  # a different picture for each direction
     assert len(rails.TEXTS["help"]) <= 380  # it fits where the Trade Cart's help (380 long) was
 
 
