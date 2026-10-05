@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Work in progress (2026-10-05): read `HANDOFF.md` first.** It holds the open train crash, the player's setup and
+how they like to work.
+
 ## What this is
 
 A graphics mod for Age of Empires II: The Conquerors (Gold Edition, UserPatch 1.5) that swaps every unit, building
