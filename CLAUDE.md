@@ -2,8 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Work in progress (2026-10-05): read `HANDOFF.md` first.** It holds the open train crash, the player's setup and
-how they like to work.
+**Read `HANDOFF.md` first.** It holds the player's setup, how they like to work, and the train crash's cause
+(found 2026-10-10 from Windows' error log).
 
 ## What this is
 
@@ -131,8 +131,9 @@ putting `tools/` on `sys.path`.
      exactly like it that most units use (`siege_row`: 7), so the cart tracks are the trains' alone. Their graphic
      keeps every setting (5 frames of 6 s) but its SLP (`track_slp`, written after the giant's and the fireball's:
      a straight piece of rails behind the train, never ahead, so it only lies where the train went; frame properties
-     16, as the original's). Four builds whose pieces lasted longer (a day, then 5 minutes) crashed whenever a train
-     was blocked by units, whatever else they changed. The train is drawn
+     16, as the original's). A piece must last under a minute (`rails.WHEEL`, `track_graphic` refuses longer): the
+     game files ground pieces in a 60-slot one-second wheel and writes past it for longer ones (004d5b03), corrupting
+     memory; the four builds whose pieces lasted a day, then 5 minutes, crashed so. The train is drawn
      `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
      come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.

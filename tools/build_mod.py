@@ -886,6 +886,9 @@ def retitle(data: bytes, old: str = EXE_TITLE, new: str = NAME) -> tuple[bytes, 
     return bytes(out), count
 
 
+DESKTOP: Optional[Path] = None  # where the desktop shortcut goes: None is the player's desktop (tests use a folder)
+
+
 def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
     """'Age of Minecraft' shortcuts with our icon, on the desktop and in the game folder. They start the mod's exe,
     or without one the game's exe with GAME=<mod> (UserPatch then loads Games\\<mod>.xml)."""
@@ -904,8 +907,9 @@ def make_shortcuts(game: Game, exe_ok: bool, log) -> None:
     def q(value) -> str:  # a PowerShell string
         return "'" + str(value).replace("'", "''") + "'"
 
+    desktop = "[Environment]::GetFolderPath('Desktop')" if DESKTOP is None else q(DESKTOP)
     script = ("$shell = New-Object -ComObject WScript.Shell; "
-              f"foreach ($dir in @([Environment]::GetFolderPath('Desktop'), {q(game.root)})) {{ "
+              f"foreach ($dir in @({desktop}, {q(game.root)})) {{ "
               f"$s = $shell.CreateShortcut((Join-Path $dir {q(NAME + '.lnk')})); $s.TargetPath = {q(target)}; "
               f"$s.Arguments = {q(arguments)}; $s.WorkingDirectory = {q(target.parent)}; "
               f"$s.IconLocation = {q(str(icon) + ',0')}; $s.Description = {q(NAME)}; $s.Save() }}")

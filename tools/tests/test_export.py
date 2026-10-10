@@ -25,6 +25,9 @@ from aom.export import render_frames  # noqa: E402
 from aom.palette import Quantiser, parse_jasc  # noqa: E402
 from aom.roster import ROSTER  # noqa: E402
 
+_DESKTOP = tempfile.TemporaryDirectory()  # the builds' desktop shortcuts go here, never on the real desktop
+build_mod.DESKTOP = Path(_DESKTOP.name)
+
 
 # --------------------------------------------------------------------------- fixtures
 
@@ -623,6 +626,8 @@ def test_full_build(tmp: Path):
     assert (track.layer, track.frame_count, track.angle_count, track.mirroring, track.frame_rate,
             track.sequence_type) == (before.layer, 5, before.angle_count, before.mirroring, before.frame_rate,
                                      before.sequence_type)
+    from aom import rails as rails_mod
+    assert rails_mod.lifetime(track) <= rails_mod.WHEEL  # gone within the game's minute, or the game closes
     assert next(g for g in graphics_after.values() if g.name == "GALLY_A1").slp == 2937  # the Galley piece is left alone
     data = datunits.decompress(after)
     at = 12 + 8 * 8 + 2 * 41 * 20 + 4 * 41  # the trains' row's pass graphics
@@ -805,11 +810,12 @@ def test_find_game(tmp: Path):
     unpacked.parent.mkdir(parents=True)
     assert build_mod.find_game(unpacked) == game
     assert build_mod.is_game(game) and not build_mod.is_game(tmp)
-    build_mod.SEARCH_FOLDERS.append(str(tmp))  # e.g. C:\\Games\\Age Of Empires II Gold Edition
+    saved = build_mod.SEARCH_FOLDERS, build_mod.COMMON_INSTALLS  # never the real game on this computer
+    build_mod.SEARCH_FOLDERS, build_mod.COMMON_INSTALLS = [str(tmp)], []  # e.g. C:\\Games\\Age Of Empires II Gold...
     try:
         assert build_mod.find_game(tmp / "elsewhere" / "build_mod.py") == game
     finally:
-        build_mod.SEARCH_FOLDERS.pop()
+        build_mod.SEARCH_FOLDERS, build_mod.COMMON_INSTALLS = saved
 
 
 def test_direct_mode_and_restore(tmp: Path):
@@ -1011,6 +1017,17 @@ def test_rails():
     assert len(frames) == len(headings(8, True)) * 5
     assert len({frames[5 * a].pixels.tobytes() for a in range(5)}) == 5  # a different picture for each direction
     assert len(rails.TEXTS["help"]) <= 380  # it fits where the Trade Cart's help (380 long) was
+
+
+def test_rails_last_under_a_minute():
+    """The game files a piece on the ground in a wheel of 60 one-second slots and writes past it (then closes) for a
+    piece lasting longer, so cart tracks whose pictures last too long are left alone."""
+    from aom import rails
+    from aom.datfile import Graphic
+    data = bytes(8) + struct.pack("<HH", 0, 41)  # no restriction rows leave the tracks behind
+    for seconds, ok in ((6.0, True), (11.8, True), (12.0, False), (60.0, False)):  # 5 pictures: 31 s, 60, 61, 301
+        g = Graphic(5, "CARTSTPS", "file", 4710, 10, rails.TRACK_FRAMES, 8, seconds, 0, 1, slp_at=100)
+        assert (rails.track_graphic(data, {5: g}, 2) == 5) == ok, seconds
 
 
 def test_language_files():

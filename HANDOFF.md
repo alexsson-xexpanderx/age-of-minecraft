@@ -33,7 +33,35 @@ too large to export (246 MB).
   and the map goes in the mod's `Script.RM`. Untested in game.
 - **Trains** (`tools/aom/rails.py`): see below. Built and driven in game by the player. **It crashes.**
 
-## Open problem: the game closes while trains run
+## The train crash: cause found (2026-10-10, on the Windows laptop)
+
+Windows' error log (`Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000}`) had six crashes of
+`age_of_minecraft.exe` on 2026-10-04, all access violations, at a different place each time (0x4dc179, 0x5, 0x57114d,
+0xcb23, 0x57121f, 0x439758; image base 0x400000, no relocations). Disassembling the player's exe (capstone):
+
+- 0x5710a7-0x5712a1 is a unit's "leave pass graphics behind" code: `world+0x64`[row] is the row's 16-byte records per
+  terrain (exit, enter, walk graphic id, replication as an int), `world+0x44`[id] the graphic. It calls 0x4d5890.
+- 0x4d5890 makes the ground piece. Its lifetime is `round(frames x frame time) + 1` seconds. It files the piece in a
+  wheel of **60 one-second slots** (`manager+0xc`, cursor `+0xfc`, advanced by 0x4d5d70 every 1000 ms) at
+  `cursor + lifetime`, minus 60 **once** (0x4d5b03). Lifetimes over 60 also count rounds, but the slot is never taken
+  modulo 60, so the piece's pointer is written past the wheel: over the cursor (+0xfc), the map pointer (+0x100), and
+  the heap after. Memory is corrupted and the game dies later somewhere unrelated, more quickly when a blocked train
+  drops piece after piece.
+- Crash times against commits: 18:52 (86f0eea, 86400 s), 19:04 (aada632, 300 s), 19:50 + 19:51 (5883298, 300 s),
+  22:43 + 22:48 (533719e, 300 s). fb7ca30 (31 s, pushed 22:46) was too late for the 22:48 crash, and there is no crash
+  in the log after it. So the "fb7ca30 crashed even when not blocked" report was most likely the 533719e build.
+- Vanilla tracks last 31 s, so the bug never shows in the unmodded game. That's also why Wine (tested on fb7ca30) and
+  the `--only rails` bisect (fb7ca30's rails) did not crash.
+
+Fixed in code: `rails.WHEEL` = 60, `rails.lifetime(g)`, and `track_graphic` refuses cart tracks lasting longer, so the
+trains are left unchanged instead of crashing. Test `test_rails_last_under_a_minute`.
+
+**To do:** the player builds the whole mod with `build_mod.bat` and plays their usual game to confirm no crash.
+Options to offer (don't build unasked): rails lasting up to ~54 s (9 pictures of 6 s; changes the graphic's frame
+count, which `track_graphic` now pins at 5). Truly permanent rails cannot come from pass graphics at all.
+
+Also fixed: on Windows the tests wrote an "Age of Minecraft" shortcut on the real desktop pointing at a temp folder
+(`build_mod.DESKTOP` now redirects it in tests), and `test_find_game` found the real game in `C:\Games`.
 
 ### What the trains are now (commit fb7ca30 and later)
 - The Trade Cart (units 128 empty, 204 loaded) looks like a Minecraft train: a furnace minecart pulling a chest
@@ -47,7 +75,7 @@ too large to export (246 MB).
   train to lay rails by itself when right-clicked onto another player's Market, never through buildings or trees,
   and ideally permanently. Permanence via decals isn't safe: pieces pile up.
 
-### Crash history (the player's Windows PC; "game just closes", no message)
+### Crash history (the player's Windows PC; "game just closes", no message; all explained above)
 | Build | What it had | Result |
 |---|---|---|
 | 86f0eea | new row 5 for trains, decal = GALLY_A1 (16 dirs, 1 frame of 86400 s) | crash when blocked by units |
@@ -76,14 +104,14 @@ too large to export (246 MB).
   flag `HKCU\...\Age of Empires II: The Conquerors Expansion\1.0\EULA FIRSTRUN=1` was copied from the player's own
   Wine setup, where they had accepted it. Scratchpad helper: `x.py` (shot/click/drag/key/type).
 
-### Hypotheses still open
+### Hypotheses from before the cause was found (now ruled out or moot)
 1. The **computer ally's trains**: the AI trains and sends its own trains to the player's Market. None of my tests had
    AI trains. The AI might do something with them that crashes together with the changed row/graphics.
 2. Something about the **combination**: the full build's other parts (Dragon, lava, giant, all sprites) with the trains.
    The Dragon and lava are themselves untested in game; the crash may not even be the trains'.
 3. **Windows-only behaviour.** Wine didn't crash in the same scenario.
 
-### Next steps on the Windows laptop
+### Next steps on the Windows laptop (as planned before; step 1 found the cause)
 1. After a crash, look in **Event Viewer → Windows Logs → Application** for the "Application Error" entry (faulting
    module, exception code, offset). On Windows Claude can run `Get-WinEvent -FilterHashtable @{LogName='Application';
    Id=1000} -MaxEvents 5 | Format-List` in PowerShell. This is the most valuable clue. Also look for UserPatch logs
@@ -105,6 +133,6 @@ too large to export (246 MB).
   `build_mod.apply_gameplay(..., rails=)`; texts by `build_mod.name_train`.
 - `tools/aom/siege.py` `trade_cart()`: the train model. `animation.py`: wheels 1-8 and the smoke (`SMOKE`).
 - `previews/rails.png`: trains laying rails round a wood (`concept_sheet.rails_scene`).
-- Tests: `python tools/tests/test_export.py` (17 tests, about 30 s).
+- Tests: `python tools/tests/test_export.py` (18 tests, about 30 s; all pass on Windows too).
 - With trains left out (`--no-wonder-pacman` or `--only` without `rails`), the .dat comes out byte-identical to
   before.

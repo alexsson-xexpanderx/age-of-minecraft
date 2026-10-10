@@ -15,9 +15,12 @@ two pictures fainter, each frame marked as the cart tracks' are). Each piece lie
 rails only lie where the train went, round buildings and trees as it went. Like the snow tracks, a piece is gone
 30 s after the train passed.
 
-The game crashed whenever a train was blocked by units in every build whose pieces lasted longer (a day, then
-5 minutes: a blocked train keeps nudging to and fro, leaving piece after piece where it stands, and they pile up),
-whatever else changed: a row of the trains' own, the track drawn by a borrowed graphic (an old Galley piece).
+A piece must be gone within a minute (`WHEEL`). The game keeps each piece left on the ground in a wheel of 60 one-second
+slots and files it `frames x frame time + 1` seconds ahead, wrapping round the wheel once only (age2_x1 1.0c with
+UserPatch 1.5: 004d5b03). A piece that lasts longer is written past the wheel, over the wheel's own position, its map
+and the memory after it, and the game later closes at some unrelated place. The four builds whose pieces lasted a day,
+then 5 minutes, crashed so (Windows' error log: access violations at a different place each time); the game's own
+tracks last 30 s and never reach it.
 """
 from __future__ import annotations
 
@@ -42,7 +45,8 @@ GAUGE = 6.5 * TRAIN_SCALE  # from the track's middle to each rail: under the tra
 SLEEPER, IRON, IRON_EDGE = "#6b4a2b", "#c4c4c4", "#6e6e6e"
 TRACK = "CARTSTPS"  # the cart tracks' graphic: 8 directions (mirrored), 6 s a picture, the ground layer
 TRACK_ANGLES = 8
-TRACK_FRAMES = 5  # pictures of 6 s, as the game's tracks have: 30 s (longer crashed the game)
+TRACK_FRAMES = 5  # pictures of 6 s, as the game's tracks have: 30 s
+WHEEL = 60  # the longest a piece on the ground may last, in seconds, counting the game's extra second (see above)
 TRACK_FADING = 2  # the last pictures, fainter and fainter
 TRACK_PROPERTIES = 16  # each frame's properties, as in the cart tracks' own SLP
 TRACK_SPACING = 4  # how often a piece is left (the cart tracks' "replication")
@@ -128,13 +132,18 @@ def _row_at(data: bytes, row: int) -> int:
     return 12 + 8 * rows + row * terrains * 20
 
 
+def lifetime(g) -> int:
+    """How many seconds the game keeps a piece of graphic `g` on the ground: all its pictures, plus one."""
+    return round(g.frame_count * g.frame_rate) + 1
+
+
 def track_graphic(data: bytes, graphics: dict, row: int) -> Optional[int]:
-    """The cart tracks' graphic, if it is as this build knows it (5 pictures in 8 directions, mirrored, no deltas) and
-    no row but the trains' (`row`) leaves it behind."""
+    """The cart tracks' graphic, if it is as this build knows it (5 pictures in 8 directions, mirrored, no deltas,
+    gone within the game's minute: `WHEEL`) and no row but the trains' (`row`) leaves it behind."""
     gid = next((gid for gid, g in graphics.items() if g.name.upper() == TRACK), None)
     g = graphics.get(gid)
     if (g is None or g.deltas or g.slp <= 0 or g.angle_count != TRACK_ANGLES or not g.mirroring or g.slp_at < 0
-            or g.frame_count != TRACK_FRAMES):
+            or g.frame_count != TRACK_FRAMES or not 0 < lifetime(g) <= WHEEL):
         return None
     rows, terrains = struct.unpack_from("<HH", data, 8)
     for k in range(rows):

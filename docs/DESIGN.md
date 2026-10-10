@@ -193,8 +193,7 @@ place in the `.dat`:
   finds its way round things, exactly as the Trade Cart did; the row now
   leaves a piece of track on every terrain. The siege weapons that shared it
   take the foot soldiers' and cavalry's row, which lets units onto exactly the
-  same ground (in snow they leave footprints instead of wheel tracks). A row
-  of its own crashed the game whenever a train was blocked by units. The
+  same ground (in snow they leave footprints instead of wheel tracks). The
   computer players' trains trade as before.
 - **The track** is the game's own cart tracks (which only the trains leave
   now), every setting as the game has it, with a new picture: a short
@@ -203,10 +202,12 @@ place in the `.dat`:
   unit, building and tree. Each piece lies behind where the train is (never
   ahead of it), so rails only lie where the train went, round buildings and
   trees as it went. Like the wheel tracks in the snow, a piece fades and is
-  gone 30 seconds after the train passed. Pieces that lasted longer (a day,
-  then 5 minutes) crashed the game whenever a train was blocked by units: a
-  blocked train keeps nudging to and fro, leaving piece after piece where it
-  stands.
+  gone 30 seconds after the train passed. A piece may not last a minute or
+  more: the game keeps track of everything left on the ground in a clock of
+  60 one-second places, and files a piece lasting longer past its end, over
+  other things in memory, so the game closes a little later. The builds whose
+  pieces lasted a day, then 5 minutes, closed so (Windows' error log showed
+  it). The build refuses to make cart tracks that last a minute or more.
 
 The game's texts call the unit **Train**, and its help text says it lays its
 own rails.
