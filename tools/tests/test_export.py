@@ -665,7 +665,7 @@ def test_full_build(tmp: Path):
     # lobbed lava bombs
     for civ in units.units:
         v = civ[785].values
-        assert (v["enabled"], v["train_location"], v["button"], v["projectile"], v["icon"]) == (1, 118, 14, 786, 52)
+        assert (v["enabled"], v["train_location"], v["button"], v["projectile"], v["icon"]) == (1, 118, 5, 786, 52)
         assert v["placement_terrain"] == (15, 15) and v["placement_side"] == civ[46].values["placement_side"]
         assert (v["terrain_restriction"], v["hill_mode"]) == (civ[46].values["terrain_restriction"],
                                                               civ[46].values["hill_mode"])
@@ -681,7 +681,7 @@ def test_full_build(tmp: Path):
     assert units.units[1][785].values["attack_graphic"] == looks["MFSTW"].id  # it erupts as it fires
     assert [len(slp.decode(out.get(s))) for s in (15603, 15604, 15605)] == [1, 12, 8]
     assert all(slp.info(out.get(s)).num_frames == 53 for s in (50705, 50706, 50707, 50708))  # its icon (52)
-    assert "Volcano: the Sea Tower (unit 785) for 2 civilisations, built by Villagers (button 14)" in report
+    assert "Volcano: the Sea Tower (unit 785) for 2 civilisations, built by Villagers (button 5)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()

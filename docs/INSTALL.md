@@ -197,8 +197,9 @@ can no longer be built in shallow fords (they can on lava instead). With
 `build_mod_direct.bat` the map goes into your game's `Random` folder, and
 `restore_original.bat` removes it again.
 
-**Volcanoes on the lava.** Select a Villager and open the build menu:
-**Build Volcano** is there (150 stone, 100 gold). Place it like a Dock: on the
+**Volcanoes on the lava.** Select a Villager and open **Build Military
+Building**: **Build Volcano** is in the top row, after the Siege Workshop (150
+stone, 100 gold). Place it like a Dock: on the
 lava, touching your island's beach (it can't stand on land or water); it is
 three tiles across. When enemies come within 8 tiles it erupts every 3 seconds and lobs a
 lava bomb at them: it hurts ships most, but also soldiers and villagers on the

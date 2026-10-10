@@ -41,7 +41,7 @@ too large to export (246 MB).
   build the Fish Trap (hard-coded; a test game of three variants placed none), so Villagers build them like a Dock,
   by the beach (the player chose this over turning the Fish Trap into the volcano on every map). The bombs hit
   everything in range, available from the start, 3x3 tiles. The unused Sea Tower (785) became the volcano. Not yet
-  placed in game: check the Villager's build menu has it (button 14), that it places by the beach, that the
+  placed in game: check the Villager's military build page has it (button 5), that it places by the beach, that the
   eruption plays when it fires, and that its icon shows in every age.
 
 ## The train crash: cause found (2026-10-10, on the Windows laptop)

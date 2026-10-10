@@ -138,7 +138,8 @@ putting `tools/` on `sys.path`.
      memory; the four builds whose pieces lasted a day, then 5 minutes, crashed so. The train is drawn
      `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
    - `volcano.py` makes the never-built Sea Tower (785, still a tower: class 52, so tower upgrades reach it) the
-     volcano, in place: built by Villagers (118, button 14) on the Dock's placement rules (side terrains, row, hill
+     volcano, in place: built by Villagers (118, button 5 on the military page: the page is the interface kind, 2 economic, 10 military;
+     a button 14 did not show) on the Dock's placement rules (side terrains, row, hill
      mode, copied from the unit named DOCK) with placement terrain 15, lava under its middle, 3x3. Fishing Ships cannot
      build it: the game hard-codes the Fishing Ship (13) to the Fish Trap (199) (004b9b8f and others); a test game of
      three Dock copies for Fishing Ships, on the Dock's, the Fish Trap's and the volcano's rules, placed none. It shoots

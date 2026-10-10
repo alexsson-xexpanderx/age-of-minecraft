@@ -5,7 +5,7 @@ The game has a tower made for the sea that it never lets anyone build: the Sea T
 (unit class 52), so the tower upgrades reach it: Fletching, Bodkin Arrow and Bracer, Masonry and Architecture, and
 Heated Shot against ships. `patch` makes it the volcano, in place, for every civilisation:
 
-- Villagers build it (`BUTTON` in their build menu), from the start of the game, on the lava by a beach: it takes
+- Villagers build it (`BUTTON` on their military build page), from the start of the game, on the lava by a beach: it takes
   the Dock's rules (the beach next to it, the ground it may cover, how level), with the tile under its middle on the
   lava (its placement terrain, the rule that keeps a Dock on water). Fishing Ships cannot build it: the game lets a
   Fishing Ship build the Fish Trap alone (it checks for the Fish Trap's unit, 004b9b8f among others), and a test
@@ -43,7 +43,9 @@ SHOTS = (786, 787)  # the Sea Tower's own shots, which nothing shoots (it shot t
 LOOK = "STWR"  # the Sea Tower's graphics' names
 VILLAGER = 118  # where buildings say Villagers build them
 DOCK = "DOCK"  # the Dock's unit name: the volcano takes its placement rules
-BUTTON = 14  # in a Villager's build menu: the buildings take 1-13 on both pages, 15 is the menu's way back
+# in a Villager's build menu, on the page its interface kind picks (10, a tower's: the military buildings; 2 is
+# the economic ones), where 5 is free: the Siege Workshop has 4, the Outpost 6 (a 14th button did not show)
+BUTTON = 5
 LAVA = 15  # the terrain (lava.LAVA)
 COST = (2, 150, 1, 3, 100, 1, -1, 0, 0)  # 150 stone, 100 gold
 TIME = 60  # seconds to build

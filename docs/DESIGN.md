@@ -186,8 +186,8 @@ tower made for the sea that it never lets anyone build, the Sea Tower;
 `volcano.py` makes it the volcano, in place in the `.dat`, for every
 civilisation:
 
-- **Where.** Villagers build it, from the start of the game, the way they
-  build a Dock: on the lava next to a beach, with lava under its middle. No
+- **Where.** Villagers build it (on their military build page), from the
+  start of the game, the way they build a Dock: on the lava next to a beach, with lava under its middle. No
   ordinary map has lava, so it is only built on Team Lava Islands. It is
   three tiles across, as big as a Barracks: 150 stone and 100 gold, 1 minute
   to build, 1500 hit points. (Fishing Ships were the first idea, out on the
