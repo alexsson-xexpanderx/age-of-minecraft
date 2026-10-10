@@ -332,13 +332,14 @@ def buildings_sheet(out: Path) -> None:
              ("Stable", "STBL", 3), ("Blacksmith", "BLAC", 3), ("Market", "MRKT", 3), ("Monastery", "CRCH", 3),
              ("University", "UNIV", 3), ("Siege workshop", "SIWS", 3), ("Dock", "DOCK", 3)]
     rows = [("Dark Age", [(name, B(code, "G", 1)) for name, code, _ in types
-                          if code in ("HOUS", "RTWC", "MILL", "DOCK")])]
-    rows.append(("Feudal (West)", [(name, B(code, "W", 2)) for name, code, _ in types[:8]]))
+                          if code in ("HOUS", "RTWC", "MILL", "DOCK", "BRKS")])]
+    feudal = [t for t in types if t[1] not in ("CRCH", "UNIV", "SIWS")]  # those come in the Castle Age
     for key, label in STYLES:
-        rows.append((label, [(name, B(code, key, age)) for name, code, age in types]))
+        rows.append((f"{label}, Feudal", [(name, B(code, key, 2)) for name, code, _ in feudal]))
+        rows.append((f"{label}, Castle", [(name, B(code, key, age)) for name, code, age in types]))
     rows.append(("Imperial", [(label, B("RTWC", key, 4)) for key, label in STYLES]
-                 + [(f"University {key}", B("UNIV", key, 4)) for key, _ in STYLES[:3]]))
-    structure_sheet("Buildings: one design per building, five village styles, materials upgrade with each age",
+                 + [(f"University {key}", B("UNIV", key, 4)) for key, _ in STYLES]))
+    structure_sheet("Buildings: each of the five sets builds in its own way, its materials upgrade with each age",
                     rows, out)
 
 
@@ -564,7 +565,8 @@ def farms_sheet(out: Path, units: dict[str, Unit]) -> None:
     folk = [("villager_farmer", 1, 10.8, -10.2, 1, "attack", 0.6)]
     tmp = out.with_suffix(".tmp.png")
     x0, _ = compose(place_units(folk, units), tmp, k=1, margin=12, fields=fields)
-    img = Image.open(tmp)
+    with Image.open(tmp) as opened:  # read it all before deleting: Windows cannot delete an open file
+        img = opened.copy()
     tmp.unlink()
     head, foot = 34, 24
     canvas = Image.new("RGB", (img.width, img.height + head + foot), PAPER)
@@ -751,7 +753,7 @@ def unit_table(units: dict[str, Unit], out: Path) -> None:
         lines += [f"| {u.replaces} | {u.name} | {u.civ or ''} |" for u in group]
         lines += [""]
     lines.insert(5, f"**{total} units.** Villager jobs share one model per job for both genders.\n")
-    out.write_text("\n".join(lines))
+    out.write_text("\n".join(lines), newline="\n")  # the same file when made on Windows
 
 
 def pacman_sounds(out: Path) -> None:

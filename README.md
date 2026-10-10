@@ -80,7 +80,8 @@ tools/aom/animals.py     sheep, chicken, goat, hoglin, pig, wolf, ocelot, phanto
 tools/aom/roster.py      the full roster and preview groups
 tools/aom/blocks.py      Minecraft block textures (woods, stones, ores, glass, leaves, workstations)
 tools/aom/voxel.py       block structures: shapes (stairs, slabs, fences, walls, panes), roofs, domes
-tools/aom/styles.py      the five village styles and their materials per age
+tools/aom/styles.py      the five building sets' materials per age
+tools/aom/architecture.py  how each set builds: platforms, walls, roofs, doors and towers
 tools/aom/structures.py  houses, town center, mill, camps, barracks, range, stable, market, dock...
 tools/aom/fortifications.py  walls, gates, towers and castles
 tools/aom/wonders.py     the eighteen wonders and scenario monuments

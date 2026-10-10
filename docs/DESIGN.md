@@ -78,39 +78,40 @@ tower's wool cap. All sheets: `previews/buildings.png`,
 `previews/fortifications.png`, `previews/wonders.png`, `previews/nature.png`,
 `previews/farms.png`.
 
-### Five village styles, four ages
+### Five building sets, four ages
 
-AoE2 draws buildings in five regional styles plus a shared Dark Age look.
-Each becomes a Minecraft village style, and each age upgrades the materials:
+AoE2 gives every civilisation one of five building sets, plus one Dark Age
+look for everyone. Each set builds in its own way, so a set's buildings
+differ in shape, not only in colour, and each age upgrades the materials:
 
-| AoE2 style | Minecraft style | Materials |
-|---|---|---|
-| Dark Age (everyone) | log cabins | oak logs, cobblestone, thatched hay roofs |
-| West European | Plains village | oak and cobblestone, then half-timbered plaster under brick roofs |
-| Central European | Taiga village | spruce and mossy stone under slate (deepslate tile) roofs |
-| Middle Eastern | Desert village | sandstone with crenellated flat roofs, terracotta domes, striped awnings |
-| Asian | cherry and bamboo | white walls, red pillars, dark roofs with upturned eaves |
-| Meso-American | Jungle temple | mossy stone bricks, jungle wood, thatch, gold |
+| Set (civilisations) | How it builds |
+|---|---|
+| Dark Age (everyone) | log cabins: oak logs, cobblestone, thatched hay roofs |
+| West European (Britons, Franks, Celts, Spanish) | timber-framed walls, the upper storey jutting out over the street, red tile gables, stone towers with pointed spires; wood in the Feudal Age, white plaster between dark timbers in the Castle Age, a stone ground floor in the Imperial Age |
+| Central European (Goths, Teutons, Vikings, Huns) | log halls on a stone footing, the logs crossing at the corners, low walls under steep roofs that come down to them, carved posts on the gables, stave-church towers of stacked eaves; turf on some Feudal houses, slate roofs from the Castle Age |
+| Middle Eastern (Byzantines, Persians, Saracens, Turks) | mud brick in the Feudal Age, then sandstone with a turquoise tile band (deep blue in the Imperial Age); flat roofs behind battlements, domes, tall gateway portals round the doors, minarets, wind towers on houses |
+| East Asian (Japanese, Chinese, Mongols, Koreans) | a stone platform with steps up the front, red pillars and a veranda, white walls, roofs in two tiers with upturned corners and gold ridge ends, pagodas |
+| Mesoamerican (Aztecs, Mayans) | thatched mud huts in the Feudal Age (plastered and painted later); from the Castle Age, stone buildings on stepped platforms with a stair up the front, a carved band and a painted band, a roof comb on top, stepped pyramids |
 
-Ages: Feudal is planks and cobblestone, Castle stone bricks, Imperial polished
-stone with gold trim (and corner towers on the Town Center).
+Ages: Feudal is wood, mud and cobblestone, Castle stone and plaster,
+Imperial polished stone with gold and blue.
 
 ### Building mapping
 
 | AoE2 building | Minecraft build |
 |---|---|
-| House | a cottage (three variants, like the game's three house frames) |
-| Town Center | village hall with a bell tower; domed in the desert, stepped in the jungle |
-| Mill | windmill with turning wool sails (Dark Age: a grinding hut with a grindstone) |
+| House | a home in its set's manner (three variants, like the game's three house frames): a two-storey timber house or a cottage, a log cabin, a house on a platform, a flat-roofed house with an upper room or a wind tower, a square or round thatched hut |
+| Town Center | the village's hall: a timber hall with a spired bell tower, a farmstead of two log halls, a hall with a pagoda behind it, a domed courtyard house between two minarets, a great thatched hall and then a temple on a stepped platform |
+| Mill | windmill with turning wool sails, its tower in its set's manner (Dark Age: a grinding hut with a grindstone) |
 | Farm | Minecraft farmland with wheat (see *Farms* below) |
 | Lumber / Mining Camp | an open shed with log piles and a chopping block / a minecart on rails with ore |
 | Barracks | a hall with a fenced training yard and armour stands |
 | Archery Range | target blocks on hay bales and a fletching table |
 | Stable | a barn with hay, a water trough and a paddock |
 | Blacksmith | a stone forge with a chimney, anvil, blast furnace, lava and rising smoke |
-| Market | stalls with striped wool awnings, barrels, chests and an emerald block |
-| Monastery | a chapel with stained glass and a bell tower |
-| University | a library of bookshelves with an enchanting table |
+| Market | a trading hall and stalls (striped wool awnings, tiled roofs with lanterns, or thatch), barrels, chests and an emerald block |
+| Monastery | a stone chapel with a spired bell tower, a stave church, a temple hall with a tall pagoda, a domed hall with a minaret, or a stepped pyramid with a shrine on top |
+| University | a library of bookshelves with an enchanting table, and its set's tower, dome, pagoda or round observatory |
 | Siege Workshop | pistons, dispensers, TNT and logs |
 | Dock | a plank pier with a boathouse, barrels and a crane |
 | Fish Trap | a ring of fences and nets with fish |
@@ -119,7 +120,7 @@ stone with gold trim (and corner towers on the Town Center).
 | Outpost | a lookout post with a torch |
 | Palisade / Stone / Fortified Wall | spruce stakes / cobblestone wall / stone bricks with battlements; diagonal walls are block staircases; ends and corners are pillars filling the tile, so every wall line joins up |
 | Gates | an arch with an iron-bar portcullis, down when shut and up when open, between two towers |
-| Castle | curtain walls, four corner towers, a gatehouse and a keep, in the civilisation's style |
+| Castle | curtain walls, four corner towers, a gatehouse and a keep, in the civilisation's set: Central European towers carry an overhanging timber gallery under a steep spire |
 | Wonders | one per civilisation: Westminster, Chartres, Hagia Sophia, the Temple of Heaven, Templo Mayor, Tikal, Hwangnyongsa and the rest |
 | Building sites, rubble | scaffolding on a foundation; scattered cobblestone and gravel |
 

@@ -1004,6 +1004,21 @@ def test_lava_map():
     assert lava.ground(50, 30).shape == (30, 50, 4) and (lava.ground(50, 30)[..., 3] == 255).all()
 
 
+def test_building_sets_differ_in_shape():
+    """Each building set builds in its own way: in every age, the five sets' versions of a building take up
+    different blocks, not only different materials; the Dark Age look stays one design for all."""
+    from aom import structures as ST
+    from aom.fortifications import castle
+    makers = [ST.house, ST.town_center, ST.mill, ST.lumber_camp, ST.mining_camp, ST.barracks, ST.archery_range,
+              ST.stable, ST.blacksmith, ST.market, ST.monastery, ST.university, ST.siege_workshop, ST.dock, castle]
+    for make in makers:
+        for age in (2, 3, 4):
+            shapes = {key: frozenset(make(key, age).blocks) for key in "WEFMX"}
+            assert len(set(shapes.values())) == 5, (make.__name__, age)
+    for make in (ST.house, ST.town_center, ST.mill, ST.barracks, ST.dock):
+        assert len({frozenset(make(key, 1).blocks.items()) for key in "WEFMXG"}) == 1, make.__name__
+
+
 def test_rails():
     """A piece of track lies behind where the train is (it never reaches ahead, so never round a corner into a
     building or a tree), in every direction the train faces."""

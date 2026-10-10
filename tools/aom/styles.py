@@ -38,6 +38,7 @@ class Style:
     fence: str  # fence wood
     cloth: str  # awnings, rugs
     dome: str  # domes and spires
+    age: int = 2  # the age these materials are for (architecture.py builds differently as the ages go by)
 
     @property
     def planks(self) -> str:
@@ -74,7 +75,11 @@ def style_for(key: str, age: int) -> Style:
     """The style's materials for an age (1 Dark, 2 Feudal, 3 Castle, 4 Imperial)."""
     s = STYLES.get(key, W)
     if s.key == "G" or age <= 1:
-        return G
+        return replace(G, age=1)
+    return replace(_materials(s, age), age=min(4, age))
+
+
+def _materials(s: Style, age: int) -> Style:
     if age == 2:
         return {
             "W": replace(s, wall="oak_planks", wall_hi="oak_planks", roof="spruce_planks", roof_cap="spruce_planks"),

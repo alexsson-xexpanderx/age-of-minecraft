@@ -1,15 +1,18 @@
 """The economic and military buildings, in every style and age.
 
-Every building is one design parameterised by a `Style` (see styles.py);
-the age picks the style's materials. Footprints follow the game (one AoE2
-tile is about 2.83 blocks): 1x1 -> 3 blocks, 2x2 -> 5, 3x3 -> 8, 4x4 -> 11,
-5x5 -> 14. The origin is the footprint centre, which lands on the sprite's
-hotspot.
+Each building says what it is (a barracks has a training yard, a stable a paddock); its building set says how it is
+built (architecture.py: timber frames, log halls, pagodas, domes, stepped platforms), and the age picks the set's
+materials (styles.py). The Dark Age look, shared by every civilisation, is one design for all (the `_dark_*`
+builders). Footprints follow the game (one AoE2 tile is about 2.83 blocks): 1x1 -> 3 blocks, 2x2 -> 5, 3x3 -> 8,
+4x4 -> 11, 5x5 -> 14. The origin is the footprint centre, which lands on the sprite's hotspot.
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
+from . import architecture as A
 from . import voxel as V
 from .geometry import Part, cuboid
 from .styles import Style, style_for
@@ -118,8 +121,79 @@ def log_pile(s: V.Structure, x: int, y: int, z: int, n: int, wood: str = "oak", 
 # --------------------------------------------------------------------------- houses
 
 def house(style: str, age: int, variant: int = 0) -> V.Structure:
-    """House (2x2): a 5x5 cottage. Three variants, like the three house frames in the game."""
+    """House (2x2): a 5x5 home. Three variants, like the three house frames in the game."""
     st = style_for(style, age)
+    if st.key == "G":
+        return _dark_house(st, variant)
+    s = _s("house", 5)
+    v = variant % 3
+    k = st.key
+    if k == "W":  # two storeys, the upper one jutting out; or a cottage with a chimney
+        if v == 2:
+            top = A.hall(s, st, 0, 0, 4, 4, 0, 3, axis="y")
+            A.door(s, st, 1, 4, 1, "+y")
+            chimney(s, 1, 1, 2, top, "bricks")
+        else:
+            A.hall(s, st, 0, 0, 3, 3, 0, 4, axis="x" if v == 0 else "y")
+            A.door(s, st, 1, 3, 1, "+y")
+        team_banner(s, 4.95, 1.5, 3, "+x", seed=f"h{v}", height=16)
+    elif k == "E":  # a log cabin under a steep roof (turf in the Feudal Age), the door in the gable end
+        sty = replace(st, roof="moss_block", roof_cap="moss_block") if v == 1 and st.age <= 2 else st
+        axis = "y" if v == 2 else "x"
+        A.hall(s, sty, 0, 0, 4, 4, 0, 3, axis=axis)
+        A.door(s, st, 4, 2, 1, "+x") if axis == "x" else A.door(s, st, 2, 4, 1, "+y")
+        if v == 2:
+            log_pile(s, 5, 0, 0, 2, st.wood, axis="y")
+        team_banner(s, 4.95, 0.8, 2.6, "+x", seed=f"h{v}", height=14) if axis == "x" else \
+            team_banner(s, 0.8, 4.95, 2.6, "+y", seed=f"h{v}", height=14)
+    elif k == "F":  # on a platform, a veranda, two tiers of roof
+        z, (x0, y0, x1, y1) = A.ground(s, st, 0, 0, 4, 4)
+        A.hall(s, st, x0, y0, x1, y1, z, 3)
+        if v == 1:
+            A.door(s, st, x1, 1, z, "+x")
+        else:
+            A.door(s, st, 1 + (v == 2), y1, z, "+y")
+        lantern(s, 4.6, 4.6, z)
+        team_banner(s, x1 + 0.95, 1.5, z + 2.6, "+x", seed=f"h{v}", height=14)
+    elif k == "M":  # flat roofs: a tall house, a house with an upper room, a house with a wind tower
+        if v == 0:
+            top = A.hall(s, st, 0, 0, 4, 4, 0, 4)
+            if st.age >= 3:
+                A.dome(s, st, 2.5, 2.5, top - 1, 1.5)
+        else:
+            A.hall(s, st, 0, 0, 4, 4, 0, 3)
+            if v == 1:
+                A.hall(s, st, 0, 0, 2, 2, 3, 3)
+            else:  # a wind tower catching the breeze through slits near its top
+                s.fill(0, 0, 3, 1, 1, 6, "mud_bricks" if st.age <= 2 else st.wall)
+                for z in (5, 6):
+                    V.window(s, 1, 0, z, "+x", "iron_bars")
+                    V.window(s, 0, 1, z, "+y", "iron_bars")
+                s.fill(0, 0, 7, 1, 1, 7, "packed_mud" if st.age <= 2 else st.base, "slab")
+        A.door(s, st, 2, 4, 1, "+y")
+        team_banner(s, 4.95, 1.5, 3, "+x", seed=f"h{v}", height=16)
+    else:  # X: a thatched hut, square or round; plastered and painted from the Castle Age
+        if v == 1:
+            wall = A.daub(st)
+            s.cylinder(2.5, 2.5, 2.4, 0, 2, wall)
+            s.cylinder(2.5, 2.5, 2.4, 0, 0, st.base)
+            if st.age >= 3:
+                s.cylinder(2.5, 2.5, 2.4, 2, 2, "red_terracotta")
+            s.cone(2.5, 2.5, 3, 3.3, "hay", step=0.55)
+            s.set(2, 2, s.height(), st.log, "post")
+            V.door(s, 2, 4, 1, "+y", st.wood)
+        else:
+            A.hall(s, st, 0, 0, 4, 4 if v == 0 else 3, 0, 3, simple=True)
+            A.door(s, st, 2, 4 if v == 0 else 3, 1, "+y")
+            if v == 2:
+                s.set(1, 4, 0, "composter")
+                s.set(3, 4, 0, "hay")
+        team_banner(s, 4.95, 1.5, 2.8, "+x", seed=f"h{v}", height=14)
+    return s
+
+
+def _dark_house(st: Style, variant: int) -> V.Structure:
+    """The Dark Age house (and the shared design before the sets had their own)."""
     s = _s("house", 5)
     v = variant % 3
     if st.key == "M":
@@ -171,77 +245,106 @@ def house(style: str, age: int, variant: int = 0) -> V.Structure:
 
 # --------------------------------------------------------------------------- town center
 
+def _banners(s: V.Structure, x1: float, y1: float, ys, xs, z: float, seed: str, height: float = 22) -> None:
+    """Team banners on the +x face at x1 (one at each y in ys) and on the +y face at y1 (one at each x in xs)."""
+    for n, y in enumerate(ys):
+        team_banner(s, x1 + 0.95, y, z, "+x", seed=f"{seed}x{n}", height=height)
+    for n, x in enumerate(xs):
+        team_banner(s, x, y1 + 0.95, z, "+y", seed=f"{seed}y{n}", height=height)
+
+
 def town_center(style: str, age: int) -> V.Structure:
-    """Town Center (4x4): an 11x11 village hall with a bell tower."""
+    """Town Center (4x4): the village's hall and its tower, on an 11x11 footprint."""
     st = style_for(style, age)
+    if st.key == "G":
+        return _dark_town_center(st)
+    s = _s("town_center", 11)
+    k = st.key
+    ox, oy = s.origin
+    if k == "W":  # a two-storey timber hall, a stone bell tower with a spire rising from its roof
+        s.fill(0, 0, 0, 10, 10, 0, st.base)
+        top = A.hall(s, st, 0, 0, 9, 9, 1, 5, axis="x")
+        A.door(s, st, 4, 9, 2, "+y", double=True)
+        A.tower(s, st, 4, 4, 3, 1, top + 1)
+        s.extras += V.bell_boxes(((5.5 - ox) * B, (5.5 - oy) * B, (top + 1) * B - 2))
+        _banners(s, 10, 10, (2.5, 8), (2.5, 8.5), 6, "tc", 26)
+    elif k == "E":  # a farmstead: a log longhouse under a huge steep roof, a smaller hall at right angles to it
+        A.hall(s, st, 0, 0, 10, 5, 0, 5, axis="x")
+        A.door(s, st, 10, 2, 1, "+x", double=True)
+        A.hall(s, st, 0, 7, 4, 10, 0, 4, axis="y")
+        A.door(s, st, 2, 10, 1, "+y")
+        log_pile(s, 7, 9, 0, 3, st.wood)
+        log_pile(s, 7, 10, 0, 2, st.wood)
+        s.set(9, 8, 0, "hay")
+        _banners(s, 10, 5, (1.2, 4.4), (), 4, "tc", 26)
+        team_banner(s, 4.95, 8.2, 3, "+x", seed="tct", height=18)
+    elif k == "F":  # a hall on a platform, a pagoda behind it
+        z, (x0, y0, x1, y1) = A.ground(s, st, 0, 0, 10, 10)
+        A.hall(s, st, 3, 2, x1, y1, z, 4)
+        A.door(s, st, 5, y1, z, "+y", double=True)
+        A.tower(s, st, 0, 0, 3, z, 8)
+        for x, y in ((0.6, 10.4), (10.4, 0.6)):
+            lantern(s, x, y, z)
+        _banners(s, x1, y1, (4.5, 7.5), (4, 8.5), z + 4, "tc", 24)
+    elif k == "M":  # a courtyard house with a great dome, a minaret at each side corner
+        s.fill(0, 0, 0, 10, 10, 0, st.base if st.age >= 3 else "packed_mud")
+        top = A.hall(s, st, 1, 1, 9, 9, 0, 5)
+        A.dome(s, st, 5.5, 5.5, top - 1, 3.2)
+        A.door(s, st, 5, 9, 1, "+y")
+        awning(s, 1, 3, 10, 3, st.cloth)
+        awning(s, 7, 9, 10, 3, st.cloth)
+        A.tower(s, st, 9, 0, 2, 0, 9)
+        A.tower(s, st, 0, 9, 2, 0, 9)
+        _banners(s, 9, 9, (3.5, 7), (), 4, "tc", 26)
+    elif A.thatched(st, simple=False):  # X, Feudal: a great thatched hall
+        A.hall(s, st, 1, 2, 9, 8, 0, 4)
+        A.door(s, st, 4, 8, 1, "+y", double=True)
+        for x, y in ((0.5, 10.5), (10.5, 0.5), (10.5, 10.5)):
+            torch(s, x, y, 0)
+        _banners(s, 9, 8, (4.5,), (2.5, 7.5), 3.8, "tc", 22)
+    else:  # X: a temple on a stepped platform, a stair up the front
+        z, (x0, y0, x1, y1) = A.ground(s, st, 0, 0, 10, 10)
+        A.hall(s, st, x0 + 1, y0 + 1, x1 - 1, y1 - 1, z, 4)
+        A.door(s, st, 5, y1 - 1, z, "+y")
+        for x, y in ((0.5, 10.5), (10.5, 0.5), (10.5, 10.5), (0.5, 0.5)):
+            torch(s, x, y, 1)
+        _banners(s, x1 - 1, y1 - 1, (4.5,), (3.5,), z + 2.8, "tc", 20)
+    return s
+
+
+def _dark_town_center(st: Style) -> V.Structure:
+    """The Dark Age Town Center: a framed village hall with a bell tower."""
     s = _s("town_center", 11)
     s.fill(0, 0, 0, 10, 10, 0, st.base)
-    if st.key == "M":
-        walls(s, st, 1, 1, 9, 9, 0, 4, corners=False)
-        for y in (3, 5, 7):
-            V.window(s, 9, y, 2, "+x")
-        for x in (3, 7):
-            V.window(s, x, 9, 2, "+y")
-        V.door(s, 5, 9, 1, "+y", "acacia")
-        s.fill(1, 1, 5, 9, 9, 5, st.wall_hi)
-        for x in range(1, 10):
-            for y in range(1, 10):
-                if (x in (1, 9) or y in (1, 9)) and (x + y) % 2 == 0:
-                    s.set(x, y, 6, st.base)
-        s.dome(5.5, 5.5, 6, 3.2, st.dome, squash=1.1)
-        s.set(5, 5, 10, st.accent)
-        for x, y in ((1, 1), (9, 1), (1, 9), (9, 9)):
-            s.fill(x, y, 5, x, y, 7, st.stone2)
-        awning(s, 2, 8, 10, 3, "orange_wool")
-        top = 11
-    elif st.key == "X":
-        s.fill(0, 0, 1, 10, 10, 1, st.base)
-        s.fill(1, 1, 2, 9, 9, 2, st.wall)
-        s.fill(2, 2, 3, 8, 8, 5, st.wall_hi)
-        for y in (4, 6):
-            V.window(s, 8, y, 4, "+x")
-        V.door(s, 5, 8, 3, "+y", "jungle")
-        for x in range(0, 11):
-            s.set(x, 10, 1, st.wall, "stair_+y")
-        V.hip_roof(s, 2, 8, 2, 8, 6, "hay")
-        top = 11
-        for x, y in ((1, 1), (9, 1), (1, 9), (9, 9)):
-            torch(s, x + 0.5, y + 0.5, 3)
-    else:
-        # ground floor with a triple door on the +y side
-        walls(s, st, 0, 0, 10, 10, 1, 3, wall=st.base if age >= 3 else st.wall)
-        for x in (3, 7):
-            s.fill(x, 10, 1, x, 10, 3, st.trim)
-        V.door(s, 4, 10, 1, "+y", st.wood if st.key != "G" else "oak", double=True)
-        V.door(s, 6, 10, 1, "+y", st.wood if st.key != "G" else "oak")
-        for y in (2, 5, 8):
-            V.window(s, 10, y, 2, "+x")
-        for x in (1, 9):
-            V.window(s, x, 10, 2, "+y")
-        # upper floor
-        walls(s, st, 0, 0, 10, 10, 4, 5, wall=st.wall_hi if age >= 3 else st.wall, base=False)
-        for x, y in ((5, 10), (10, 5)):
-            s.fill(x, y, 4, x, y, 5, st.trim)
-        for y in (2, 3, 7, 8):
-            V.window(s, 10, y, 5, "+x")
-        for x in (2, 3, 7, 8):
-            V.window(s, x, 10, 5, "+y")
-        top = roof(s, st, 0, 0, 10, 10, 6, axis="x")
+    # ground floor with a triple door on the +y side
+    walls(s, st, 0, 0, 10, 10, 1, 3)
+    for x in (3, 7):
+        s.fill(x, 10, 1, x, 10, 3, st.trim)
+    V.door(s, 4, 10, 1, "+y", "oak", double=True)
+    V.door(s, 6, 10, 1, "+y", "oak")
+    for y in (2, 5, 8):
+        V.window(s, 10, y, 2, "+x")
+    for x in (1, 9):
+        V.window(s, x, 10, 2, "+y")
+    # upper floor
+    walls(s, st, 0, 0, 10, 10, 4, 5, wall=st.wall, base=False)
+    for x, y in ((5, 10), (10, 5)):
+        s.fill(x, y, 4, x, y, 5, st.trim)
+    for y in (2, 3, 7, 8):
+        V.window(s, 10, y, 5, "+x")
+    for x in (2, 3, 7, 8):
+        V.window(s, x, 10, 5, "+y")
+    top = roof(s, st, 0, 0, 10, 10, 6, axis="x")
     # bell tower
-    if st.key not in ("M", "X"):
-        z0 = top - 3
-        s.fill(4, 4, z0, 6, 6, top - 1, st.wall_hi)
-        for x, y in ((4, 4), (4, 6), (6, 4), (6, 6)):
-            s.fill(x, y, top, x, y, top + 2, st.trim if st.key != "G" else "oak_log", "post")
-        s.fill(4, 4, top + 3, 6, 6, top + 3, st.roof if st.key != "G" else "spruce_planks", "slab")
-        s.set(5, 5, top + 3, st.roof_cap if st.key != "G" else "spruce_planks")
-        s.set(5, 5, top + 4, "player_wool", "slab")
-        ox, oy = s.origin
-        s.extras += V.bell_boxes(((5.5 - ox) * B, (5.5 - oy) * B, (top + 2) * B + 12))
-    if age >= 4:
-        for x, y in ((0, 0), (0, 10), (10, 0), (10, 10)):
-            s.fill(x, y, 1, x, y, 7, st.stone)
-            s.set(x, y, 8, st.accent)
+    z0 = top - 3
+    s.fill(4, 4, z0, 6, 6, top - 1, st.wall_hi)
+    for x, y in ((4, 4), (4, 6), (6, 4), (6, 6)):
+        s.fill(x, y, top, x, y, top + 2, "oak_log", "post")
+    s.fill(4, 4, top + 3, 6, 6, top + 3, "spruce_planks", "slab")
+    s.set(5, 5, top + 3, "spruce_planks")
+    s.set(5, 5, top + 4, "player_wool", "slab")
+    ox, oy = s.origin
+    s.extras += V.bell_boxes(((5.5 - ox) * B, (5.5 - oy) * B, (top + 2) * B + 12))
     team_banner(s, 10.95, 2.5, 4, "+x", seed="tc1", height=26)
     team_banner(s, 10.95, 8.5, 4, "+x", seed="tc2", height=26)
     team_banner(s, 2.5, 10.95, 4, "+y", seed="tc3", height=26)
@@ -255,7 +358,7 @@ def mill(style: str, age: int, t: float = 0.0, part: str = "all") -> V.Structure
     """Mill (2x2): a windmill whose wool sails turn. `part`: all, body or sails."""
     st = style_for(style, age)
     s = _s("mill", 5)
-    if age <= 1:
+    if st.key == "G":
         # Dark Age: an open grinding hut with hay and a grindstone
         for x, y in ((0, 0), (0, 4), (4, 0), (4, 4)):
             s.fill(x, y, 0, x, y, 2, "oak_log")
@@ -265,20 +368,46 @@ def mill(style: str, age: int, t: float = 0.0, part: str = "all") -> V.Structure
         s.set(3, 1, 0, "hay")
         s.set(3, 3, 0, "composter")
         return s
+    k = st.key
+    front, z = (3, 1) if k == "F" else (4, 0)  # the wall the sails turn in front of, the ground floor
     if part in ("all", "body"):
-        body = st.base if st.key in ("E", "W", "F") else st.wall
-        s.cylinder(2.5, 2.5, 2.3, 0, 4, body)
-        s.cylinder(2.5, 2.5, 2.0, 5, 6, st.wall_hi if st.key != "X" else st.wall)
-        V.door(s, 2, 4, 0, "+y", st.wood)
-        V.window(s, 4, 2, 3, "+x")
-        s.cone(2.5, 2.5, 7, 2.2, st.roof if st.key not in ("M", "X") else st.dome, step=0.8)
-        s.set(3, 4, 0, "hay")
-        s.set(4, 3, 0, "hay")
-        s.set(4, 4, 0, "composter")
-        if age >= 3:
-            s.fill(1, 1, 0, 1, 1, 1, "hay")
+        if k == "W":  # a round stone tower, a plastered top, a pointed red cap
+            s.cylinder(2.5, 2.5, 2.3, 0, 4, st.base)
+            s.cylinder(2.5, 2.5, 2.0, 5, 6, st.wall_hi)
+            s.cone(2.5, 2.5, 7, 2.2, st.roof, step=0.8)
+        elif k == "E":  # a wooden smock mill under a steep shingled cap
+            logs = (f"{st.wood}_wood", f"stripped_{st.wood}_log")
+            s.cylinder(2.5, 2.5, 2.4, 0, 0, st.base)
+            for zz in range(1, 7):
+                s.cylinder(2.5, 2.5, 2.4 - 0.08 * zz, zz, zz, logs[zz % 2])
+            s.cone(2.5, 2.5, 7, 2.4, st.roof, step=0.4)
+            s.set(2, 2, s.height(), st.log, "post")
+        elif k == "F":  # a square tower on a platform, two tiers of roof
+            zz, (x0, y0, x1, y1) = A.ground(s, st, 0, 0, 4, 4)
+            A.hall(s, st, x0, y0, x1, y1, zz, 5)
+        elif k == "M":  # a mud-brick (later sandstone) tower with a dome
+            wall = "mud_bricks" if st.age <= 2 else st.wall
+            s.cylinder(2.5, 2.5, 2.3, 0, 6, wall)
+            if st.age >= 3:
+                s.cylinder(2.5, 2.5, 2.3, 6, 6, A.tiles(st))
+            A.dome(s, st, 2.5, 2.5, 7, 1.7)
+        else:  # X: a plastered tower under a thatched cone
+            s.cylinder(2.5, 2.5, 2.3, 0, 6, A.daub(st))
+            s.cylinder(2.5, 2.5, 2.3, 0, 0, st.base)
+            s.cone(2.5, 2.5, 7, 3.0, "hay", step=0.5)
+            s.set(2, 2, s.height(), st.log, "post")
+        V.door(s, 2, front, z, "+y", st.wood)
+        V.window(s, front, 2, z + 3, "+x")
+        if k == "F":
+            s.set(4, 4, 1, "composter")
+        else:
+            s.set(3, 4, 0, "hay")
+            s.set(4, 3, 0, "hay")
+            s.set(4, 4, 0, "composter")
+            if st.age >= 3:
+                s.fill(1, 1, 0, 1, 1, 1, "hay")
     if part in ("all", "sails"):
-        s.parts.append(sails(s, st, t, hub=(2.5, 4.9, 5.5)))
+        s.parts.append(sails(s, st, t, hub=(2.5, front + 0.9, 5.5)))
     return s
 
 
@@ -310,11 +439,8 @@ def lumber_camp(style: str, age: int = 2) -> V.Structure:
     st = style_for(style, max(2, age))
     s = _s("lumber_camp", 5)
     s.fill(0, 0, 0, 4, 1, 0, st.floor if st.floor not in ("sand", "gravel") else "coarse_dirt")
-    for x, y in ((0, 0), (4, 0), (0, 2), (4, 2)):
-        s.fill(x, y, 0, x, y, 2, st.log)
-    s.fill(0, 0, 3, 4, 2, 3, st.planks, "slab")
-    s.fill(1, 0, 0, 3, 0, 2, st.planks)
-    s.carve(1, 0, 1, 3, 0, 2)
+    A.shed(s, st, 0, 0, 4, 2, 3)
+    s.fill(1, 0, 0, 3, 0, 0, st.planks)
     log_pile(s, 1, 1, 0, 3, "oak")
     log_pile(s, 0, 3, 0, 3, "birch")
     log_pile(s, 0, 4, 0, 2, "spruce")
@@ -334,9 +460,7 @@ def mining_camp(style: str, age: int = 2) -> V.Structure:
     """Mining camp (2x2): a shed over a minecart on rails, with ore blocks and a pickaxe."""
     st = style_for(style, max(2, age))
     s = _s("mining_camp", 5)
-    for x, y in ((0, 0), (4, 0), (0, 2), (4, 2)):
-        s.fill(x, y, 0, x, y, 2, st.log)
-    s.fill(0, 0, 3, 4, 2, 3, st.planks, "slab")
+    A.shed(s, st, 0, 0, 4, 2, 3)
     s.fill(1, 0, 0, 3, 0, 1, "cobblestone")
     s.set(1, 1, 0, "gold_ore")
     s.set(3, 1, 0, "stone")
@@ -364,17 +488,67 @@ def mining_camp(style: str, age: int = 2) -> V.Structure:
 
 # --------------------------------------------------------------------------- military production
 
+def _front_hall(s: V.Structure, st: Style, x1: int, y1: int, h: int = 4, axis: str = "x",
+                simple: bool = False) -> tuple[int, int, int, str, int, int]:
+    """The set's hall on the rectangle (0, 0)-(x1, y1), with room for its door on the side facing the camera: a
+    West European upper storey juts out to the rectangle's edge, a Central European door goes in the gable end, an
+    East Asian hall stands on a platform. Returns (door x, door y, door level, facing, and the far corner of the
+    ground floor's walls)."""
+    k = st.key
+    if k == "W":
+        A.hall(s, st, 0, 0, x1 - 1, y1 - 1, 0, h, axis=axis)
+        door = ((x1 - 1) // 2, y1 - 1, 1, "+y") if axis == "x" else (x1 - 1, (y1 - 1) // 2, 1, "+x")
+        return (*door, x1 - 1, y1 - 1)
+    if k == "E":
+        A.hall(s, st, 0, 0, x1, y1, 0, h, axis=axis)
+        door = (x1, y1 // 2 - 1, 1, "+x") if axis == "x" else (x1 // 2 - 1, y1, 1, "+y")
+        return (*door, x1, y1)
+    if k == "F":
+        z, (x0, y0, fx1, fy1) = A.ground(s, st, 0, 0, x1, y1)
+        A.hall(s, st, x0, y0, fx1, fy1, z, h - 1)
+        door = (fx1 // 2, fy1, z, "+y") if axis == "x" else (fx1, fy1 // 2, z, "+x")
+        return (*door, fx1, fy1)
+    A.hall(s, st, 0, 0, x1, y1, 0, h, axis=axis, simple=simple)
+    door = (x1 // 2, y1, 1, "+y") if axis == "x" else (x1, y1 // 2, 1, "+x")
+    return (*door, x1, y1)
+
+
 def barracks(style: str, age: int) -> V.Structure:
     """Barracks (3x3): a long hall with a fenced training yard and armour stands."""
     st = style_for(style, age)
+    if st.key == "G":
+        return _dark_barracks(st)
     s = _s("barracks", 8)
-    walls(s, st, 0, 0, 7, 4, 0, 3 if age >= 3 else 2)
-    z = 4 if age >= 3 else 3
-    V.door(s, 3, 4, 1, "+y", st.wood, double=True)
+    x, y, z, facing, wx1, wy1 = _front_hall(s, st, 7, 4)
+    A.door(s, st, x, y, z, facing, double=True)
+    if st.key == "M" and st.age >= 3:  # a crenellated gate tower at the back corner
+        s.fill(0, 0, 0, 1, 1, 7, st.wall)
+        V.crenellate(s, 0, 1, 0, 1, 8, st.base)
+    # training yard in front (+y)
+    for xx in range(0, 8):
+        s.set(xx, 7, 0, st.fence, "fence")
+    for yy in range(5, 8):
+        s.set(0, yy, 0, st.fence, "fence")
+        s.set(7, yy, 0, st.fence, "fence")
+    s.clear(3, 7, 0)
+    s.clear(4, 7, 0)
+    for xx in (2, 5):  # armour stands: iron chestplate on a post with a helmet
+        s.set(xx, 6, 0, "oak_planks", "post")
+        s.set(xx, 6, 1, "iron_block", "cube_small")
+    s.set(6, 5, 0, "hay")
+    team_banner(s, 7.95, 1.5, 3, "+x", seed="br1", height=20)
+    team_banner(s, 1.5, 4.95, 3, "+y", seed="br2", height=20)
+    return s
+
+
+def _dark_barracks(st: Style) -> V.Structure:
+    """The Dark Age barracks: a framed hall and its yard."""
+    s = _s("barracks", 8)
+    walls(s, st, 0, 0, 7, 4, 0, 2)
+    V.door(s, 3, 4, 1, "+y", "oak", double=True)
     windows_x(s, 1, 6, 4, 2, every=5)
     windows_y(s, 1, 3, 7, 2)
-    roof(s, st, 0, 0, 7, 4, z, axis="x")
-    # training yard in front (+y)
+    roof(s, st, 0, 0, 7, 4, 3, axis="x")
     for x in range(0, 8):
         s.set(x, 7, 0, st.fence, "fence")
     for y in range(5, 8):
@@ -382,15 +556,12 @@ def barracks(style: str, age: int) -> V.Structure:
         s.set(7, y, 0, st.fence, "fence")
     s.clear(3, 7, 0)
     s.clear(4, 7, 0)
-    for x in (2, 5):  # armour stands: iron chestplate on a post with a helmet
+    for x in (2, 5):
         s.set(x, 6, 0, "oak_planks", "post")
         s.set(x, 6, 1, "iron_block", "cube_small")
     s.set(6, 5, 0, "hay")
-    if age >= 3:
-        s.fill(0, 0, 4, 0, 0, z + 2, st.stone)
-        s.fill(7, 0, 4, 7, 0, z + 2, st.stone)
-    team_banner(s, 7.95, 1.5, z - 0.2, "+x", seed="br1", height=22)
-    team_banner(s, 1.5, 4.95, z - 0.2, "+y", seed="br2", height=22)
+    team_banner(s, 7.95, 1.5, 2.8, "+x", seed="br1", height=22)
+    team_banner(s, 1.5, 4.95, 2.8, "+y", seed="br2", height=22)
     return s
 
 
@@ -398,27 +569,20 @@ def archery_range(style: str, age: int) -> V.Structure:
     """Archery range (3x3): a hall with targets on hay bales and a fletching table."""
     st = style_for(style, age)
     s = _s("archery_range", 8)
-    walls(s, st, 0, 0, 4, 7, 0, 2 if age <= 2 else 3)
-    z = 3 if age <= 2 else 4
-    V.door(s, 4, 3, 1, "+x", st.wood, double=True)
-    windows_y(s, 1, 6, 4, 2, every=5)
-    windows_x(s, 1, 3, 7, 2)
-    roof(s, st, 0, 0, 4, 7, z, axis="y")
-    for y in (1, 4):  # targets
-        s.set(7, y, 0, "hay")
-        s.set(7, y, 1, "target")
+    x, y, z, facing, wx1, wy1 = _front_hall(s, st, 4, 7, axis="y")
+    A.door(s, st, x, y, z, facing, double=True)
+    for yy in (1, 4):  # targets
+        s.set(7, yy, 0, "hay")
+        s.set(7, yy, 1, "target")
     s.set(6, 6, 0, "fletching_table")
-    for y in range(0, 8):
-        if y not in (2, 3, 5, 6):
-            continue
     ox, oy = s.origin
     arrow = {f: np.tile(parse("#6b4a2a"), (1, 1, 1)) for f in FACES}
     feather = {f: np.tile(parse("#f2f2f2"), (2, 2, 1)) for f in FACES}
-    for y, dz in ((1.3, 22), (1.7, 25), (4.4, 21)):
-        s.extras += [cuboid(((6.2 - ox) * B, (y - oy) * B, dz), (12, 1, 1), arrow),
-                     cuboid(((6.2 - ox) * B, (y - oy) * B - 0.5, dz - 0.5), (3, 2, 2), feather)]
-    team_banner(s, 4.95, 1.5, z - 0.2, "+x", seed="ar1", height=20)
-    team_banner(s, 2, 7.95, z - 0.2, "+y", seed="ar2", height=20)
+    for yy, dz in ((1.3, 22), (1.7, 25), (4.4, 21)):
+        s.extras += [cuboid(((6.2 - ox) * B, (yy - oy) * B, dz), (12, 1, 1), arrow),
+                     cuboid(((6.2 - ox) * B, (yy - oy) * B - 0.5, dz - 0.5), (3, 2, 2), feather)]
+    team_banner(s, 4.95, 5.5, 3, "+x", seed="ar1", height=18)
+    team_banner(s, 2, 7.95, 3, "+y", seed="ar2", height=18)
     return s
 
 
@@ -426,38 +590,36 @@ def stable(style: str, age: int) -> V.Structure:
     """Stable (3x3): a barn with hay bales, a water trough and a fenced paddock."""
     st = style_for(style, age)
     s = _s("stable", 8)
-    walls(s, st, 0, 0, 7, 4, 0, 3)
-    s.carve(2, 4, 1, 5, 4, 2)  # wide barn door opening
-    s.fill(2, 4, 3, 5, 4, 3, st.trim)
-    s.fill(2, 3, 1, 5, 3, 1, "hay")
-    s.set(3, 3, 2, "hay")
-    windows_y(s, 1, 3, 7, 2)
-    roof(s, st, 0, 0, 7, 4, 4, axis="x")
-    for x in range(0, 8):
-        s.set(x, 7, 0, st.fence, "fence")
-    for y in range(5, 8):
-        s.set(7, y, 0, st.fence, "fence")
+    x, y, z, facing, wx1, wy1 = _front_hall(s, st, 7, 4, simple=True)
+    if facing == "+y":  # the wide barn door, hay in the dark behind it
+        s.carve(x - 1, y, z, x + 1, y, z + 1)
+        s.fill(x - 1, y - 1, z, x + 1, y - 1, z, "hay")
+    else:
+        s.carve(x, y - 1, z, x, y + 1, z + 1)
+        s.fill(x - 1, y - 1, z, x - 1, y + 1, z, "hay")
+    for xx in range(0, 8):
+        s.set(xx, 7, 0, st.fence, "fence")
+    for yy in range(5, 8):
+        s.set(7, yy, 0, st.fence, "fence")
     s.set(0, 6, 0, "cauldron")
     s.set(1, 6, 0, "cauldron")
     s.set(6, 5, 0, "hay")
     s.set(5, 6, 0, "hay")
-    team_banner(s, 7.95, 1.5, 3.8, "+x", seed="st1", height=22)
-    team_banner(s, 6.5, 4.95, 3.8, "+y", seed="st2", height=22, pattern="stripe")
+    team_banner(s, 7.95, 0.8, 3, "+x", seed="st1", height=20)
+    team_banner(s, 6.5, 4.95, 3, "+y", seed="st2", height=20, pattern="stripe")
     return s
 
 
 def blacksmith(style: str, age: int, t: float = 0.0, part: str = "all") -> V.Structure:
-    """Blacksmith (3x3): a stone forge with a chimney, anvil and blast furnace. `part` smoke = the smoke only."""
+    """Blacksmith (3x3): a forge hall with a chimney, and an open-air forge with an anvil and furnace beside it.
+    `part` smoke = the smoke only."""
     st = style_for(style, age)
     s = _s("blacksmith", 8)
     if part in ("all", "body"):
-        walls(s, st, 0, 0, 5, 5, 0, 2, wall=st.base if st.key != "M" else st.wall)
-        V.door(s, 2, 5, 1, "+y", st.wood)
-        V.window(s, 5, 2, 2, "+x")
-        s.set(5, 4, 1, "blast_furnace")
-        top = roof(s, st, 0, 0, 5, 5, 3, axis="x")
-        chimney(s, 1, 1, 3, top + 1, "bricks" if st.key != "M" else "cut_sandstone")
-        # open-air forge in front
+        x, y, z, facing, wx1, wy1 = _front_hall(s, st, 5, 5)
+        A.door(s, st, x, y, z, facing)
+        chimney(s, 1, 1, 3, s.height(), {"M": "mud_bricks", "X": "packed_mud"}.get(st.key, "bricks"))
+        # open-air forge beside it
         s.fill(6, 1, 0, 7, 4, 0, "smooth_stone", "slab")
         s.set(6, 2, 0, "furnace")
         s.set(7, 3, 0, "anvil_block", "cube_small")
@@ -465,10 +627,8 @@ def blacksmith(style: str, age: int, t: float = 0.0, part: str = "all") -> V.Str
         s.set(7, 1, 0, "lava", "slab")
         s.set(3, 7, 0, "grindstone_block", "cube_small")
         s.set(1, 7, 0, "barrel")
-        for x, y in ((7, 0), (7, 5)):
-            s.fill(x, y, 0, x, y, 2, st.log)
-        s.fill(6, 0, 3, 7, 5, 3, st.planks, "slab")
-        team_banner(s, 5.95, 1, 2.8, "+x", seed="bs", height=18)
+        A.shed(s, st, 6, 0, 7, 5, 3, axis="y")
+        team_banner(s, 5.95, 1, 2.8, "+x", seed="bs", height=16)
     if part in ("all", "smoke"):
         ox, oy = s.origin
         top_z = (s.height() if part == "all" else 9) * B
@@ -487,108 +647,160 @@ def blacksmith(style: str, age: int, t: float = 0.0, part: str = "all") -> V.Str
 # --------------------------------------------------------------------------- trade and learning
 
 def market(style: str, age: int) -> V.Structure:
-    """Market (4x4): stalls with striped wool awnings, barrels, chests and an emerald trading post."""
+    """Market (4x4): a trading hall and stalls with barrels, chests and an emerald trading post. The stalls are the
+    set's: striped wool awnings, tiled roofs on red posts with lanterns, or thatch."""
     st = style_for(style, age)
+    k = st.key
     s = _s("market", 11)
     s.fill(0, 0, 0, 10, 10, 0, st.floor if st.floor != "podzol" else "gravel", "carpet")
-    walls(s, st, 0, 0, 5, 4, 0, 2)
-    V.door(s, 2, 4, 1, "+y", st.wood)
-    V.window(s, 5, 2, 2, "+x")
-    roof(s, st, 0, 0, 5, 4, 3, axis="x")
+    x, y, z, facing, wx1, wy1 = _front_hall(s, st, 5, 4)
+    A.door(s, st, x, y, z, facing)
+    if k == "M" and st.age >= 3:
+        A.dome(s, st, 3.0, 2.5, s.height() - 1, 1.8)
     # stalls
     colours = [st.cloth, "yellow_wool", "blue_wool", "lime_wool"]
+    post = {"F": st.trim, "X": st.log}.get(k, st.fence)
     stalls = [(7, 1), (7, 5), (1, 7), (5, 8)]
-    for k, (x, y) in enumerate(stalls):
+    for n, (sx, sy) in enumerate(stalls):
         for dx, dy in ((0, 0), (2, 0), (0, 2), (2, 2)):
-            s.fill(x + dx, y + dy, 0, x + dx, y + dy, 1, st.fence, "fence")
+            s.fill(sx + dx, sy + dy, 0, sx + dx, sy + dy, 1, post, "post" if k in ("F", "X") else "fence")
         for dx in range(0, 3):
             for dy in range(0, 3):
-                c = colours[k % 4] if (dx + dy) % 2 == 0 else "white_wool"
-                s.set(x + dx, y + dy, 2, c, "slab")
-        s.set(x + 1, y + 1, 0, ["barrel", "chest", "melon", "pumpkin"][k % 4])
-        s.set(x, y + 1, 0, "barrel" if k % 2 else "hay")
+                if k == "F":
+                    c = st.roof
+                elif k == "X":
+                    c = "hay"
+                else:
+                    c = colours[n % 4] if (dx + dy) % 2 == 0 else "white_wool"
+                s.set(sx + dx, sy + dy, 2, c, "slab")
+        if k == "F":
+            s.set(sx + 1, sy + 1, 3, st.roof, "slab")
+            lantern(s, sx + 2.5, sy + 2.5, 0)
+        s.set(sx + 1, sy + 1, 0, ["barrel", "chest", "melon", "pumpkin"][n % 4])
+        s.set(sx, sy + 1, 0, "barrel" if n % 2 else "hay")
     s.set(9, 9, 0, "emerald_block")
     s.set(5, 6, 0, "composter")
     flag(s, 10.2, 10.2, 0, height=40, seed="mk")
-    team_banner(s, 5.95, 1, 2.8, "+x", seed="mk1", height=18)
+    team_banner(s, 5.95, 1, 2.8, "+x", seed="mk1", height=16)
     return s
 
 
 def monastery(style: str, age: int = 3) -> V.Structure:
-    """Monastery (3x3): a chapel with stained glass and a bell tower."""
+    """Monastery (3x3): the set's house of worship. A chapel with a spired bell tower, a stave church of stacked
+    roofs, a temple hall with a pagoda, a domed hall with a minaret, or a stepped pyramid with a shrine on top."""
     st = style_for(style, age)
     s = _s("monastery", 8)
-    wall = st.wall_hi if st.key in ("W", "F") else st.wall
-    walls(s, st, 1, 0, 6, 7, 0, 4, wall=wall)
-    V.door(s, 3, 7, 1, "+y", st.wood, double=True)
-    for y in (1, 3, 5):
-        s.set(6, y, 2, "yellow_stained_glass" if y == 3 else "blue_stained_glass")
-        s.set(6, y, 3, "red_stained_glass")
-    s.set(3, 7, 4, "purple_stained_glass")
-    s.set(4, 7, 4, "purple_stained_glass")
-    if st.key == "M":
-        s.fill(1, 0, 5, 6, 7, 5, st.wall_hi)
-        s.dome(3.5, 3.5, 6, 2.6, st.dome)
-        s.fill(0, 6, 0, 0, 6, 9, st.stone2)
-        s.set(0, 6, 10, st.accent)
-    elif st.key == "X":
-        V.hip_roof(s, 1, 6, 0, 7, 5, st.stone2, overhang=0)
-    else:
-        roof(s, st, 1, 0, 6, 7, 5, axis="y")
-    if st.key != "M":
-        s.fill(0, 0, 0, 1, 1, 8, st.stone)  # bell tower on the back corner
-        s.fill(0, 0, 9, 1, 1, 9, st.roof if st.key != "X" else st.stone2, "slab")
-        ox, oy = s.origin
-        s.extras += V.bell_boxes(((1 - ox) * B, (1 - oy) * B, 8.6 * B))
-        s.carve(0, 1, 7, 1, 1, 8)
-        s.carve(1, 0, 7, 1, 1, 8)
+    k = st.key
+    ox, oy = s.origin
+    if k == "W":
+        walls(s, st, 1, 0, 6, 7, 0, 4, wall=st.stone)
+        V.door(s, 3, 7, 1, "+y", st.wood, double=True)
+        for y in (1, 3, 5):
+            s.set(6, y, 2, "yellow_stained_glass" if y == 3 else "blue_stained_glass")
+            s.set(6, y, 3, "red_stained_glass")
+        s.set(3, 7, 4, "purple_stained_glass")
+        s.set(4, 7, 4, "purple_stained_glass")
+        steep = A.steep_gable(s, 1, 6, 0, 7, 5, st.roof, st.stone, st.roof_cap, axis="y", overhang=0)
+        top = A.tower(s, st, 0, 0, 2, 0, steep - 1)
+        s.extras += V.bell_boxes(((1 - ox) * B, (1 - oy) * B, (steep - 2) * B - 2))
+        team_banner(s, 6.95, 6, 3.8, "+x", seed="mo", height=22, pattern="stripe")
+    elif k == "E":  # a stave church: a log nave and a tower of stacked steep roofs
+        A.hall(s, st, 2, 3, 6, 7, 0, 4, axis="y")
+        A.door(s, st, 3, 7, 1, "+y", double=True)
+        A.tower(s, st, 1, 0, 4, 0, 5)
+        team_banner(s, 6.95, 5, 2.8, "+x", seed="mo", height=18, pattern="stripe")
+    elif k == "F":  # a temple hall on a platform, a tall pagoda behind it
+        z, (x0, y0, x1, y1) = A.ground(s, st, 0, 0, 7, 7)
+        A.hall(s, st, 2, 2, x1, y1, z, 3)
+        A.door(s, st, 3, y1, z, "+y", double=True)
+        A.tower(s, st, 0, 0, 2, z, 10)
+        lantern(s, 7.6, 7.6, z)
+        team_banner(s, x1 + 0.95, 4, z + 2.8, "+x", seed="mo", height=18, pattern="stripe")
+    elif k == "M":  # a domed hall and a minaret
+        top = A.hall(s, st, 1, 1, 7, 7, 0, 5)
+        A.dome(s, st, 4.5, 4.5, top - 1, 2.7)
+        A.door(s, st, 4, 7, 1, "+y")
+        for y in (2, 4):
+            s.set(7, y, 2, "blue_stained_glass")
+            s.set(7, y, 3, "yellow_stained_glass")
+        A.tower(s, st, 0, 6, 2, 0, 11)
+        team_banner(s, 7.95, 5.5, 4, "+x", seed="mo", height=22, pattern="stripe")
+    else:  # X: a stepped pyramid with a stair up the front and a shrine on top
+        top = A.tower(s, st, 0, 0, 8, 0, 8)
+        for i in range(4):
+            for xx in (3, 4):
+                s.set(xx, 8 - i, 2 * i, st.base)
+                s.set(xx, 8 - i, 2 * i + 1, st.base, "stair_+y")
+        s.fill(3, 3, top - 1, 4, 4, top - 1, st.stone2)
+        s.carve(3, 4, top - 2, 4, 4, top - 2)  # the shrine's doorway
+        for x, y in ((7.6, 0.4), (0.4, 7.6)):
+            torch(s, x, y, 0)
+        team_banner(s, 7.95, 2, 1.8, "+x", seed="mo", height=16, pattern="stripe")
     s.set(7, 3, 0, "cauldron")  # the cleric's brewing corner
     s.set(7, 5, 0, "red_mushroom_block", "cube_small")
-    team_banner(s, 6.95, 6, 3.8, "+x", seed="mo", height=22, pattern="stripe")
     return s
 
 
 def university(style: str, age: int, t: float = 0.0, part: str = "all") -> V.Structure:
-    """University (3x3): a library of bookshelves under a dome or tower, with an enchanting table."""
+    """University (3x3): a library of bookshelves with an enchanting table, and the set's tower, dome or
+    observatory."""
     st = style_for(style, age)
     s = _s("university", 8)
+    k = st.key
+    fz = 4
     if part in ("all", "body"):
-        walls(s, st, 0, 0, 7, 7, 0, 3, wall=st.wall_hi if st.key != "X" else st.wall)
-        for y in (1, 2, 5, 6):
-            s.set(7, y, 1, "bookshelf")
-            s.set(7, y, 2, "bookshelf")
-        for x in (1, 2, 5, 6):
-            s.set(x, 7, 1, "bookshelf")
-            s.set(x, 7, 2, "bookshelf")
-        V.door(s, 3, 7, 1, "+y", st.wood, double=True)
-        V.door(s, 7, 3, 1, "+x", st.wood, double=True)
-        s.fill(0, 0, 4, 7, 7, 4, st.base)
-        if st.key == "M" or (age >= 4 and st.key not in ("F", "X")):
-            s.dome(4.0, 4.0, 5, 2.8, st.dome)
-            s.set(3, 3, 8, "enchanting_table")
+        if k == "X" and not A.thatched(st, simple=False):  # a round observatory on a platform
+            z, _ = A.ground(s, st, 0, 0, 7, 7)
+            s.cylinder(3.5, 3.5, 2.6, z, z + 3, st.wall)
+            s.cylinder(3.5, 3.5, 2.6, z + 4, z + 4, st.stone2)
+            s.cylinder(3.5, 3.5, 2.6, z + 5, z + 5, "red_terracotta" if st.age <= 3 else "gold_block")
+            s.dome(3.5, 3.5, z + 6, 2.2, "white_concrete")
+            s.carve(3, 1, z + 7, 4, 1, z + 7)  # the slits it watches the stars through
+            s.carve(5, 3, z + 7, 5, 4, z + 7)
+            V.door(s, 3, 6, z, "+y", st.wood)
+            for y in (2, 4):
+                s.set(6, y, z + 1, "bookshelf")
+            fz = z + 4
         else:
-            roof(s, st, 1, 1, 6, 6, 5, axis="x")
-        s.set(0, 7, 5, "lectern_top")
-        team_banner(s, 7.95, 4, 3.8, "+x", seed="un", height=18)
+            x, y, z, facing, wx1, wy1 = _front_hall(s, st, 6, 6)
+            A.door(s, st, x, y, z, facing, double=True)
+            for xx in (1, wx1 - 1 if facing == "+y" else 4):
+                if s.get(xx, wy1, z + 1) is not None:
+                    s.set(xx, wy1, z + 1, "bookshelf")
+            if k == "W":
+                A.tower(s, st, 6, 0, 2, 0, 9)
+            elif k == "E":
+                A.tower(s, st, 6, 0, 2, 0, 4)
+            elif k == "F":
+                A.tower(s, st, 6, 0, 2, 0, 8)
+            elif k == "M":
+                A.dome(s, st, 3.5, 3.5, s.height() - 1, 2.6)
+                if st.age >= 4:
+                    A.tower(s, st, 6, 0, 2, 0, 10)
+            fz = 3
+        s.set(0, 7, 0, "lectern_top")
+        team_banner(s, 6.95, 3, 2.8, "+x", seed="un", height=16)
     if part in ("all", "flag"):
-        flag(s, 7.5, 7.5, 5, height=26, seed="un", t=t)
+        flag(s, 7.5, 7.5, 0 if k != "X" else 1, height=fz * B + 10, seed="un", t=t)
     return s
 
 
 # --------------------------------------------------------------------------- siege and sea
 
 def siege_workshop(style: str, age: int = 3) -> V.Structure:
-    """Siege workshop (4x4): an open workshop full of TNT, dispensers and pistons."""
+    """Siege workshop (4x4): an open-fronted workshop full of TNT, dispensers and pistons."""
     st = style_for(style, age)
     s = _s("siege_workshop", 11)
-    walls(s, st, 0, 0, 10, 4, 0, 3)
-    s.carve(2, 4, 1, 8, 4, 3)
-    for x in (2, 5, 8):
-        s.fill(x, 4, 1, x, 4, 3, st.trim)
-    roof(s, st, 0, 0, 10, 4, 4, axis="x")
-    for x in (3, 6):
-        s.set(x, 3, 1, "piston")
-        s.set(x + 1, 3, 1, "dispenser")
+    x, y, z, facing, wx1, wy1 = _front_hall(s, st, 10, 4)
+    if facing == "+y":  # open along the front, posts holding it up
+        s.carve(1, y, z, wx1 - 1, y, z + 1)
+        for xx in range(1, wx1, 3):
+            s.fill(xx, y, z, xx, y, z + 1, st.trim if st.key != "M" else st.wall)
+    else:
+        s.carve(x, 1, z, x, wy1 - 1, z + 1)
+    for xx in (3, 6):
+        s.set(xx, 2, max(z, 1), "piston")
+        s.set(xx + 1, 2, max(z, 1), "dispenser")
     s.fill(1, 6, 0, 2, 7, 0, "tnt")
     s.set(1, 6, 1, "tnt")
     s.set(9, 6, 0, "crafting_table")
@@ -600,23 +812,29 @@ def siege_workshop(style: str, age: int = 3) -> V.Structure:
     wheel = {f: np.tile(parse("#5a4028"), (4, 4, 1)) for f in FACES}
     for wx, wy in ((7.2, 6.4), (8.4, 6.4)):
         s.extras.append(cuboid(((wx - ox) * B, (wy - oy) * B, 0), (3, 14, 14), wheel))
-    team_banner(s, 10.95, 1.5, 3.8, "+x", seed="sw1", height=22)
-    team_banner(s, 1, 4.95, 3.8, "+y", seed="sw2", height=22)
+    team_banner(s, 10.95, 1.5, 3, "+x", seed="sw1", height=20)
     return s
 
 
 def dock(style: str, age: int) -> V.Structure:
-    """Dock (3x3): a plank pier on log posts with a boathouse, barrels and a crane."""
+    """Dock (3x3): a plank pier on log posts with the set's boathouse, barrels and a crane."""
     st = style_for(style, age)
     s = _s("dock", 8)
     s.fill(0, 0, 0, 7, 7, 0, st.planks, "slab")
     for x in range(0, 8, 3):
         for y in range(0, 8, 3):
             s.set(x, y, 0, st.log)
-    walls(s, st, 0, 0, 3, 3, 1, 3, base=False)
-    V.door(s, 1, 3, 1, "+y", st.wood)
-    V.window(s, 3, 1, 2, "+x")
-    roof(s, st, 0, 0, 3, 3, 4, axis="x")
+    if st.key == "G":
+        walls(s, st, 0, 0, 3, 3, 1, 3, base=False)
+        V.door(s, 1, 3, 1, "+y", st.wood)
+        V.window(s, 3, 1, 2, "+x")
+        roof(s, st, 0, 0, 3, 3, 4, axis="x")
+    else:
+        A.hall(s, st, 0, 0, 3, 3, 1, 3 if st.key != "E" else 4, simple=True)
+        if st.key == "E":
+            A.door(s, st, 3, 1, 2, "+x")
+        else:
+            A.door(s, st, 1, 3, 2, "+y")
     s.set(6, 1, 1, "barrel")
     s.set(6, 2, 1, "barrel")
     s.set(5, 1, 1, "chest")

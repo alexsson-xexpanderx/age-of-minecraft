@@ -43,7 +43,9 @@ putting `tools/` on `sys.path`.
   `easter.EASTER`) are dicts of key → builder. They merge into `roster.ROSTER`. That key is the same one used by
   `--only`, `slpmap.Target.unit` and `docs/UNITS.md`.
 - Buildings and scenery are `voxel.Structure`s on an integer block grid, with textures from `blocks.py` and
-  materials from `styles.py` (per style letter and age). `props.render_static(spec, …)` builds and renders them.
+  materials from `styles.py` (per style letter and age). Each set builds in its own way (`architecture.py`:
+  `ground`, `hall`, `door`, `tower`, `shed`), so the sets differ in shape; the shared Dark Age look (style G) is
+  the `_dark_*` builders in `structures.py`. `props.render_static(spec, …)` builds and renders them.
   The spec's `mode` (variants / anim / facing / pieces / overlay) says how the original SLP's frames are organised.
 - `render.py` is an orthographic ray-caster from AoE2's camera. It outputs palette-agnostic `Frame`s whose pixels
   each have a *kind* (TRANSPARENT, SOLID, PLAYER, SHADOW, OUTLINE). `palette.Quantiser` maps them to the game's

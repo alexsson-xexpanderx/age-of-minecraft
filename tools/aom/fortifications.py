@@ -22,6 +22,7 @@ import zlib
 
 import numpy as np
 
+from . import architecture as A
 from . import voxel as V
 from .geometry import Part
 from .structures import flag, team_banner, torch
@@ -255,15 +256,21 @@ def castle(style: str, age: int = 3) -> V.Structure:
     # curtain walls
     s.ring(0, 0, 10, 10, 1, 5, stone)
     V.crenellate(s, 0, 10, 0, 10, 6, detail)
-    # corner towers
+    # corner towers; the Central European ones carry an overhanging timber gallery under a steep spire
     for x, y in ((0, 0), (0, 8), (8, 0), (8, 8)):
-        s.fill(x, y, 0, x + 2, y + 2, 8, stone)
-        V.crenellate(s, x, x + 2, y, y + 2, 9, detail)
+        if st.key == "E":
+            s.fill(x, y, 0, x + 2, y + 2, 7, stone)
+            s.fill(x - 1, y - 1, 8, x + 3, y + 3, 9, f"{st.wood}_wood")
+            s.ring(x - 1, y - 1, x + 3, y + 3, 9, 9, f"stripped_{st.wood}_log")
+            A.steep_hip(s, x - 1, x + 3, y - 1, y + 3, 10, st.roof, overhang=0)
+        else:
+            s.fill(x, y, 0, x + 2, y + 2, 8, stone)
+            V.crenellate(s, x, x + 2, y, y + 2, 9, detail)
         if st.key == "F":
             V.pagoda_roof(s, x, x + 2, y, y + 2, 9, st.roof)
         elif st.key == "M":
             s.dome(x + 1.5, y + 1.5, 9, 1.5, st.dome)
-        elif st.key in ("W", "E"):
+        elif st.key == "W":
             s.cone(x + 1.5, y + 1.5, 10, 1.6, st.roof, step=0.45)
         V.window(s, x + 2, y + 1, 6, "+x")
         V.window(s, x + 1, y + 2, 6, "+y")
@@ -283,6 +290,11 @@ def castle(style: str, age: int = 3) -> V.Structure:
     elif st.key == "M":
         V.crenellate(s, k0, k1, k0, k1, 10, detail)
         s.dome(5.5, 5.5, 10, 2.2, st.dome)
+    elif st.key == "E":  # a steep slate spire, carved posts at its eaves
+        top = A.steep_hip(s, k0, k1, k0, k1, 10, st.roof)
+        for x, y in ((k0 - 1, k0 - 1), (k0 - 1, k1 + 1), (k1 + 1, k0 - 1), (k1 + 1, k1 + 1)):
+            s.set(x, y, 11, st.log, "post")
+        s.set(5, 5, top, st.log, "post")
     else:
         V.crenellate(s, k0, k1, k0, k1, 10, detail)
         s.fill(k0 + 1, k0 + 1, 10, k1 - 1, k1 - 1, 11, stone)

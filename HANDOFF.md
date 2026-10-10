@@ -31,7 +31,11 @@ too large to export (246 MB).
   no hero flag 32. Untested in game.
 - **Team Lava Islands** map: terrain 15 ("Old Water") becomes dark lava, Docks stand on lava instead of in Shallows,
   and the map goes in the mod's `Script.RM`. Untested in game.
-- **Trains** (`tools/aom/rails.py`): see below. Built and driven in game by the player. **It crashes.**
+- **Trains** (`tools/aom/rails.py`): see below. The crash is fixed (2026-10-10); the player played the fixed
+  build and confirmed it works.
+- **Building sets differ in shape** (2026-10-10, `tools/aom/architecture.py`): the player found the buildings too
+  alike across civilisations and chose "five sets with their own shapes, Dark Age kept shared" over giving each
+  of the 18 civilisations its own look (that needs new graphics in the .dat). Previewed, untested in game.
 
 ## The train crash: cause found (2026-10-10, on the Windows laptop)
 
@@ -133,6 +137,6 @@ Also fixed: on Windows the tests wrote an "Age of Minecraft" shortcut on the rea
   `build_mod.apply_gameplay(..., rails=)`; texts by `build_mod.name_train`.
 - `tools/aom/siege.py` `trade_cart()`: the train model. `animation.py`: wheels 1-8 and the smoke (`SMOKE`).
 - `previews/rails.png`: trains laying rails round a wood (`concept_sheet.rails_scene`).
-- Tests: `python tools/tests/test_export.py` (18 tests, about 30 s; all pass on Windows too).
+- Tests: `python tools/tests/test_export.py` (19 tests, about 30 s; all pass on Windows too).
 - With trains left out (`--no-wonder-pacman` or `--only` without `rails`), the .dat comes out byte-identical to
   before.
