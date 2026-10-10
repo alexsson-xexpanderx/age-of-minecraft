@@ -62,6 +62,13 @@ class Graphic:
         return self.slp_at + 31 if self.slp_at >= 0 else -1
 
     @property
+    def sequence_at(self) -> int:
+        """Offset of the sequence type (int8): how the game picks its frames. Seen in the game's own graphics: 1 the
+        Trebuchet's tumbling rock (played over time), 2 the arrows' (frames not played over time), 3 the attack
+        animations that shoot on a frame (an archer's, the Trebuchet's)."""
+        return self.slp_at + 39 if self.slp_at >= 0 else -1
+
+    @property
     def mirroring_at(self) -> int:
         return self.slp_at + 42 if self.slp_at >= 0 else -1
 

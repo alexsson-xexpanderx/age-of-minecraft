@@ -189,7 +189,7 @@ def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> by
         b += struct.pack("<Hh", len(g.get("deltas", [])), -1)
         b += struct.pack("<BHH", 0, g["frames"], g["angles"])
         b += struct.pack("<fff", 1.0, 0.1, 0.0)
-        b += struct.pack("<bhbb", 0, gid, g.get("mirror", 1), 0)
+        b += struct.pack("<bhbb", g.get("seq", 0), gid, g.get("mirror", 1), 0)
         for d in g.get("deltas", []):
             b += struct.pack("<hhihhhh", d, 0, 0, 0, 0, -1, 0)
     if ground is not None:
@@ -411,8 +411,10 @@ def fake_game(root: Path) -> Path:
     table += [{"name": "STWR1N0", "slp": 4911, "frames": 1, "angles": 1, "mirror": 0},  # site, the Dock sinking
               {"name": "STWR1NN", "slp": 4912, "frames": 1, "angles": 1, "mirror": 0, "deltas": [sea, -1]},
               {"name": "M_ARRO_S", "slp": 3800, "frames": 11, "angles": 32, "mirror": 24},
-              {"name": "MFSTW", "slp": 4863, "frames": 11, "angles": 32, "mirror": 24, "deltas": [-1, sea + 2]},
-              {"name": "MRSTW", "slp": 4864, "frames": 11, "angles": 32, "mirror": 24, "deltas": [-1, sea + 2]},
+              {"name": "MFSTW", "slp": 4863, "frames": 11, "angles": 32, "mirror": 24, "deltas": [-1, sea + 2],
+               "seq": 2},  # the arrows' sequence type, as in the game
+              {"name": "MRSTW", "slp": 4864, "frames": 11, "angles": 32, "mirror": 24, "deltas": [-1, sea + 2],
+               "seq": 2},
               {"name": "CNST3_NN", "slp": 238, "frames": 1, "angles": 3, "mirror": 0},
               {"name": "DEXP3_NN", "slp": 4597, "frames": 10, "angles": 1, "mirror": 0}]
     (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar,
@@ -675,8 +677,10 @@ def test_full_build(tmp: Path):
         assert graphics_after[v["dying"][0]].name == "DEXP3_NN"
         assert civ[786].values["projectile_arc"] == civ[787].values["projectile_arc"] > 0.5  # lobbed high
     looks = {g.name: g for g in graphics_after.values() if g.name in ("STWR1NN", "MFSTW", "MRSTW")}
-    assert [(looks[n].slp, looks[n].frame_count, looks[n].angle_count, looks[n].mirroring) for n in
-            ("STWR1NN", "MFSTW", "MRSTW")] == [(15603, 1, 1, 0), (15604, 12, 1, 0), (15605, 8, 1, 0)]
+    # the eruption plays like an attack that fires on a frame, the bomb tumbles: with the arrows' sequence type the
+    # eruption never reached its bomb's frame and the volcano never fired
+    assert [(looks[n].slp, looks[n].frame_count, looks[n].angle_count, looks[n].mirroring, looks[n].sequence_type)
+            for n in ("STWR1NN", "MFSTW", "MRSTW")] == [(15603, 1, 1, 0, 0), (15604, 12, 1, 0, 3), (15605, 8, 1, 0, 1)]
     assert all(d.graphic_id == -1 for g in looks.values() for d in g.deltas)  # no old shadows drawn with them
     assert units.units[1][785].values["attack_graphic"] == looks["MFSTW"].id  # it erupts as it fires
     assert [len(slp.decode(out.get(s))) for s in (15603, 15604, 15605)] == [1, 12, 8]

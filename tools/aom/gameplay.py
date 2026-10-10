@@ -260,10 +260,11 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the trains' rails did not read back as expected"]
     if erupts is not None:
         drawn = datfile.read_graphics(packed)
-        looks = [(drawn[erupts[k]].slp, drawn[erupts[k]].frame_count, drawn[erupts[k]].angle_count)
-                 for k in ("rest", "erupt", "flight")]
-        if looks != [(volcano[0][0], 1, 1), (volcano[0][1], volcanoes.ERUPTION_FRAMES, 1),
-                     (volcano[0][2], volcanoes.BOMB_FRAMES, 1)]:
+        looks = [(drawn[erupts[k]].slp, drawn[erupts[k]].frame_count, drawn[erupts[k]].angle_count,
+                  drawn[erupts[k]].sequence_type) for k in ("rest", "erupt", "flight")]
+        if looks != [(volcano[0][0], 1, 1, volcanoes.STILL),
+                     (volcano[0][1], volcanoes.ERUPTION_FRAMES, 1, volcanoes.ERUPTING),
+                     (volcano[0][2], volcanoes.BOMB_FRAMES, 1, volcanoes.TUMBLING)]:
             return None, notes + ["not changed: the volcano's pictures did not read back as expected"]
     return DatPatch(packed, len(civs.units), notes, strings if pac_done else None, sounds_added=table is not None,
                     giant_name=giant_name, dragon_strings=dragon_strings, fire_layout=fire_layout,

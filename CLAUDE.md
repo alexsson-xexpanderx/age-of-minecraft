@@ -146,7 +146,10 @@ putting `tools/` on `sys.path`.
      its own unused shots (786, 787)
      as lobbed lava bombs. Its three graphics (STWR1NN at rest; 787's MFSTW, made one direction of 12 frames, its
      attack graphic: buildings play attack graphics, as the unpacked Trebuchet does; 786's MRSTW the bomb) draw new
-     SLPs (`volcano_slp`, `eruption_slp`, `bomb_slp`, written after the rails'), their old shadow deltas set to -1.
+     SLPs (`volcano_slp`, `eruption_slp`, `bomb_slp`, written after the rails'), their old shadow deltas set to -1,
+     with the sequence types of what they now are (`datfile.Graphic.sequence_at`: eruption 3, as attack animations
+     that fire on a frame; bomb 1, as the Trebuchet's rock): with the arrows' 2 the eruption stood on its first
+     picture and the volcano never reached the frame it fires on (`FRAME`), so it never fired.
      Its icon goes at the end of the four building icon sheets (50705-50708, one per age); its texts by
      `name_volcano`. `--only volcano` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds

@@ -20,7 +20,10 @@ Heated Shot against ships. `patch` makes it the volcano, in place, for every civ
   STWR1NN), the eruption it plays each time it fires (787's graphic, MFSTW, made one picture of `ERUPTION_FRAMES`:
   its attack graphic, with the Trebuchet's firing boom), and the lava bomb (786's graphic, MRSTW, a tumbling glowing
   rock of `BOMB_FRAMES`). Both shot graphics drew the old arrows in 32 directions; a volcano and a ball of rock look
-  the same from every side, so they become one direction.
+  the same from every side, so they become one direction. They also take the sequence types of the pictures they
+  now are (`ERUPTING`, `TUMBLING`): an arrow's frames are not played over time, so with the arrows' type the eruption
+  stood still on its first picture and the volcano, waiting for the picture its bomb leaves on (`FRAME`), never
+  fired (seen in game, 2026-10-11).
 - Its icon is added at the end of the four building icon sheets (one per age), and its texts name it the Volcano.
 """
 from __future__ import annotations
@@ -63,6 +66,9 @@ ERUPTION_FRAMES = 12
 ERUPTION_SECONDS = 0.1  # a picture: the eruption plays 1.2 s of its 3 s reload
 BOMB_FRAMES = 8
 BOMB_SECONDS = 0.08
+# sequence types (datfile.Graphic.sequence_at): the eruption plays like an attack that shoots on a frame (an
+# archer's, the Trebuchet's: 3), the bomb tumbles like the Trebuchet's rock (1); the arrows' type (2) never plays
+ERUPTING, TUMBLING, STILL = 3, 1, 0
 BUILDING_LAYER, SHOT_LAYER = 20, 30
 SITE, SINKING = "CNST3_NN", "DEXP3_NN"  # the Barracks' building site; the Dock's going down
 BOOM = "trebfire.wav"  # the Trebuchet's firing boom, on each eruption
@@ -324,10 +330,11 @@ def _own_graphic(graphics: dict, civs, gid: int, owners: set[int]) -> bool:
     return True
 
 
-def _redraw(data: bytearray, g, slp_id: int, frames: int, seconds: float, layer: int, sound: int) -> None:
-    """Graphic `g` draws SLP `slp_id`, in one direction, and nothing else with it: its old extra layers (the Sea
-    Tower's shadow, the arrows' shadow on the ground) become the picture itself (delta -1); the new pictures have
-    their own shadows."""
+def _redraw(data: bytearray, g, slp_id: int, frames: int, seconds: float, layer: int, sound: int,
+            sequence: int) -> None:
+    """Graphic `g` draws SLP `slp_id`, in one direction, played as `sequence`, and nothing else with it: its old
+    extra layers (the Sea Tower's shadow, the arrows' shadow on the ground) become the picture itself (delta -1); the
+    new pictures have their own shadows."""
     for k, d in enumerate(g.deltas):
         if d.graphic_id != -1:
             struct.pack_into("<h", data, g.delta_at(k), -1)
@@ -335,6 +342,7 @@ def _redraw(data: bytearray, g, slp_id: int, frames: int, seconds: float, layer:
     struct.pack_into("<b", data, g.layer_at, layer)
     struct.pack_into("<HH", data, g.frames_at, frames, 1)  # one direction
     struct.pack_into("<f", data, g.frame_rate_at, seconds)
+    struct.pack_into("<b", data, g.sequence_at, sequence)
     struct.pack_into("<b", data, g.mirroring_at, 0)
     struct.pack_into("<h", data, g.sound_at, sound)
 
@@ -393,9 +401,9 @@ def patch(data: bytearray, civs, graphics: dict, slps: tuple[int, int, int],
             if s is not None and s.type == 60:
                 DU.patch(data, s, standing=(flight, -1), walking=(flight, -1), projectile_arc=ARC)
         patched += 1
-    _redraw(data, graphics[rest], slps[0], 1, 0.0, BUILDING_LAYER, -1)
-    _redraw(data, graphics[erupt], slps[1], ERUPTION_FRAMES, ERUPTION_SECONDS, BUILDING_LAYER, boom)
-    _redraw(data, graphics[flight], slps[2], BOMB_FRAMES, BOMB_SECONDS, SHOT_LAYER, -1)
+    _redraw(data, graphics[rest], slps[0], 1, 0.0, BUILDING_LAYER, -1, STILL)
+    _redraw(data, graphics[erupt], slps[1], ERUPTION_FRAMES, ERUPTION_SECONDS, BUILDING_LAYER, boom, ERUPTING)
+    _redraw(data, graphics[flight], slps[2], BOMB_FRAMES, BOMB_SECONDS, SHOT_LAYER, -1, TUMBLING)
     strings = {"name": first.values["name_id"], "creation": first.values["creation_id"]}
     if first.values["help_id"] > HELP_STRINGS:
         strings["help"] = first.values["help_id"] - HELP_STRINGS
