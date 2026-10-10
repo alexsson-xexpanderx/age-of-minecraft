@@ -138,8 +138,9 @@ putting `tools/` on `sys.path`.
      memory; the four builds whose pieces lasted a day, then 5 minutes, crashed so. The train is drawn
      `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
    - `volcano.py` makes the never-built Sea Tower (785, still a tower: class 52, so tower upgrades reach it) the
-     volcano, in place: built by Fishing Ships (13, button 2), on lava alone (`lava_row`: the first restriction row
-     no unit uses and that lets units nowhere, now terrain 15 only), 3x3, shooting its own unused shots (786, 787)
+     volcano, in place: built by Fishing Ships (13, button 2), on lava alone (placement terrain 15: the tile under its
+     middle; the rest by `water_row`, the fish's row of deep water and lava; a row made lava-only from an unused one
+     never let it be placed in game, though a Dock as big places on lava), 3x3, shooting its own unused shots (786, 787)
      as lobbed lava bombs. Its three graphics (STWR1NN at rest; 787's MFSTW, made one direction of 12 frames, its
      attack graphic: buildings play attack graphics, as the unpacked Trebuchet does; 786's MRSTW the bomb) draw new
      SLPs (`volcano_slp`, `eruption_slp`, `bomb_slp`, written after the rails'), their old shadow deltas set to -1.

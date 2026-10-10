@@ -5,9 +5,11 @@ The game has a tower made for the sea that it never lets anyone build: the Sea T
 (unit class 52), so the tower upgrades reach it: Fletching, Bodkin Arrow and Bracer, Masonry and Architecture, and
 Heated Shot against ships. `patch` makes it the volcano, in place, for every civilisation:
 
-- Fishing Ships (unit 13) build it, the button next to their Fish Trap, from the start of the game. It may stand on
-  lava alone: it takes a row of the terrain restriction table that no unit used and that let units nowhere
-  (`lava_row`), which now lets it onto the lava and nothing else.
+- Fishing Ships (unit 13) build it, the button next to their Fish Trap, from the start of the game, on the lava alone:
+  the tile under its middle must be lava (its placement terrain, the rule that keeps a Dock on water), and the rest
+  of it on lava or deep water (`water_row`: the terrain restriction row the fish swim in). A row of the volcano's
+  own, made from one no unit used, let the game draw it but never place it, though the row read lava as allowed
+  (a Dock, as big and as tall, places on the lava with the rows the game had).
 - It is three tiles across, as big as a Barracks, built on the Barracks' building site, and it sinks like a Dock when
   destroyed.
 - It shoots its own shots (786, and 787: the game left both unused, the Sea Tower shot the towers' arrow), which
@@ -293,12 +295,17 @@ def icon_sheets(archives: list[tuple[str, object]]) -> list[tuple[str, object, i
 
 # --------------------------------------------------------------------------- the .dat
 
-def lava_row(data: bytes, civs) -> Optional[int]:
-    """The terrain restriction row for the volcano: the first that no unit uses and that lets units nowhere."""
+WATER, BEACH, SHALLOWS = 1, 2, 4
+
+
+def water_row(data: bytes, civs) -> Optional[int]:
+    """The terrain restriction row for the volcano: one some unit uses (the fish) that lets it onto the water and
+    the lava (terrain 15) and nowhere on land, the beach or the shallows; the fewest terrains if there are several."""
     rows = datfile.restrictions(data)
     used = {u.values["terrain_restriction"] for units in civs.units for u in units if u is not None}
-    return next((k for k, row in enumerate(rows) if k not in used and not any(a > 0 for a in row)
-                 and len(row) > LAVA), None)
+    fits = [k for k, row in enumerate(rows) if k in used and len(row) > LAVA and row[LAVA] > 0 and row[WATER] > 0
+            and row[0] <= 0 and row[BEACH] <= 0 and row[SHALLOWS] <= 0]
+    return min(fits, key=lambda k: sum(1 for a in rows[k] if a > 0), default=None)
 
 
 def _own_graphic(graphics: dict, civs, gid: int, owners: set[int]) -> bool:
@@ -357,9 +364,9 @@ def patch(data: bytearray, civs, graphics: dict, slps: tuple[int, int, int],
     owners = {SEA_TOWER, *SHOTS}
     if len({rest, erupt, flight}) != 3 or not all(_own_graphic(graphics, civs, g, owners) for g in (rest, erupt, flight)):
         return None, "Volcano: not changed, the Sea Tower's pictures are not its own here", None
-    row = lava_row(bytes(data), civs)
+    row = water_row(bytes(data), civs)
     if row is None:
-        return None, "Volcano: not changed, no row of the terrain restriction table is free for the lava", None
+        return None, "Volcano: not changed, no row of the terrain restriction table is the water and the lava", None
     try:
         sounds = datfile.sound_files(bytes(data))
     except (ValueError, struct.error):
@@ -367,8 +374,6 @@ def patch(data: bytearray, civs, graphics: dict, slps: tuple[int, int, int],
     boom = next((sid for sid, files in sounds.items() if BOOM in (f.lower() for f in files)), -1)
     by_name = {g.name.upper(): gid for gid, g in graphics.items()}
     site, sinking = by_name.get(SITE), by_name.get(SINKING)
-    rows, terrains = struct.unpack_from("<HH", data, 8)
-    struct.pack_into("<f", data, 12 + 8 * rows + row * terrains * 20 + 4 * LAVA, 1.0)  # the lava, and nothing else
     patched = 0
     for units in civs.units:
         if len(units) <= max(SEA_TOWER, *SHOTS) or units[SEA_TOWER] is None or units[SEA_TOWER].type != 80:
@@ -377,7 +382,7 @@ def patch(data: bytearray, civs, graphics: dict, slps: tuple[int, int, int],
         armours = [(c, ARMOUR.get(c, a)) for c, a in u.values["armours"]]
         attacks = ATTACK if len(u.values["attacks"]) == len(ATTACK) else None
         DU.patch(data, u, enabled=1, train_location=FISHING_SHIP, button=BUTTON, cost=COST, train_time=TIME,
-                 hit_points=HP, terrain_restriction=row, projectile=SHOTS[0], placement_terrain=(-1, -1), armours=armours,
+                 hit_points=HP, terrain_restriction=row, projectile=SHOTS[0], placement_terrain=(LAVA, LAVA), armours=armours,
                  max_range=RANGE, line_of_sight=SIGHT, reload=RELOAD, attack_graphic=erupt, frame_delay=FRAME,
                  displacement=crater(), collision_size=(SIZE, SIZE, u.values["collision_size"][2]),
                  outline_size=(SIZE, SIZE, u.values["outline_size"][2]), clearance_size=(SIZE, SIZE),
@@ -402,7 +407,8 @@ def patch(data: bytearray, civs, graphics: dict, slps: tuple[int, int, int],
         strings["help"] = first.values["help_id"] - HELP_STRINGS
     done = {"row": row, "rest": rest, "erupt": erupt, "flight": flight}
     return done, (f"Volcano: the Sea Tower (unit {SEA_TOWER}) for {patched} civilisations, built by Fishing Ships "
-                  f"(unit {FISHING_SHIP}, button {BUTTON}) on lava alone (terrain restriction {row}): "
+                  f"(unit {FISHING_SHIP}, button {BUTTON}) on lava alone (placement terrain {LAVA}, terrain "
+                  f"restriction {row}): "
                   f"{COST[1]} stone, {COST[4]} gold, {TIME} s, {HP} hit points, 3x3 tiles, lava bombs "
                   f"{'/'.join(str(a) for _, a in ATTACK)} (pierce/ships/buildings) at range {RANGE:g} every "
                   f"{RELOAD:g} s" + (f", icon {icon_index}" if icon_index is not None else "")

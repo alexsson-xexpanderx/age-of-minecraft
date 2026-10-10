@@ -187,11 +187,12 @@ tower made for the sea that it never lets anyone build, the Sea Tower;
 civilisation:
 
 - **Where.** Fishing Ships build it (the button next to the Fish Trap), from
-  the start of the game, anywhere on the lava and nowhere else: it takes a
-  row of the game's "where may it stand" table that no unit used and that let
-  units nowhere, which now lets it onto the lava alone. It is three tiles
-  across, as big as a Barracks: 150 stone and 100 gold, 1 minute to build,
-  1500 hit points.
+  the start of the game, anywhere on the lava and nowhere else: the tile
+  under its middle must be lava (the rule that keeps a Dock on water), and
+  the rest of it where the fish swim (deep water or lava, no beach). No
+  ordinary map has lava, so it is only built on Team Lava Islands. It is
+  three tiles across, as big as a Barracks: 150 stone and 100 gold, 1 minute
+  to build, 1500 hit points.
 - **How it fights.** Every 3 seconds, at a tower's range (8 tiles), it
   erupts: a fountain of lava out of its crater, and a lava bomb lobbed high
   at the enemy, ship, unit or building. A bomb does 12 piercing damage, 18

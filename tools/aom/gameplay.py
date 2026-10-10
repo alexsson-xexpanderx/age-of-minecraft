@@ -221,10 +221,9 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
         if mount is not None and mount.type == 80 and (
                 mount.values["train_location"] != volcanoes.FISHING_SHIP
                 or mount.values["terrain_restriction"] != erupts["row"]
+                or mount.values["placement_terrain"] != (volcanoes.LAVA, volcanoes.LAVA)
                 or mount.values["attack_graphic"] != erupts["erupt"]):
             return None, notes + ["not changed: the volcano did not read back as expected"]
-    if erupts is not None and [k for k, a in enumerate(rows[erupts["row"]]) if a > 0] != [volcanoes.LAVA]:
-        return None, notes + ["not changed: the volcano's lava row did not read back as expected"]
     if pac_done:
         try:
             heads = DU.read_unit_headers(bytes(data), check)
