@@ -37,10 +37,12 @@ too large to export (246 MB).
   alike across civilisations and chose "five sets with their own shapes, Dark Age kept shared" over giving each
   of the 18 civilisations its own look (that needs new graphics in the .dat). Previewed, untested in game.
 - **Volcanoes** (2026-10-10, `tools/aom/volcano.py`): the player asked for volcanoes built on the lava that erupt
-  at enemy ships. They chose: Fishing Ships build them anywhere on lava, the bombs hit everything in range (not
-  only ships), available from the start, 3x3 tiles. The unused Sea Tower (785) became the volcano. Untested in
-  game: check that the Fishing Ship shows the second build button, that the eruption plays when it fires, and
-  that its icon shows in every age.
+  at enemy ships. They chose Fishing Ships building them anywhere on lava, but the game only lets a Fishing Ship
+  build the Fish Trap (hard-coded; a test game of three variants placed none), so Villagers build them like a Dock,
+  by the beach (the player chose this over turning the Fish Trap into the volcano on every map). The bombs hit
+  everything in range, available from the start, 3x3 tiles. The unused Sea Tower (785) became the volcano. Not yet
+  placed in game: check the Villager's build menu has it (button 14), that it places by the beach, that the
+  eruption plays when it fires, and that its icon shows in every age.
 
 ## The train crash: cause found (2026-10-10, on the Windows laptop)
 

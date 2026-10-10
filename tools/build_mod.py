@@ -47,7 +47,7 @@ from aom import spritemap  # noqa: E402
 STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface"}
 LAVA = "lava"  # and this: the lava, its Dock rule and the Team Lava Islands map
 RAILS = "rails"  # and this: the trains laying rails behind them
-VOLCANO = "volcano"  # and this: the volcano Fishing Ships build on the lava
+VOLCANO = "volcano"  # and this: the volcano Villagers build on the lava
 
 
 def static_group(spec: dict) -> str:

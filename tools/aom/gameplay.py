@@ -116,7 +116,7 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
               dragon_sounds: Optional[dict[str, list[int]]] = None,
               lava: Optional[tuple[int, int]] = None,
               rails: Optional[int] = None,
-              volcano: Optional[tuple[tuple[int, int, int], Optional[int]]] = None) -> tuple[Optional[DatPatch], list[str]]:
+              volcano: Optional[tuple] = None) -> tuple[Optional[DatPatch], list[str]]:
     """All .dat changes: Pac-Man at the Wonder (with icon `icon` and `sounds`, if given), the giant red Pac-Man
     drawn from SLP `giant` (if given; with Pac-Man only), the dragon at the Wonder with its fireballs drawn from SLP
     `fire` (if given, with `dragon_sounds`), the lava (if given: its texture's SLP and minimap colour; lava.py), the
@@ -219,7 +219,7 @@ def patch_dat(raw: bytes, graphics: dict, pacman: bool = True, javelina: bool = 
             return None, notes + ["not changed: the trains did not read back as expected"]
         mount = units[volcanoes.SEA_TOWER] if erupts is not None and len(units) > volcanoes.SEA_TOWER else None
         if mount is not None and mount.type == 80 and (
-                mount.values["train_location"] != volcanoes.FISHING_SHIP
+                mount.values["train_location"] != volcanoes.VILLAGER
                 or mount.values["terrain_restriction"] != erupts["row"]
                 or mount.values["placement_terrain"] != (volcanoes.LAVA, volcanoes.LAVA)
                 or mount.values["attack_graphic"] != erupts["erupt"]):

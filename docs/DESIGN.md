@@ -180,19 +180,18 @@ deer and boar, and sheep. The build writes the map into the mod's
 
 ![volcano](../previews/volcano.png)
 
-A Fishing Ship can build a **volcano** out on the lava, and it erupts at
-enemies that come within range, raining lava bombs on them. The game has a
+Villagers can build a **volcano** on the lava by their island's beach, and
+it erupts at enemies that come within range, raining lava bombs on them. The game has a
 tower made for the sea that it never lets anyone build, the Sea Tower;
 `volcano.py` makes it the volcano, in place in the `.dat`, for every
 civilisation:
 
-- **Where.** Fishing Ships build it (the button next to the Fish Trap), from
-  the start of the game, anywhere on the lava and nowhere else: the tile
-  under its middle must be lava (the rule that keeps a Dock on water), and
-  the rest of it where the fish swim (deep water or lava, no beach). No
+- **Where.** Villagers build it, from the start of the game, the way they
+  build a Dock: on the lava next to a beach, with lava under its middle. No
   ordinary map has lava, so it is only built on Team Lava Islands. It is
   three tiles across, as big as a Barracks: 150 stone and 100 gold, 1 minute
-  to build, 1500 hit points.
+  to build, 1500 hit points. (Fishing Ships were the first idea, out on the
+  open lava, but the game only ever lets a Fishing Ship build a Fish Trap.)
 - **How it fights.** Every 3 seconds, at a tower's range (8 tiles), it
   erupts: a fountain of lava out of its crater, and a lava bomb lobbed high
   at the enemy, ship, unit or building. A bomb does 12 piercing damage, 18

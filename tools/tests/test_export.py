@@ -93,8 +93,7 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     which may stand on Water or Shallows next to a beach, and the Trade Cart (128, and 204 loaded) and the Bombard
     Cannon (36), which go where the restriction table's third row lets them (the same ground as the eighth), the Sea
     Tower (785: graphics `sea_graphic` on, its shadow, picture, its two shots' and the arrows' shadow), which shoots
-    the towers' arrow and goes on the fourth row, its own unused shots (786, 787), the Fishing Ship (13), and fish
-    (69), which swim where the seventh row lets them.
+    the towers' arrow and goes on the fourth row, and its own unused shots (786, 787).
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -105,13 +104,13 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     for u in range(slots):
         tasks = [attack, board] if u in (74, 493) else [attack] if u == 860 else []
         out += struct.pack("<bH", 1, len(tasks)) + b"".join(TASK.pack(*t) for t in tasks) if u % 2 == 0 or u in (
-            276, 860, 823, 493, 13, 69, 785, 787) else b"\0"
+            276, 860, 823, 493, 785, 787) else b"\0"
     out += struct.pack("<H", civs)
     rng = np.random.default_rng(5)
     for c in range(civs):
         out += struct.pack("<b20sHhh", 1, [b"Gaia", b"British", b"French"][c % 3], 4, 1, 1)
         out += struct.pack("<4f", 1, 2, 3, 4) + struct.pack("<bH", 0, slots)
-        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823, 493, 13, 69, 785, 787)]
+        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823, 493, 785, 787)]
         # like the original game's file, a pointer is a memory address (0 = no unit)
         out += struct.pack(f"<{slots}i", *[int(rng.integers(0x400000, 0x7fffffff)) if u in present else 0
                                            for u in range(slots)])
@@ -137,10 +136,6 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
                 out += _unit_bytes(u, 70, "TCART" if u == 128 else "TCARTF", cls=19, restriction=2)
             elif u == 36:  # a Bombard Cannon, which goes where the Trade Cart goes
                 out += _unit_bytes(u, 70, "BCANN", cls=13, restriction=2)
-            elif u == 13:
-                out += _unit_bytes(u, 70, "FSHSP", cls=21)
-            elif u == 69:
-                out += _unit_bytes(u, 30, "FISHS", restriction=6)
             elif u == 785:
                 out += _unit_bytes(u, 80, "STWR", sea_graphic + 1, attacks=[(11, 0), (16, 9), (3, 7)],
                                    armours=[(21, 0), (11, 0), (4, 0), (3, 6), (13, 0)], reload=2.0, projectile=504,
@@ -178,12 +173,11 @@ def fake_terrains(terrains: dict[int, tuple[str, int]]) -> bytes:
 def fake_dat(graphics: list[dict], civs: bytes = b"", ground: dict = None) -> bytes:
     """A minimal empires2_x1_p1.dat: header sections plus the given graphics (and terrains and unit tables)."""
     b = bytearray(b"VER 5.7\0")
-    restrictions, terrains = 8, 41  # rows 0 and 1 let units everywhere, 2 and 7 on land (the first 30 terrains), 6 in
-    b += struct.pack("<HH", restrictions, terrains)  # deep water and the old water (the fish's), the rest nowhere
+    restrictions, terrains = 8, 41  # rows 0 and 1 let units everywhere, 2 and 7 on land (the first 30 terrains), the
+    b += struct.pack("<HH", restrictions, terrains)  # rest nowhere
     b += struct.pack(f"<{2 * restrictions}i", *([1] * 2 * restrictions))
     for k in range(restrictions):
-        b += struct.pack(f"<{terrains}f", *[(1.0 if k < 2 or k in (2, 7) and t < 30 or k == 6 and t in (1, 15, 22, 23)
-                                             else 0.0) for t in range(terrains)])
+        b += struct.pack(f"<{terrains}f", *[(1.0 if k < 2 or k in (2, 7) and t < 30 else 0.0) for t in range(terrains)])
         b += bytes(16 * terrains)
     b += struct.pack("<H", 2) + bytes(36 * 2)
     b += struct.pack("<H", 1) + struct.pack("<hhHi", 0, 0, 2, 300000)  # one sound, with two files
@@ -666,18 +660,20 @@ def test_full_build(tmp: Path):
     assert {p for _, p in slp.frame_props(out.get(15602))} == {16}  # marked as the cart tracks' own frames are
     assert "Trains: the Trade Carts (units 128, 204, 4 in all) keep their terrain restriction 2, which now" in report
     assert "CARTSTPS) draw SLP 15602, 5 pictures" in report and "(BCANN) use 7, exactly like it" in report
-    # the volcano: the Sea Tower (785), built by Fishing Ships (13) on the lava alone (its middle on the lava, the
-    # rest where the fish swim), three tiles across, shooting its own shots (786, 787) as lobbed lava bombs
+    # the volcano: the Sea Tower (785), built by Villagers on the Dock's rules (46 here: a beach beside it, its
+    # ground, its level) with the lava under its middle, three tiles across, shooting its own shots (786, 787) as
+    # lobbed lava bombs
     for civ in units.units:
         v = civ[785].values
-        assert (v["enabled"], v["train_location"], v["button"], v["projectile"], v["icon"]) == (1, 13, 2, 786, 52)
-        assert v["terrain_restriction"] == 6 and v["placement_terrain"] == (15, 15)
+        assert (v["enabled"], v["train_location"], v["button"], v["projectile"], v["icon"]) == (1, 118, 14, 786, 52)
+        assert v["placement_terrain"] == (15, 15) and v["placement_side"] == civ[46].values["placement_side"]
+        assert (v["terrain_restriction"], v["hill_mode"]) == (civ[46].values["terrain_restriction"],
+                                                              civ[46].values["hill_mode"])
         assert v["collision_size"][:2] == v["clearance_size"] == (1.5, 1.5)
         assert v["attacks"] == [(3, 12), (16, 18), (11, 15)] and v["cost"] == (2, 150, 1, 3, 100, 1, -1, 0, 0)
         assert graphics_after[v["construction_graphic"]].name == "CNST3_NN"
         assert graphics_after[v["dying"][0]].name == "DEXP3_NN"
         assert civ[786].values["projectile_arc"] == civ[787].values["projectile_arc"] > 0.5  # lobbed high
-    assert [k for k, a in enumerate(rows[6]) if a > 0] == [1, 15, 22, 23]  # the fish's row, as it was
     looks = {g.name: g for g in graphics_after.values() if g.name in ("STWR1NN", "MFSTW", "MRSTW")}
     assert [(looks[n].slp, looks[n].frame_count, looks[n].angle_count, looks[n].mirroring) for n in
             ("STWR1NN", "MFSTW", "MRSTW")] == [(15603, 1, 1, 0), (15604, 12, 1, 0), (15605, 8, 1, 0)]
@@ -685,7 +681,7 @@ def test_full_build(tmp: Path):
     assert units.units[1][785].values["attack_graphic"] == looks["MFSTW"].id  # it erupts as it fires
     assert [len(slp.decode(out.get(s))) for s in (15603, 15604, 15605)] == [1, 12, 8]
     assert all(slp.info(out.get(s)).num_frames == 53 for s in (50705, 50706, 50707, 50708))  # its icon (52)
-    assert "Volcano: the Sea Tower (unit 785) for 2 civilisations, built by Fishing Ships" in report
+    assert "Volcano: the Sea Tower (unit 785) for 2 civilisations, built by Villagers (button 14)" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -699,7 +695,7 @@ def test_full_build(tmp: Path):
     assert [langdll.read_string(p1, i) for i in (5128, 6128)] == ["Train", "Build Train"]
     assert langdll.read_string(p1, 26128).startswith("Build <b> Train<b> (<cost>) \nTrades by land, laying its own")
     assert [langdll.read_string(p1, i) for i in (5785, 6785)] == ["Volcano", "Build Volcano"]
-    assert langdll.read_string(p1, 26785).startswith("Build <b> Volcano<b> (<cost>) \nA volcano out on the lava")
+    assert langdll.read_string(p1, 26785).startswith("Build <b> Volcano<b> (<cost>) \nA volcano on the lava")
     assert langdll.read_string(p1_before, 5860) == "Furious the Monkey Boy"
     assert langdll.read_string((game / "language_x1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()

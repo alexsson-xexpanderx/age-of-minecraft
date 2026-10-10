@@ -65,7 +65,8 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "projectile": "h", "displacement": "fff", "displayed": "hhff", "displayed_pierce": "h",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h",
            "resource_capacity": "h", "hero_status": "b", "placement_terrain": "hh", "clearance_size": "ff",
-           "projectile_arc": "f", "construction_graphic": "h", "frame_delay": "h"}
+           "projectile_arc": "f", "construction_graphic": "h", "frame_delay": "h",
+           "placement_side": "hh", "hill_mode": "b"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -107,12 +108,15 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     f["enabled"] = r.p
     v["enabled"] = r.one("b")
     r.one("b")  # disabled
-    r.take("hh")  # placement side terrains: one of them must be next to it (a Dock's: the beach)
+    f["placement_side"] = r.p
+    v["placement_side"] = r.take("hh")  # placement side terrains: one of them must be next to it (a Dock's: the beach)
     f["placement_terrain"] = r.p
     v["placement_terrain"] = r.take("hh")  # it may only be placed on these (a Dock's: Water and Shallows)
     f["clearance_size"] = r.p
     v["clearance_size"] = r.take("ff")  # room kept free round a building when placing it (tiles)
-    r.take("bb")  # hill mode, fog visibility
+    f["hill_mode"] = r.p
+    v["hill_mode"] = r.one("b")  # how level its ground must be (0 any, 3 like a Dock)
+    r.one("b")  # fog visibility
     f["terrain_restriction"] = r.p
     v["terrain_restriction"] = r.one("h")  # which terrains the unit may stand on (a row of the restriction table)
     r.one("b")  # fly mode

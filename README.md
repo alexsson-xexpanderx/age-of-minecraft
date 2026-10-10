@@ -90,7 +90,7 @@ tools/aom/gaia.py        map decorations: yurts, ruins, graves, flags, torches, 
 tools/aom/farmland.py    farms, which are terrain: Minecraft farmland and wheat in terrain.drs
 tools/aom/lava.py        the lava (the unused terrain 15), Docks on it, and the Team Lava Islands map
 tools/aom/rails.py       trains laying their own rails: a track left behind them on the ground (an unused graphic)
-tools/aom/volcano.py     volcanoes Fishing Ships build on the lava, erupting at enemies (the unused Sea Tower)
+tools/aom/volcano.py     volcanoes Villagers build on the lava by the beach, erupting at enemies (the unused Sea Tower)
 tools/aom/interface.py   the screen panels repainted: planks, inventory grey, slots and item icons
 tools/aom/menu.py        the main menu: a block village by day, every button a Minecraft thing, names on Minecraft buttons
 tools/aom/screens.py     the other screens: found by their screen files, redrawn as the deepslate hall

@@ -492,19 +492,19 @@ def lava_scene(out: Path, units: dict[str, Unit]) -> None:
 
 
 def volcano_scene(out: Path, units: dict[str, Unit]) -> None:
-    """A volcano out on the lava, built by the Fishing Ship beside it, erupting at enemy ships: its lava bombs in the
-    air on their way to the Galleon, the island's Dock behind it."""
+    """A volcano on the lava by the island's beach, erupting at enemy ships: its lava bombs in the air on their way
+    to the Galleon, the island's Dock behind it, a Fishing Ship out on the lava."""
     from aom import volcano as volcanoes
     from aom.voxel import all_blocks
     placed = place_buildings([(B("DOCK", "W", 3), 3.5, 4.5), (B("HOUS", "W", 2), 0.0, 2.0)])
     root = volcanoes.volcano((volcanoes.FRAME + 0.5) / volcanoes.ERUPTION_FRAMES).part(all_blocks())
-    placed.append((render(root, BUILDING_HEADING, camera=fit_camera(root, BUILDING_HEADING)), 1, *tile_xy(8.5, 7.5)))
-    fleet = [("fishing_ship", 1, 6.6, 11.0, 3, "walk", 0.2), ("galleon", 2, 13.0, 3.2, 6, "walk", 0.4),
+    placed.append((render(root, BUILDING_HEADING, camera=fit_camera(root, BUILDING_HEADING)), 1, *tile_xy(4.6, 9.5)))
+    fleet = [("fishing_ship", 1, 7.6, 7.0, 3, "walk", 0.2), ("galleon", 2, 13.0, 3.2, 6, "walk", 0.4),
              ("war_galley", 2, 12.4, 8.8, 5, "walk", 0.3)]
     placed += place_units(fleet, units)
     bomb = {"lava_bomb": volcanoes.bomb()}
     for k, (f, height) in enumerate(((0.25, 230), (0.55, 260), (0.8, 160))):  # on their way to the Galleon
-        i, j = 8.5 + (13.0 - 8.5) * f, 7.5 + (3.2 - 7.5) * f
+        i, j = 4.6 + (13.0 - 4.6) * f, 9.5 + (3.2 - 9.5) * f
         frame, player, x, y = place_units([("lava_bomb", 1, i, j, 0, "idle", k / 3)], bomb)[0]
         placed.append((frame, player, x, y - height))
     compose(placed, out, shore=3.0, lava=True)
