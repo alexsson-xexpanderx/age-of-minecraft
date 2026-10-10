@@ -40,8 +40,8 @@ files are not changed. It writes:
 
 ```
 Games\age_of_minecraft.xml                    the UserPatch mod definition ("Age of Minecraft")
-Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, the lava, the trains' rails, Pac-Man's and the Dragon's icons and sounds
-Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man and the Dragon at the Wonder, the lava, trains laying rails, the Javelina's own look
+Games\age_of_minecraft\Data\gamedata_x1_p1.drs  every Minecraft sprite, farm, panel, the menu and screens, the lava, the trains' rails, the volcano, Pac-Man's and the Dragon's icons and sounds
+Games\age_of_minecraft\Data\empires2_x1_p1.dat  its rules: Pac-Man and the Dragon at the Wonder, the lava, trains laying rails, volcanoes, the Javelina's own look
 Games\age_of_minecraft\Script.RM\Team Lava Islands.rms  the Team Lava Islands map
 Games\age_of_minecraft\Data\language_x1_p1.dll  its own texts: Pac-Man's, the Dragon's and the Train's names, and "Age of Minecraft"
 Games\age_of_minecraft\age_of_minecraft.ico    its icon, a villager king
@@ -94,8 +94,8 @@ each one backed up first, and **`restore_original.bat`** puts them back.
 | `test_2_train_look_only.bat` | a test build with only the train's look (no rails): double-click, then `build_mod.bat` for the whole mod again |
 | `build_mod_direct.bat` | put the sprites straight into `Data\graphics.drs`, the farms into `Data\terrain.drs` and the panels into `Data\interfac.drs` (no mod exe needed); each file is backed up first as `<name>.aom-backup` |
 | `restore_original.bat` | undo `build_mod_direct.bat` (graphics, farms, panels, the rules file, the icons, the language files and the Team Lava Islands map) |
-| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man or Dragon at the Wonder, no lava, no rails behind the trains, and the cheat unit keeps its name and icon) |
-| `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man or Dragon at the Wonder, no lava, no rails, and the Javelina keeps the Wild Boar's look) |
+| `build_mod.bat "<game>" --no-wonder-pacman` | keep the game's rules unchanged (no Pac-Man or Dragon at the Wonder, no lava, no rails behind the trains, no volcanoes, and the cheat unit keeps its name and icon) |
+| `build_mod.bat "<game>" --no-dat` | do not touch `empires2_x1_p1.dat` at all (no Pac-Man or Dragon at the Wonder, no lava, no rails, no volcanoes, and the Javelina keeps the Wild Boar's look) |
 
 ## What to expect in this test
 
@@ -161,7 +161,7 @@ He has his own arcade sounds: click on him and he goes "waka-waka" (or
 boings, or giggles), orders get a "wakawakawaka" or a big CHOMP and
 "nom nom", the Wonder plays a little jingle when he is ready, every bite
 chomps, and he dies with a sad "wah wah wah waaah" and two pops. Listen to
-them in `previews/sounds/`. He, the Dragon, the lava and the trains below are
+them in `previews/sounds/`. He, the Dragon, the lava, the volcanoes and the trains below are
 the mod's changes to the game's rules; `--no-wonder-pacman` leaves the rules
 alone.
 
@@ -196,6 +196,15 @@ desert, mountains or snow, at random. One thing changes on every map: Docks
 can no longer be built in shallow fords (they can on lava instead). With
 `build_mod_direct.bat` the map goes into your game's `Random` folder, and
 `restore_original.bat` removes it again.
+
+**Volcanoes on the lava.** Select a Fishing Ship out on the lava: next to
+Build Fish Trap there is **Build Volcano** (150 stone, 100 gold). Place it
+anywhere on the lava (it can't stand on water or land); it is three tiles
+across. When enemies come within 8 tiles it erupts every 3 seconds and lobs a
+lava bomb at them: it hurts ships most, but also soldiers and villagers on the
+shore and buildings in range. The tower upgrades (Fletching, Bodkin Arrow,
+Bracer, Masonry, Architecture, Heated Shot) make it stronger too. The
+computer players don't build volcanoes.
 
 **Trains.** The Trade Cart is now a **Train**: a big Minecraft furnace
 minecart, smoking as it goes, pulling a chest minecart. It trades as the Trade

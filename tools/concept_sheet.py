@@ -10,9 +10,10 @@ Writes into previews/ by default:
     battle.png          siege and cavalry assaulting a town, 2x zoom
     harbor.png          the fleet on the water, 2x zoom
     lava.png            Team Lava Islands: an island's beach with a Dock, and ships on the lava, 2x zoom
+    volcano.png         a volcano on the lava erupting at enemy ships, its lava bombs in the air, 2x zoom
     rails.png           trains between two Markets, round a wood, on the rails they lay as they go, 2x zoom
     village.png         a Dark Age village with fields, a forest and mines, 2x zoom
-    buildings.png       every building in the five village styles
+    buildings.png       every building in the five building sets
     wonders.png         the eighteen wonders and the scenario monuments
     fortifications.png  walls, gates, towers and castles
     walls.png           wall lines in every direction, with corners, as the game places them
@@ -490,6 +491,25 @@ def lava_scene(out: Path, units: dict[str, Unit]) -> None:
     compose(placed + place_units(fleet, units), out, shore=3.0, lava=True)
 
 
+def volcano_scene(out: Path, units: dict[str, Unit]) -> None:
+    """A volcano out on the lava, built by the Fishing Ship beside it, erupting at enemy ships: its lava bombs in the
+    air on their way to the Galleon, the island's Dock behind it."""
+    from aom import volcano as volcanoes
+    from aom.voxel import all_blocks
+    placed = place_buildings([(B("DOCK", "W", 3), 3.5, 4.5), (B("HOUS", "W", 2), 0.0, 2.0)])
+    root = volcanoes.volcano((volcanoes.FRAME + 0.5) / volcanoes.ERUPTION_FRAMES).part(all_blocks())
+    placed.append((render(root, BUILDING_HEADING, camera=fit_camera(root, BUILDING_HEADING)), 1, *tile_xy(8.5, 7.5)))
+    fleet = [("fishing_ship", 1, 6.6, 11.0, 3, "walk", 0.2), ("galleon", 2, 13.0, 3.2, 6, "walk", 0.4),
+             ("war_galley", 2, 12.4, 8.8, 5, "walk", 0.3)]
+    placed += place_units(fleet, units)
+    bomb = {"lava_bomb": volcanoes.bomb()}
+    for k, (f, height) in enumerate(((0.25, 230), (0.55, 260), (0.8, 160))):  # on their way to the Galleon
+        i, j = 8.5 + (13.0 - 8.5) * f, 7.5 + (3.2 - 7.5) * f
+        frame, player, x, y = place_units([("lava_bomb", 1, i, j, 0, "idle", k / 3)], bomb)[0]
+        placed.append((frame, player, x, y - height))
+    compose(placed, out, shore=3.0, lava=True)
+
+
 def rails_scene(out: Path, units: dict[str, Unit]) -> None:
     """Trains between a Market and another player's, round a wood, on the rails they leave behind them: a piece every
     quarter tile, in the nearest of the track's 8 directions (as the game draws it), behind where the train was."""
@@ -784,6 +804,7 @@ def main() -> None:
     battle_scene(out / "battle.png", units)
     harbor_scene(out / "harbor.png", units)
     lava_scene(out / "lava.png", units)
+    volcano_scene(out / "volcano.png", units)
     rails_scene(out / "rails.png", units)
     village_scene(out / "village.png", units)
     buildings_sheet(out / "buildings.png")

@@ -47,6 +47,7 @@ from aom import spritemap  # noqa: E402
 STATIC_GROUPS = {"buildings", "farms", "walls", "wonders", "nature", "decorations", "projectiles", "interface"}
 LAVA = "lava"  # and this: the lava, its Dock rule and the Team Lava Islands map
 RAILS = "rails"  # and this: the trains laying rails behind them
+VOLCANO = "volcano"  # and this: the volcano Fishing Ships build on the lava
 
 
 def static_group(spec: dict) -> str:
@@ -445,8 +446,9 @@ def main(argv=None) -> int:
     log(f"palette: {len(game.palette)} colours")
 
     only = set(args.only.split(",")) if args.only else None
-    if only and not only <= set(ROSTER) | STATIC_GROUPS | {LAVA, RAILS}:
-        raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER) - STATIC_GROUPS - {LAVA, RAILS}))}")
+    features = {LAVA, RAILS, VOLCANO}
+    if only and not only <= set(ROSTER) | STATIC_GROUPS | features:
+        raise SystemExit(f"unknown units: {', '.join(sorted(only - set(ROSTER) - STATIC_GROUPS - features))}")
     targets = list(TARGETS) + game.name_targets({t.slp for t in TARGETS})
     targets = [t for t in targets if only is None or t.unit in only]
 
@@ -632,9 +634,11 @@ def main(argv=None) -> int:
     dragon = not args.no_wonder_pacman and (only is None or "dragon" in only)
     lava = not args.no_wonder_pacman and (only is None or LAVA in only)
     rails = not args.no_wonder_pacman and (only is None or RAILS in only)
+    volcano = not args.no_wonder_pacman and (only is None or VOLCANO in only)
     javelina = bool(created) or (jav is not None and (only is None or "javelina" in only))
-    if not args.no_dat and (pacman or javelina or dragon or lava or rails):
-        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon, lava=lava, rails=rails)
+    if not args.no_dat and (pacman or javelina or dragon or lava or rails or volcano):
+        apply_gameplay(game, args.mode, log, pacman=pacman, javelina=javelina, dragon=dragon, lava=lava, rails=rails,
+                       volcano=volcano)
     exe_ok = False
     if args.mode == "upmod":
         mod_archive(game, log)
@@ -1093,9 +1097,9 @@ LAVA_SLP = 15000  # the first id tried for the lava's texture (the terrain textu
 
 
 def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bool = True,
-                   dragon: bool = True, lava: bool = True, rails: bool = True) -> None:
+                   dragon: bool = True, lava: bool = True, rails: bool = True, volcano: bool = True) -> None:
     """The .dat changes (Pac-Man and the dragon at the Wonder, the Javelina's own sprites, the lava, the trains laying
-    rails), their icons, names, sounds, textures and the lava's map."""
+    rails, the volcano), their icons, names, sounds, textures and the lava's map."""
     from aom import gameplay
     if game.dat_path is None:
         log(".dat changes: no empires2_x1_p1.dat found, skipped")
@@ -1151,10 +1155,25 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         sound_ids = {name: [next(free) for _ in variants] for name, variants in waves.items()}
     if dragon:
         roar_ids = {name: [next(free) for _ in variants] for name, variants in roars.items()}
-    pictures = free_resource_ids(game, raw, 3, start=GIANT_SLP)
+    pictures = free_resource_ids(game, raw, 6, start=GIANT_SLP)
     giant = next(pictures) if pacman else None  # the giant's own SLP
     fire = next(pictures) if dragon else None  # the dragon's fireball's
     track = next(pictures) if rails else None  # the rails the trains lay
+    looks = tuple(next(pictures) for _ in range(3)) if volcano else None  # the volcano at rest, erupting, its bomb
+    volcano_icon, volcano_sheets = None, []
+    if volcano:  # its icon, at the end of every copy of the four building icon sheets
+        from aom import volcano as volcanoes
+        current = volcanoes.icon_sheets(archives)
+        if current:
+            index = max(slp.info(sheet).num_frames for *_, sheet in current)
+            added = [(n, d, sid, volcanoes.add_icon(sheet, index, quant)) for n, d, sid, sheet in current]
+            for n, _, sid, (_, msg) in added:
+                log(f"Volcano icon in {n} (sheet {sid}): {msg}")
+            if all(sheet is not None for *_, (sheet, _) in added):
+                volcano_sheets, volcano_icon = [(n, d, sid, sheet) for n, d, sid, (sheet, _) in added], index
+        else:
+            log(f"Volcano icon: no building icon sheet ({volcanoes.BUILDING_ICONS[0]}) in "
+                f"{', '.join(n for n, _ in archives)}")
     lava_dat = lava_tiles = None
     if lava:  # in the Water's tile shapes: the old water that becomes the lava was drawn with the Water's texture
         from aom import lava as lava_map
@@ -1167,13 +1186,15 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
             colour = int(quant.indices(np.array([lava_map.MINIMAP]))[0])
             lava_dat = (next(free_resource_ids(game, raw, 1, start=LAVA_SLP)), colour)
     patch, notes = gameplay.patch_dat(raw, game.graphics_table, pacman, javelina, icon, sound_ids, giant, giant_icon,
-                                      fire, dragon_icon, roar_ids, lava_dat, track)
+                                      fire, dragon_icon, roar_ids, lava_dat, track,
+                                      (looks, volcano_icon) if volcano else None)
     for note in notes:
         log(note)
     if patch is None:
         return
     write_game_file(game, mode, "empires2_x1_p1.dat", patch.data, log)
-    if not patch.pacman_strings and not patch.dragon_strings and not patch.lava and not patch.train_strings:
+    if not (patch.pacman_strings or patch.dragon_strings or patch.lava or patch.train_strings
+            or patch.volcano_strings):
         return
     touched: dict[str, Drs] = {}
     if patch.dragon_strings and dragon_icon is not None:
@@ -1219,6 +1240,17 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         art_drs.put(track, rail_map.track_slp(quant))
         touched[art_name] = art_drs
         log(f"Trains: their rails are SLP {track} in {art_name}")
+    if patch.volcano_strings:  # its pictures, where the game finds new files, and its icons
+        art_name, art_drs = next(((n, d) for n, d in game.archives if n.lower() == "gamedata_x1_p1.drs"),
+                                 (game.graphics_path.name, game.graphics))
+        for sid, data in zip(looks, (volcanoes.volcano_slp(quant), volcanoes.eruption_slp(quant),
+                                     volcanoes.bomb_slp(quant))):
+            art_drs.put(sid, data)
+        touched[art_name] = art_drs
+        log(f"Volcano: its pictures are SLPs {looks[0]}-{looks[2]} in {art_name}")
+        for name, drs, sid, sheet in volcano_sheets:
+            drs.put(sid, sheet)
+            touched[name] = drs
     if patch.giant_name is not None:  # the giant red Pac-Man's picture, where the game finds new files
         sound_drs.put(giant, gameplay.giant_slp(quant))
         touched[sound_name] = sound_drs
@@ -1235,6 +1267,8 @@ def apply_gameplay(game: Game, mode: str, log, pacman: bool = True, javelina: bo
         name_dragon(game, mode, patch.dragon_strings, log)
     if patch.train_strings:
         name_train(game, mode, patch.train_strings, log)
+    if patch.volcano_strings:
+        name_volcano(game, mode, patch.volcano_strings, log)
     if patch.lava:
         write_map(game, mode, lava_map.MAP_FILE, lava_map.script(), lava_map.MARK, log)
 
@@ -1300,8 +1334,20 @@ def name_dragon(game: Game, mode: str, strings: dict[str, int], log) -> None:
 def name_train(game: Game, mode: str, strings: dict[str, int], log) -> None:
     """The train's name, button and help texts: in the mod's own language file, or in the game's where they fit (a
     help text too long for its place gets a short one)."""
-    from aom import langdll, rails as rail_map
-    texts = {sid: rail_map.TEXTS[key] for key, sid in strings.items()}
+    from aom import rails as rail_map
+    _name(game, mode, strings, rail_map.TEXTS, rail_map.SHORT_HELP, "Train", log)
+
+
+def name_volcano(game: Game, mode: str, strings: dict[str, int], log) -> None:
+    """The volcano's name, button and help texts, as the train's."""
+    from aom import volcano as volcanoes
+    _name(game, mode, strings, volcanoes.TEXTS, volcanoes.SHORT_HELP, "Volcano", log)
+
+
+def _name(game: Game, mode: str, strings: dict[str, int], texts: dict[str, str], short: str, what: str,
+          log) -> None:
+    from aom import langdll
+    texts = {sid: texts[key] for key, sid in strings.items()}
     if mode == "upmod":
         game.mod_strings.update(texts)
         return
@@ -1309,13 +1355,13 @@ def name_train(game: Game, mode: str, strings: dict[str, int], log) -> None:
         path = pick(game.root, name)  # as the texts before them left it
         data = new = path.read_bytes()
         for sid, text in texts.items():
-            for attempt in (text, rail_map.SHORT_HELP) if sid == strings.get("help") else (text,):
+            for attempt in (text, short) if sid == strings.get("help") else (text,):
                 try:
                     if langdll.read_string(new, sid):
                         new = langdll.set_string(new, sid, attempt)
                     break
                 except (langdll.DllError, struct.error) as exc:
-                    log(f"Train's texts: string {sid} in {name} not set to {attempt[:30]!r} ({exc})")
+                    log(f"{what}'s texts: string {sid} in {name} not set to {attempt[:30]!r} ({exc})")
         if new != data:
             write_game_file(game, mode, name, new, log, folder=game.root)
 

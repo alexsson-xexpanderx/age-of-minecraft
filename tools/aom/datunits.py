@@ -64,7 +64,8 @@ FORMATS = {"enabled": "b", "icon": "h", "hide_in_editor": "b", "train_time": "h"
            "blast_width": "f", "reload": "f", "blast_level": "b", "line_of_sight": "f", "max_range": "f",
            "projectile": "h", "displacement": "fff", "displayed": "hhff", "displayed_pierce": "h",
            "train_sound": "h", "selection_sound": "h", "dying_sound": "h", "attack_sound": "h", "move_sound": "h",
-           "resource_capacity": "h", "hero_status": "b", "placement_terrain": "hh"}
+           "resource_capacity": "h", "hero_status": "b", "placement_terrain": "hh", "clearance_size": "ff",
+           "projectile_arc": "f", "construction_graphic": "h", "frame_delay": "h"}
 
 
 def _unit(r: _R, civ: int) -> UnitRecord:
@@ -109,7 +110,8 @@ def _unit(r: _R, civ: int) -> UnitRecord:
     r.take("hh")  # placement side terrains: one of them must be next to it (a Dock's: the beach)
     f["placement_terrain"] = r.p
     v["placement_terrain"] = r.take("hh")  # it may only be placed on these (a Dock's: Water and Shallows)
-    r.take("ff")  # clearance size
+    f["clearance_size"] = r.p
+    v["clearance_size"] = r.take("ff")  # room kept free round a building when placing it (tiles)
     r.take("bb")  # hill mode, fog visibility
     f["terrain_restriction"] = r.p
     v["terrain_restriction"] = r.one("h")  # which terrains the unit may stand on (a row of the restriction table)
@@ -197,8 +199,9 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         f["displayed"] = r.p  # what the unit's panel shows: melee armour, attack, range, reload time
         v["displayed"] = r.take("hhff")
     if utype == 60:  # projectiles
-        r.take("bbbbb")
-        r.one("f")
+        r.take("bbbbb")  # projectile type, smart mode, hit mode, vanish mode, area effect
+        f["projectile_arc"] = r.p
+        v["projectile_arc"] = r.one("f")  # how high it lobs: a tower's arrow 0.05, a Mangonel's stone 0.4
     if utype >= 70:  # creatable: cost, training
         f["cost"] = r.p
         v["cost"] = r.take("hhhhhhhhh")
@@ -222,7 +225,9 @@ def _unit(r: _R, civ: int) -> UnitRecord:
         f["displayed_pierce"] = r.p
         v["displayed_pierce"] = r.one("h")  # the pierce armour its panel shows
     if utype == 80:  # buildings
-        r.take("hh")  # construction graphic, snow graphic
+        f["construction_graphic"] = r.p
+        v["construction_graphic"] = r.one("h")  # the building site while it is built
+        r.one("h")  # snow graphic
         r.one("b")  # adjacent mode
         r.one("h")  # graphics angle
         r.one("b")  # disappears when built

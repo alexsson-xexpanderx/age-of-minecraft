@@ -85,13 +85,16 @@ def _unit_bytes(uid: int, utype: int, name: str, standing: int = -1, dead: int =
 
 
 def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_graphic: int = 0,
-              saboteur_graphic: int = 0, crossbow_graphic: int = 0) -> bytes:
+              saboteur_graphic: int = 0, crossbow_graphic: int = 0, sea_graphic: int = 0) -> bytes:
     """Civilisations with unit tables: filler units, the Wonder (276), Furious the Monkey Boy (860) with his bite and
     armour, the Saboteur (706) with its blast, the Javelina (822) borrowing the Wild Boar's sprites, with its
     carcass (823) and the boar's (356), and the Advanced Heavy Crossbowman (493: graphics `crossbow_graphic` on,
     attack, dying, standing, walking) with its shot (508) and the shot Chemistry makes of it (520), a Dock (46),
     which may stand on Water or Shallows next to a beach, and the Trade Cart (128, and 204 loaded) and the Bombard
-    Cannon (36), which go where the restriction table's third row lets them (the same ground as the eighth).
+    Cannon (36), which go where the restriction table's third row lets them (the same ground as the eighth), the Sea
+    Tower (785: graphics `sea_graphic` on, its shadow, picture, its two shots' and the arrows' shadow), which shoots
+    the towers' arrow and goes on the seventh row (one no other unit uses), its own unused shots (786, 787) and the
+    Fishing Ship (13).
 
     Before them, the units' task lists: the Militia (74) can attack and board a Transport Ship, the Monkey Boy
     (860) can only attack."""
@@ -102,13 +105,13 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
     for u in range(slots):
         tasks = [attack, board] if u in (74, 493) else [attack] if u == 860 else []
         out += struct.pack("<bH", 1, len(tasks)) + b"".join(TASK.pack(*t) for t in tasks) if u % 2 == 0 or u in (
-            276, 860, 823, 493) else b"\0"
+            276, 860, 823, 493, 13, 785, 787) else b"\0"
     out += struct.pack("<H", civs)
     rng = np.random.default_rng(5)
     for c in range(civs):
         out += struct.pack("<b20sHhh", 1, [b"Gaia", b"British", b"French"][c % 3], 4, 1, 1)
         out += struct.pack("<4f", 1, 2, 3, 4) + struct.pack("<bH", 0, slots)
-        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823, 493)]
+        present = [u for u in range(slots) if u % 2 == 0 or u in (276, 860, 823, 493, 13, 785, 787)]
         # like the original game's file, a pointer is a memory address (0 = no unit)
         out += struct.pack(f"<{slots}i", *[int(rng.integers(0x400000, 0x7fffffff)) if u in present else 0
                                            for u in range(slots)])
@@ -134,6 +137,15 @@ def fake_civs(civs: int = 2, slots: int = 900, monkey_graphic: int = 0, boar_gra
                 out += _unit_bytes(u, 70, "TCART" if u == 128 else "TCARTF", cls=19, restriction=2)
             elif u == 36:  # a Bombard Cannon, which goes where the Trade Cart goes
                 out += _unit_bytes(u, 70, "BCANN", cls=13, restriction=2)
+            elif u == 13:
+                out += _unit_bytes(u, 70, "FSHSP", cls=21)
+            elif u == 785:
+                out += _unit_bytes(u, 80, "STWR", sea_graphic + 1, attacks=[(11, 0), (16, 9), (3, 7)],
+                                   armours=[(21, 0), (11, 0), (4, 0), (3, 6), (13, 0)], reload=2.0, projectile=504,
+                                   cls=52, restriction=6)
+            elif u in (786, 787):
+                g = sea_graphic + (4 if u == 786 else 3)
+                out += _unit_bytes(u, 60, "MRSTW" if u == 786 else "MFSTW", g, walking=g)
             elif u == 822:
                 out += _unit_bytes(u, 70, "BOARJ", boar_graphic, dead=356)
             elif u in (356, 823):
@@ -266,6 +278,8 @@ def fake_game(root: Path) -> Path:
     interfac.put(53010, slp.encode([slp.SlpFrame(np.full((17, 22), 0, np.int16), (0, 0))]))  # UserPatch's steak
     icon = slp.SlpFrame(np.full((36, 36), 77, np.int16), (0, 0))
     interfac.put(50730, slp.encode([icon] * 170))  # the unit icon sheet
+    for sid in (50705, 50706, 50707, 50708):  # the building icon sheets, one per age
+        interfac.put(sid, slp.encode([icon] * 52))
     interfac.put(50189, fake_menu())  # the main menu, and its palette
     interfac.put(50589, fake_palette(), "bina")
     # screen files: the game setup (its big picture shown by two screens, in two palettes); a picture no screen file
@@ -396,9 +410,18 @@ def fake_game(root: Path) -> Path:
     for name, slp_id, frames in (("BOARJ_AN", 5157, 17), ("BOARJ_DN", 5158, 11), ("BOARJ_FN", 5159, 10),
                                  ("BOARJ_RN", 5160, 10), ("BOARJ_SN", 5161, 5), ("BOARJ_WN", 5162, 10)):
         table.append({"name": name, "slp": slp_id, "frames": frames, "angles": 8})  # only 5157 has a file
+    sea = len(table)  # the Sea Tower: its shadow and picture, its shots' (with the arrows' shadow), and the Barracks'
+    table += [{"name": "STWR1N0", "slp": 4911, "frames": 1, "angles": 1, "mirror": 0},  # site, the Dock sinking
+              {"name": "STWR1NN", "slp": 4912, "frames": 1, "angles": 1, "mirror": 0, "deltas": [sea, -1]},
+              {"name": "M_ARRO_S", "slp": 3800, "frames": 11, "angles": 32, "mirror": 24},
+              {"name": "MFSTW", "slp": 4863, "frames": 11, "angles": 32, "mirror": 24, "deltas": [-1, sea + 2]},
+              {"name": "MRSTW", "slp": 4864, "frames": 11, "angles": 32, "mirror": 24, "deltas": [-1, sea + 2]},
+              {"name": "CNST3_NN", "slp": 238, "frames": 1, "angles": 3, "mirror": 0},
+              {"name": "DEXP3_NN", "slp": 4597, "frames": 10, "angles": 1, "mirror": 0}]
     (data / "empires2_x1_p1.dat").write_bytes(fake_dat(table, fake_civs(monkey_graphic=monkey, boar_graphic=boar,
                                                                          saboteur_graphic=saboteur,
-                                                                         crossbow_graphic=crossbow), FAKE_TERRAINS))
+                                                                         crossbow_graphic=crossbow, sea_graphic=sea),
+                                                       FAKE_TERRAINS))
     return root
 
 
@@ -640,6 +663,25 @@ def test_full_build(tmp: Path):
     assert {p for _, p in slp.frame_props(out.get(15602))} == {16}  # marked as the cart tracks' own frames are
     assert "Trains: the Trade Carts (units 128, 204, 4 in all) keep their terrain restriction 2, which now" in report
     assert "CARTSTPS) draw SLP 15602, 5 pictures" in report and "(BCANN) use 7, exactly like it" in report
+    # the volcano: the Sea Tower (785), built by Fishing Ships (13) on the lava alone (the fourth row, which no unit
+    # used and which let units nowhere), three tiles across, shooting its own shots (786, 787) as lobbed lava bombs
+    for civ in units.units:
+        v = civ[785].values
+        assert (v["enabled"], v["train_location"], v["button"], v["projectile"], v["icon"]) == (1, 13, 2, 786, 52)
+        assert v["terrain_restriction"] == 3 and v["collision_size"][:2] == v["clearance_size"] == (1.5, 1.5)
+        assert v["attacks"] == [(3, 12), (16, 18), (11, 15)] and v["cost"] == (2, 150, 1, 3, 100, 1, -1, 0, 0)
+        assert graphics_after[v["construction_graphic"]].name == "CNST3_NN"
+        assert graphics_after[v["dying"][0]].name == "DEXP3_NN"
+        assert civ[786].values["projectile_arc"] == civ[787].values["projectile_arc"] > 0.5  # lobbed high
+    assert [k for k, a in enumerate(rows[3]) if a > 0] == [15]
+    looks = {g.name: g for g in graphics_after.values() if g.name in ("STWR1NN", "MFSTW", "MRSTW")}
+    assert [(looks[n].slp, looks[n].frame_count, looks[n].angle_count, looks[n].mirroring) for n in
+            ("STWR1NN", "MFSTW", "MRSTW")] == [(15603, 1, 1, 0), (15604, 12, 1, 0), (15605, 8, 1, 0)]
+    assert all(d.graphic_id == -1 for g in looks.values() for d in g.deltas)  # no old shadows drawn with them
+    assert units.units[1][785].values["attack_graphic"] == looks["MFSTW"].id  # it erupts as it fires
+    assert [len(slp.decode(out.get(s))) for s in (15603, 15604, 15605)] == [1, 12, 8]
+    assert all(slp.info(out.get(s)).num_frames == 53 for s in (50705, 50706, 50707, 50708))  # its icon (52)
+    assert "Volcano: the Sea Tower (unit 785) for 2 civilisations, built by Fishing Ships" in report
     # his name and the game's: the mod's own language_x1_p1.dll has them; the game's files are untouched
     p1_before = (game / "language_x1_p1.dll").read_bytes()
     p1 = (mod / "Data" / "language_x1_p1.dll").read_bytes()
@@ -652,6 +694,8 @@ def test_full_build(tmp: Path):
     assert langdll.read_string(p1, 26493).startswith("Create <b> Dragon<b> (<cost>) \nA flying dragon")
     assert [langdll.read_string(p1, i) for i in (5128, 6128)] == ["Train", "Build Train"]
     assert langdll.read_string(p1, 26128).startswith("Build <b> Train<b> (<cost>) \nTrades by land, laying its own")
+    assert [langdll.read_string(p1, i) for i in (5785, 6785)] == ["Volcano", "Build Volcano"]
+    assert langdll.read_string(p1, 26785).startswith("Build <b> Volcano<b> (<cost>) \nA volcano out on the lava")
     assert langdll.read_string(p1_before, 5860) == "Furious the Monkey Boy"
     assert langdll.read_string((game / "language_x1.dll").read_bytes(), 5860) == "Furious the Monkey Boy"
     assert not (mod / "Data" / "language_x1.dll").exists()
@@ -827,7 +871,7 @@ def test_direct_mode_and_restore(tmp: Path):
     panel_before = Drs(game / "Data" / "interfac.drs").get(51141)
     for _ in range(2):  # building twice starts from the originals again
         assert build_mod.main(["--game", str(game), "--mode", "direct", "--only",
-                               "militia,pacman,dragon,farms,interface,lava,rails", "--jobs", "1"]) == 0
+                               "militia,pacman,dragon,farms,interface,lava,rails,volcano", "--jobs", "1"]) == 0
     assert (game / "Data" / "graphics.drs").read_bytes() != before
     assert (game / "Data" / ("graphics.drs" + build_mod.BACKUP)).read_bytes() == before
     assert (game / "Data" / "terrain.drs").read_bytes() != ground_before
@@ -1017,6 +1061,25 @@ def test_building_sets_differ_in_shape():
             assert len(set(shapes.values())) == 5, (make.__name__, age)
     for make in (ST.house, ST.town_center, ST.mill, ST.barracks, ST.dock):
         assert len({frozenset(make(key, 1).blocks.items()) for key in "WEFMXG"}) == 1, make.__name__
+
+
+def test_volcano():
+    """The volcano fits its three tiles, its crater's lava lies below its rim (not on a column above it), lava runs
+    down its sides, and its pictures come in the layout its graphics are given."""
+    from aom import volcano as volcanoes
+    from aom.voxel import tiles_to_blocks
+    s = volcanoes.volcano()
+    lo, hi = s.bounds()
+    assert hi[0] - lo[0] <= tiles_to_blocks(3) + 2 and hi[1] - lo[1] <= tiles_to_blocks(3) + 2  # eaves of rock
+    pool = [z for (x, y, z), (b, _) in s.blocks.items() if b == "lava" and (x, y) in ((3, 3), (4, 4))]
+    rim = max(z for (x, y, z), (b, _) in s.blocks.items() if b == volcanoes.RIM)
+    assert pool and max(pool) == volcanoes.POOL < rim  # a pool in the crater, below its rim
+    assert sum(1 for (x, y, z), (b, _) in s.blocks.items() if b == "lava" and z < volcanoes.HEIGHT // 2) >= 4
+    quant = Quantiser(parse_jasc(fake_palette()))
+    assert [slp.info(f(quant)).num_frames for f in (volcanoes.volcano_slp, volcanoes.eruption_slp,
+                                                     volcanoes.bomb_slp)] == [1, volcanoes.ERUPTION_FRAMES,
+                                                                              volcanoes.BOMB_FRAMES]
+    assert volcanoes.icon(36).shape == (36, 36) and volcanoes.icon(36).max() < len(volcanoes.ICON_COLOURS)
 
 
 def test_rails():

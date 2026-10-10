@@ -176,6 +176,35 @@ deer and boar, and sheep. The build writes the map into the mod's
 `build_mod_direct.bat`, into the game's `Random` folder, which
 `restore_original.bat` empties of it again).
 
+### Volcanoes
+
+![volcano](../previews/volcano.png)
+
+A Fishing Ship can build a **volcano** out on the lava, and it erupts at
+enemies that come within range, raining lava bombs on them. The game has a
+tower made for the sea that it never lets anyone build, the Sea Tower;
+`volcano.py` makes it the volcano, in place in the `.dat`, for every
+civilisation:
+
+- **Where.** Fishing Ships build it (the button next to the Fish Trap), from
+  the start of the game, anywhere on the lava and nowhere else: it takes a
+  row of the game's "where may it stand" table that no unit used and that let
+  units nowhere, which now lets it onto the lava alone. It is three tiles
+  across, as big as a Barracks: 150 stone and 100 gold, 1 minute to build,
+  1500 hit points.
+- **How it fights.** Every 3 seconds, at a tower's range (8 tiles), it
+  erupts: a fountain of lava out of its crater, and a lava bomb lobbed high
+  at the enemy, ship, unit or building. A bomb does 12 piercing damage, 18
+  more against ships and 15 more against buildings. It is still a tower to
+  the game, so the tower upgrades reach it (Fletching, Bodkin Arrow, Bracer,
+  Masonry, Architecture), and Heated Shot makes it hit ships harder.
+- **Its look.** A cone of blackstone and deepslate, a pool of lava in its
+  crater and lava running down the two sides facing the camera, a thin smoke
+  plume, and a flag in its owner's colour on its slope. It is built on the
+  Barracks' building site and sinks like a Dock when destroyed. Its three
+  pictures (at rest, the eruption, the bomb) and its icon (the volcano
+  erupting at night) are new, drawn like everything else in the mod.
+
 ### Trains and their rails
 
 ![rails](../previews/rails.png)

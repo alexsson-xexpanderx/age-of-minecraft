@@ -137,6 +137,14 @@ putting `tools/` on `sys.path`.
      game files ground pieces in a 60-slot one-second wheel and writes past it for longer ones (004d5b03), corrupting
      memory; the four builds whose pieces lasted a day, then 5 minutes, crashed so. The train is drawn
      `TRAIN_SCALE` big, the track as wide (`GAUGE`); its texts by `name_train`. `--only rails` builds just this.
+   - `volcano.py` makes the never-built Sea Tower (785, still a tower: class 52, so tower upgrades reach it) the
+     volcano, in place: built by Fishing Ships (13, button 2), on lava alone (`lava_row`: the first restriction row
+     no unit uses and that lets units nowhere, now terrain 15 only), 3x3, shooting its own unused shots (786, 787)
+     as lobbed lava bombs. Its three graphics (STWR1NN at rest; 787's MFSTW, made one direction of 12 frames, its
+     attack graphic: buildings play attack graphics, as the unpacked Trebuchet does; 786's MRSTW the bomb) draw new
+     SLPs (`volcano_slp`, `eruption_slp`, `bomb_slp`, written after the rails'), their old shadow deltas set to -1.
+     Its icon goes at the end of the four building icon sheets (50705-50708, one per age); its texts by
+     `name_volcano`. `--only volcano` builds just this.
    - `sounds.py` (Pac-Man's) and `roars.py` (the dragon's) WAVs go into `gamedata_x1_p1.drs`. The dragon's sounds
      come after Pac-Man's in the `.dat`'s sound table and take resource ids after his, so his never move.
    - `langdll.py` renames the unit: in direct mode in the game's own DLLs, in place. In the standalone mod,

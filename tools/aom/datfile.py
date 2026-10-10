@@ -46,6 +46,29 @@ class Graphic:
         """Offset of the drawing layer (10 shadows, 20 units and buildings, 22 birds, 30 projectiles), if known."""
         return self.slp_at + 6 if self.slp_at >= 0 else -1
 
+    # Offsets of the fields after the SLP id, if known: frames (uint16), angles (uint16), seconds a frame (float),
+    # mirroring (int8). A graphic with per-angle sounds (angle_sounds_at >= 0) must keep its angle count: the record's
+    # size depends on it.
+    @property
+    def frames_at(self) -> int:
+        return self.slp_at + 23 if self.slp_at >= 0 else -1
+
+    @property
+    def angles_at(self) -> int:
+        return self.slp_at + 25 if self.slp_at >= 0 else -1
+
+    @property
+    def frame_rate_at(self) -> int:
+        return self.slp_at + 31 if self.slp_at >= 0 else -1
+
+    @property
+    def mirroring_at(self) -> int:
+        return self.slp_at + 42 if self.slp_at >= 0 else -1
+
+    def delta_at(self, k: int) -> int:
+        """Offset of delta k's graphic id (-1 draws the graphic itself there)."""
+        return self.slp_at + 44 + 16 * k if self.slp_at >= 0 else -1
+
     @property
     def stored_angles(self) -> int:
         """Angles actually stored in the SLP (the rest are mirrored by the game)."""
