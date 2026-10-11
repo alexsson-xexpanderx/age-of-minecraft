@@ -55,7 +55,11 @@ The player asked for an MP4 showcase for Reddit. Claude ran the game on the lapt
 soundcard, cffi; the player approved the downloads). Cheats: `aegis` (instant building and training). The Map Editor
 makes staged scenes quickly; set diplomacy on **both** players' sides, or the computer player attacks. Arrow keys and
 the screen edge scroll far too fast for smooth pans whatever the scroll speed, so the video cuts between steady shots.
-The result is `showcase/age_of_minecraft_showcase.mp4` (55.8 s, kept out of git).
+The player found the first cut too crowded ("too many units"), so the edit shows each shot through a closer camera
+that drifts slowly (no game panels), joined by slide-show transitions made in code (blocks placed one by one, a
+turning cube, push, doors, pixelate, a block iris, zoom, and the picture cracking and falling apart like a mined
+block), and ends on the menu's own block logo dropping in letter by letter over the blurred volcanoes (their asked
+for title). The result is `showcase/age_of_minecraft_showcase.mp4` (72 s, 1920x1080, 91 MB, kept out of git).
 
 ## The train crash: cause found (2026-10-10, on the Windows laptop)
 
