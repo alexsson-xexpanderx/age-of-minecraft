@@ -40,9 +40,22 @@ too large to export (246 MB).
   at enemy ships. They chose Fishing Ships building them anywhere on lava, but the game only lets a Fishing Ship
   build the Fish Trap (hard-coded; a test game of three variants placed none), so Villagers build them like a Dock,
   by the beach (the player chose this over turning the Fish Trap into the volcano on every map). The bombs hit
-  everything in range, available from the start, 3x3 tiles. The unused Sea Tower (785) became the volcano. Not yet
-  placed in game: check the Villager's military build page has it (button 5), that it places by the beach, that the
-  eruption plays when it fires, and that its icon shows in every age.
+  everything in range, available from the start, 3x3 tiles. The unused Sea Tower (785) became the volcano.
+  Tested in game by Claude on 2026-10-11 (driving the game itself, see "Recording the game" below): it is on the
+  Villager's military build page (button 5), places on lava by the beach, and, since commit 62345d8 (its eruption had
+  kept an arrow's sequence type and never played, so it never fired), erupts and sank three Galleons and three Fire
+  Ships in about 15 s. Its icon was seen in the Imperial Age only. The player noted the volcanoes are "only powerful
+  against boats"; asked whether that is a wish (bombs weak against land) or an observation, no answer yet.
+
+## Recording the game (2026-10-11)
+
+The player asked for an MP4 showcase for Reddit. Claude ran the game on the laptop (UserPatch's windowed mode at
+800x600 for the menus, full screen 1920x1200 in game), sent mouse and keys with SendInput, and recorded with ffmpeg's
+`ddagrab` plus the speakers through WASAPI loopback (`soundcard`), both in a scratch venv (imageio-ffmpeg 0.6.0,
+soundcard, cffi; the player approved the downloads). Cheats: `aegis` (instant building and training). The Map Editor
+makes staged scenes quickly; set diplomacy on **both** players' sides, or the computer player attacks. Arrow keys and
+the screen edge scroll far too fast for smooth pans whatever the scroll speed, so the video cuts between steady shots.
+The result is `showcase/age_of_minecraft_showcase.mp4` (55.8 s, kept out of git).
 
 ## The train crash: cause found (2026-10-10, on the Windows laptop)
 
