@@ -59,7 +59,11 @@ The player found the first cut too crowded ("too many units"), so the edit shows
 that drifts slowly (no game panels), joined by slide-show transitions made in code (blocks placed one by one, a
 turning cube, push, doors, pixelate, a block iris, zoom, and the picture cracking and falling apart like a mined
 block), and ends on the menu's own block logo dropping in letter by letter over the blurred volcanoes (their asked
-for title). The result is `showcase/age_of_minecraft_showcase.mp4` (72 s, 1920x1080, 91 MB, kept out of git).
+for title). They then asked for music: an original chiptune made in code (120 BPM, A minor; no Minecraft or AoE2
+music, both copyrighted), each scene starting on A minor at its cut, the shots lengthened or shortened so every
+transition sits on a bar line, a break while the title's letters fall and one big hit as the last one lands; the
+game's own sound plays under it at 40%. The result is `showcase/age_of_minecraft_showcase.mp4` (72 s, 1920x1080,
+92 MB, kept out of git). The editing scripts (scratchpad `edit.py`, `music.py`) were not kept in the repo.
 
 ## The train crash: cause found (2026-10-10, on the Windows laptop)
 
